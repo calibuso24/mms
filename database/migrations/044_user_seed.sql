@@ -8,3 +8,65 @@ ON CONFLICT (user_name) DO UPDATE
   SET full_name = EXCLUDED.full_name,
       profile = EXCLUDED.profile,
       is_active = EXCLUDED.is_active;
+
+INSERT INTO look_up (look_up_type, code, name, description, display_order)
+VALUES ('contact_entity_type', 'person', 'Person', 'Individual contact entity.', 1)
+ON CONFLICT (look_up_type, name) DO NOTHING;
+
+INSERT INTO contact (entity_type_id, contact_name)
+SELECT
+    entity_lookup.look_up_id,
+    u.full_name
+FROM "user" u
+JOIN look_up entity_lookup
+    ON entity_lookup.look_up_type = 'contact_entity_type'
+   AND entity_lookup.name = 'Person'
+WHERE u.contact_id IS NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM contact c
+      WHERE c.contact_name = u.full_name
+        AND c.entity_type_id = entity_lookup.look_up_id
+  );
+
+UPDATE "user" u
+SET contact_id = c.contact_id
+FROM contact c
+WHERE u.contact_id IS NULL
+  AND c.contact_name = u.full_name
+  AND c.entity_type_id = (
+      SELECT look_up_id
+      FROM look_up
+      WHERE look_up_type = 'contact_entity_type'
+        AND name = 'Person'
+  );
+
+INSERT INTO address (contact_id, address_label, address, is_primary)
+SELECT u.contact_id, 'Primary', '', TRUE
+FROM "user" u
+WHERE u.contact_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM address a
+      WHERE a.contact_id = u.contact_id
+  );
+
+INSERT INTO phone (contact_id, phone_label, phone_number, is_primary)
+SELECT u.contact_id, 'Primary', '', TRUE
+FROM "user" u
+WHERE u.contact_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM phone p
+      WHERE p.contact_id = u.contact_id
+  );
+
+INSERT INTO email (contact_id, email_label, email_address, is_primary)
+SELECT u.contact_id, 'Primary', '', TRUE
+FROM "user" u
+WHERE u.contact_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM email e
+      WHERE e.contact_id = u.contact_id
+  );

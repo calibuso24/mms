@@ -164,7 +164,7 @@ INSERT INTO material_option (
     material_id,
     option_code,
     option_name,
-    option_type,
+    option_type_id,
     requires_approval,
     notes
 )
@@ -172,22 +172,25 @@ SELECT
     m.material_id,
     'MFO-000001',
     'PVC Tee Red 200 mm x 100 mm assembly',
-    'assembly',
+    option_type_lookup.look_up_id,
     TRUE,
     'Use only when approved by the authorized project representative.'
 FROM material m
+JOIN look_up option_type_lookup
+    ON option_type_lookup.look_up_type = 'material_option_type'
+   AND option_type_lookup.code = 'assembly'
 WHERE m.product_code = 'MAT-000004'
 ON CONFLICT (option_code) DO NOTHING;
 
 INSERT INTO material_option_detail (
-    material_fulfillment_option_id,
+    material_option_id,
     component_material_id,
     required_quantity,
     uom_id,
     notes
 )
 SELECT
-    option_record.material_fulfillment_option_id,
+    option_record.material_option_id,
     component_material.material_id,
     1,
     u.uom_id,
@@ -198,4 +201,4 @@ FROM (
 JOIN material_option option_record ON option_record.option_code = 'MFO-000001'
 JOIN material component_material ON component_material.product_code = source.component_product_code
 JOIN unit_of_measure u ON u.uom_name = 'Piece'
-ON CONFLICT (material_fulfillment_option_id, component_material_id) DO NOTHING;
+ON CONFLICT (material_option_id, component_material_id) DO NOTHING;
