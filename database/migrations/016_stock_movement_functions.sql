@@ -2,14 +2,14 @@ CREATE OR REPLACE FUNCTION stock_movement_consume(
     p_source_id BIGINT,
     p_destination_id BIGINT,
     p_material_id BIGINT,
-    p_material_brand_id BIGINT DEFAULT NULL,
     p_uom_id BIGINT,
     p_quantity NUMERIC,
     p_movement_type_code TEXT,
     p_status_code TEXT DEFAULT 'completed',
     p_method TEXT DEFAULT 'fifo',
     p_reference_code TEXT DEFAULT NULL,
-    p_notes TEXT DEFAULT NULL
+    p_notes TEXT DEFAULT NULL,
+    p_material_brand_id BIGINT DEFAULT NULL
 )
 RETURNS BIGINT
 LANGUAGE plpgsql
