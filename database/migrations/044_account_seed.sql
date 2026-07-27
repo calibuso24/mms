@@ -1,6 +1,6 @@
 -- Migration: 044_user_seed.sql
 -- Seed initial users: SuperUser and Admin
-INSERT INTO "user" (user_name, password_hash, full_name, profile, is_active, log_date_created)
+INSERT INTO account (user_name, password_hash, full_name, profile, is_active, log_date_created)
 VALUES
   ('superuser', NULL, 'SuperUser', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
   ('admin', NULL, 'Admin', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now())
@@ -17,7 +17,7 @@ INSERT INTO contact (entity_type_id, contact_name)
 SELECT
     entity_lookup.look_up_id,
     u.full_name
-FROM "user" u
+FROM account u
 JOIN look_up entity_lookup
     ON entity_lookup.look_up_type = 'contact_entity_type'
    AND entity_lookup.name = 'Person'
@@ -29,7 +29,7 @@ WHERE u.contact_id IS NULL
         AND c.entity_type_id = entity_lookup.look_up_id
   );
 
-UPDATE "user" u
+UPDATE account u
 SET contact_id = c.contact_id
 FROM contact c
 WHERE u.contact_id IS NULL
@@ -43,7 +43,7 @@ WHERE u.contact_id IS NULL
 
 INSERT INTO address (contact_id, address_label, address, is_primary)
 SELECT u.contact_id, 'Primary', '', TRUE
-FROM "user" u
+FROM account u
 WHERE u.contact_id IS NOT NULL
   AND NOT EXISTS (
       SELECT 1
@@ -53,7 +53,7 @@ WHERE u.contact_id IS NOT NULL
 
 INSERT INTO phone (contact_id, phone_label, phone_number, is_primary)
 SELECT u.contact_id, 'Primary', '', TRUE
-FROM "user" u
+FROM account u
 WHERE u.contact_id IS NOT NULL
   AND NOT EXISTS (
       SELECT 1
@@ -63,7 +63,7 @@ WHERE u.contact_id IS NOT NULL
 
 INSERT INTO email (contact_id, email_label, email_address, is_primary)
 SELECT u.contact_id, 'Primary', '', TRUE
-FROM "user" u
+FROM account u
 WHERE u.contact_id IS NOT NULL
   AND NOT EXISTS (
       SELECT 1
