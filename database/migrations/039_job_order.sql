@@ -6,8 +6,8 @@ CREATE TABLE job_order (
     service_type_id BIGINT NOT NULL REFERENCES look_up(look_up_id),
     requesting_party_id BIGINT REFERENCES party(party_id),
     service_provider_id BIGINT REFERENCES party(party_id),
-    requested_by_user_id BIGINT REFERENCES "user"(user_id),
-    prepared_by_user_id BIGINT REFERENCES "user"(user_id),
+    requested_by_account_id BIGINT REFERENCES account(account_id),
+    prepared_by_account_id BIGINT REFERENCES account(account_id),
     requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     expected_completion_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
@@ -16,10 +16,10 @@ CREATE TABLE job_order (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );
@@ -35,10 +35,10 @@ CREATE TABLE job_order_item (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );
@@ -46,8 +46,8 @@ CREATE TABLE job_order_item (
 CREATE INDEX IF NOT EXISTS idx_job_order_service_type_id ON job_order(service_type_id);
 CREATE INDEX IF NOT EXISTS idx_job_order_requesting_party_id ON job_order(requesting_party_id);
 CREATE INDEX IF NOT EXISTS idx_job_order_service_provider_id ON job_order(service_provider_id);
-CREATE INDEX IF NOT EXISTS idx_job_order_requested_by_user_id ON job_order(requested_by_user_id);
-CREATE INDEX IF NOT EXISTS idx_job_order_prepared_by_user_id ON job_order(prepared_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_job_order_requested_by_account_id ON job_order(requested_by_account_id);
+CREATE INDEX IF NOT EXISTS idx_job_order_prepared_by_account_id ON job_order(prepared_by_account_id);
 CREATE INDEX IF NOT EXISTS idx_job_order_status_id ON job_order(status_id);
 
 CREATE INDEX IF NOT EXISTS idx_job_order_item_job_order_id ON job_order_item(job_order_id);

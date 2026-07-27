@@ -6,17 +6,17 @@ CREATE TABLE delivery_receipt (
     project_id BIGINT NOT NULL REFERENCES party(party_id),
     material_request_id BIGINT REFERENCES material_request(material_request_id),
     purchase_order_id BIGINT REFERENCES purchase_order(purchase_order_id),
-    prepared_by_user_id BIGINT REFERENCES "user"(user_id),
+    prepared_by_account_id BIGINT REFERENCES account(account_id),
     delivered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     status_id BIGINT NOT NULL REFERENCES look_up(look_up_id),
     notes TEXT,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );
@@ -24,5 +24,5 @@ CREATE TABLE delivery_receipt (
 CREATE INDEX IF NOT EXISTS idx_delivery_receipt_project_id ON delivery_receipt(project_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_receipt_material_request_id ON delivery_receipt(material_request_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_receipt_purchase_order_id ON delivery_receipt(purchase_order_id);
-CREATE INDEX IF NOT EXISTS idx_delivery_receipt_prepared_by_user_id ON delivery_receipt(prepared_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_receipt_prepared_by_account_id ON delivery_receipt(prepared_by_account_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_receipt_status_id ON delivery_receipt(status_id);
