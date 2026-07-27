@@ -4,7 +4,7 @@ CREATE TABLE audit_log (
     entity_table TEXT NOT NULL,
     entity_id BIGINT,
     operation TEXT NOT NULL,
-    changed_by BIGINT REFERENCES "user"(user_id),
+    changed_by BIGINT REFERENCES account(account_id),
     changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     changes JSONB,
     reference_code TEXT,

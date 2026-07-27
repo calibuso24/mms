@@ -9,7 +9,7 @@ CREATE TABLE stock_transfer (
     project_id BIGINT REFERENCES party(party_id),
     purchase_order_id BIGINT REFERENCES purchase_order(purchase_order_id),
     delivery_advice_id BIGINT REFERENCES delivery_advice(delivery_advice_id),
-    prepared_by_user_id BIGINT REFERENCES "user"(user_id),
+    prepared_by_account_id BIGINT REFERENCES account(account_id),
     transfer_date TIMESTAMPTZ NOT NULL DEFAULT now(),
     status_id BIGINT NOT NULL REFERENCES look_up(look_up_id),
     reference_code TEXT,
@@ -17,10 +17,10 @@ CREATE TABLE stock_transfer (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );
@@ -39,10 +39,10 @@ CREATE TABLE stock_transfer_item (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );
@@ -53,7 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_transfer_destination_id ON stock_transfer(d
 CREATE INDEX IF NOT EXISTS idx_stock_transfer_project_id ON stock_transfer(project_id);
 CREATE INDEX IF NOT EXISTS idx_stock_transfer_purchase_order_id ON stock_transfer(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_stock_transfer_delivery_advice_id ON stock_transfer(delivery_advice_id);
-CREATE INDEX IF NOT EXISTS idx_stock_transfer_prepared_by_user_id ON stock_transfer(prepared_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_stock_transfer_prepared_by_account_id ON stock_transfer(prepared_by_account_id);
 CREATE INDEX IF NOT EXISTS idx_stock_transfer_status_id ON stock_transfer(status_id);
 
 CREATE INDEX IF NOT EXISTS idx_stock_transfer_item_stock_transfer_id ON stock_transfer_item(stock_transfer_id);

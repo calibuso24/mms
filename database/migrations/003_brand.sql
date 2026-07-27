@@ -5,10 +5,10 @@ CREATE TABLE brand (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );

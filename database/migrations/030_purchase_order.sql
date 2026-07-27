@@ -6,7 +6,7 @@ CREATE TABLE purchase_order (
     project_id BIGINT NOT NULL REFERENCES party(party_id),
     material_request_id BIGINT REFERENCES material_request(material_request_id),
     supplier_party_id BIGINT NOT NULL REFERENCES party(party_id),
-    requested_by_user_id BIGINT REFERENCES "user"(user_id),
+    requested_by_account_id BIGINT REFERENCES account(account_id),
     prepared_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     expected_delivery_date TIMESTAMPTZ,
     order_type_id BIGINT NOT NULL REFERENCES look_up(look_up_id),
@@ -16,10 +16,10 @@ CREATE TABLE purchase_order (
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,
-    log_created_by_user_id BIGINT,
-    log_updated_by_user_id BIGINT,
+    log_created_by_account_id BIGINT,
+    log_updated_by_account_id BIGINT,
     log_date_deleted TIMESTAMPTZ,
-    log_deleted_by_user_id BIGINT,
+    log_deleted_by_account_id BIGINT,
     log_module_created TEXT,
     log_module_updated TEXT
 );
@@ -27,6 +27,6 @@ CREATE TABLE purchase_order (
 CREATE INDEX IF NOT EXISTS idx_purchase_order_project_id ON purchase_order(project_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_order_material_request_id ON purchase_order(material_request_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_order_supplier_party_id ON purchase_order(supplier_party_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_order_requested_by_user_id ON purchase_order(requested_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_order_requested_by_account_id ON purchase_order(requested_by_account_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_order_order_type_id ON purchase_order(order_type_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_order_status_id ON purchase_order(status_id);
