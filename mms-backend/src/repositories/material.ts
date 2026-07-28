@@ -30,7 +30,7 @@ export class MaterialRepository {
         sc.sub_category_name,
         u.uom_name,
         u.abbreviation as uom_abbreviation,
-        l.look_up_name as status_name
+        l.name as status_name
        FROM material m
        LEFT JOIN category c ON m.category_id = c.category_id
        LEFT JOIN sub_category sc ON m.sub_category_id = sc.sub_category_id
@@ -50,7 +50,7 @@ export class MaterialRepository {
         sc.sub_category_name,
         u.uom_name,
         u.abbreviation as uom_abbreviation,
-        l.look_up_name as status_name
+        l.name as status_name
        FROM material m
        LEFT JOIN category c ON m.category_id = c.category_id
        LEFT JOIN sub_category sc ON m.sub_category_id = sc.sub_category_id
@@ -73,7 +73,7 @@ export class MaterialRepository {
       sc.sub_category_name,
       u.uom_name,
       u.abbreviation as uom_abbreviation,
-      l.look_up_name as status_name
+      l.name as status_name
      FROM material m
      LEFT JOIN category c ON m.category_id = c.category_id
      LEFT JOIN sub_category sc ON m.sub_category_id = sc.sub_category_id
