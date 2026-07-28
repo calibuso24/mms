@@ -8,6 +8,25 @@
 -- ============================================================================
 
 -- ============================================================================
+-- SECTION 0: SEED REPORT CATEGORY LOOKUPS
+-- ============================================================================
+
+-- Insert report category lookups if they don't exist
+INSERT INTO look_up (look_up_type, code, name, description, display_order, is_active, log_date_created)
+VALUES
+    ('REPORT_CATEGORY', 'INV', 'Inventory', 'Inventory reports', 0, true, CURRENT_TIMESTAMP),
+    ('REPORT_CATEGORY', 'PUR', 'Purchasing', 'Purchasing reports', 1, true, CURRENT_TIMESTAMP),
+    ('REPORT_CATEGORY', 'WH', 'Warehouse', 'Warehouse reports', 2, true, CURRENT_TIMESTAMP),
+    ('REPORT_CATEGORY', 'PRJ', 'Projects', 'Project reports', 3, true, CURRENT_TIMESTAMP),
+    ('REPORT_CATEGORY', 'ACC', 'Accounting', 'Accounting reports', 4, true, CURRENT_TIMESTAMP),
+    ('REPORT_CATEGORY', 'ADM', 'Administration', 'Administration reports', 5, true, CURRENT_TIMESTAMP)
+ON CONFLICT (look_up_type, name) DO NOTHING;
+
+-- Create index for report category lookups
+CREATE INDEX IF NOT EXISTS idx_look_up_type_code 
+ON look_up(look_up_type, code);
+
+-- ============================================================================
 -- SECTION 1: SEED REPORT CATALOG DATA
 -- ============================================================================
 
@@ -30,6 +49,7 @@ INSERT INTO report_catalog (
     report_category_lookup_id,
     report_type_lookup_id,
     description,
+    report_url,
     display_order,
     requires_parameter,
     is_active,
@@ -41,6 +61,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Provides a comprehensive summary of current inventory levels by product, warehouse, and status',
+    '/reports/inv001',
     1,
     TRUE,
     TRUE,
@@ -55,6 +76,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Detailed transaction-level inventory ledger for auditing and reconciliation',
+    '/reports/inv002',
     2,
     TRUE,
     TRUE,
@@ -69,6 +91,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Individual stock card report showing in/out movements for a specific material',
+    '/reports/inv003',
     3,
     TRUE,
     TRUE,
@@ -83,6 +106,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Report of all stock movements within a specified date range',
+    '/reports/inv004',
     4,
     TRUE,
     TRUE,
@@ -97,6 +121,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Materials that have fallen below their reorder levels',
+    '/reports/inv005',
     5,
     FALSE,
     TRUE,
@@ -111,6 +136,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Materials approaching expiration or already expired',
+    '/reports/inv006',
     6,
     FALSE,
     TRUE,
@@ -125,6 +151,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Inventory'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Report of inventory adjustments made during physical counts',
+    '/reports/inv007',
     7,
     TRUE,
     TRUE,
@@ -140,6 +167,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Purchasing'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'List of all material purchase requests within a date range',
+    '/reports/pur001',
     1,
     TRUE,
     TRUE,
@@ -154,6 +182,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Purchasing'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Detailed purchase orders with item-level breakdown',
+    '/reports/pur002',
     2,
     TRUE,
     TRUE,
@@ -168,6 +197,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Purchasing'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Supplier performance metrics including delivery timeliness and quality',
+    '/reports/pur003',
     3,
     TRUE,
     TRUE,
@@ -182,6 +212,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Purchasing'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Status tracking of purchase orders and delivery receipts',
+    '/reports/pur004',
     4,
     TRUE,
     TRUE,
@@ -196,6 +227,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Purchasing'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Purchase orders with pending or delayed deliveries',
+    '/reports/pur005',
     5,
     FALSE,
     TRUE,
@@ -211,6 +243,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Warehouse'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Report of goods received from suppliers',
+    '/reports/war001',
     1,
     TRUE,
     TRUE,
@@ -225,6 +258,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Warehouse'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Report of materials issued from warehouse to projects',
+    '/reports/war002',
     2,
     TRUE,
     TRUE,
@@ -239,6 +273,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Warehouse'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Inter-warehouse material transfers',
+    '/reports/war003',
     3,
     TRUE,
     TRUE,
@@ -253,11 +288,42 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Warehouse'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Materials returned from projects back to warehouse',
+    '/reports/war004',
     4,
     TRUE,
     TRUE,
     'report_catalog'
 WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'WAR004')
+
+UNION ALL
+
+SELECT
+    'WH001',
+    'Warehouse Stock Movement',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Warehouse'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Warehouse stock movement report',
+    '/reports/wh001',
+    5,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'WH001')
+
+UNION ALL
+
+SELECT
+    'WH002',
+    'Stock Transfer',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Warehouse'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Inter-warehouse stock transfers',
+    '/reports/wh002',
+    6,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'WH002')
 
 -- PROJECTS REPORTS (Category: Projects)
 UNION ALL
@@ -268,6 +334,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Projects'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Material requests submitted by projects',
+    '/reports/pro001',
     1,
     TRUE,
     TRUE,
@@ -282,6 +349,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Projects'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Material consumption and usage by project',
+    '/reports/pro002',
     2,
     TRUE,
     TRUE,
@@ -296,11 +364,42 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Projects'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Comparison of budgeted versus actual material consumption',
+    '/reports/pro003',
     3,
     TRUE,
     TRUE,
     'report_catalog'
 WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'PRO003')
+
+UNION ALL
+
+SELECT
+    'PRJ001',
+    'Project Summary',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Projects'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Project status summary',
+    '/reports/prj001',
+    4,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'PRJ001')
+
+UNION ALL
+
+SELECT
+    'PRJ002',
+    'Job Order Status',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Projects'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Job order status and tracking',
+    '/reports/prj002',
+    5,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'PRJ002')
 
 -- ACCOUNTING REPORTS (Category: Accounting)
 UNION ALL
@@ -311,6 +410,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Accounting'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Inventory value summary using various valuation methods',
+    '/reports/acc001',
     1,
     FALSE,
     TRUE,
@@ -325,6 +425,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Accounting'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Detailed cost analysis of inventory movements',
+    '/reports/acc002',
     2,
     TRUE,
     TRUE,
@@ -339,6 +440,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Accounting'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Quarterly inventory audit and reconciliation report',
+    '/reports/acc003',
     3,
     FALSE,
     TRUE,
@@ -353,6 +455,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Accounting'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Summary of material expenses by category and period',
+    '/reports/acc004',
     4,
     TRUE,
     TRUE,
@@ -368,6 +471,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Administration'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'User activity log and system usage statistics',
+    '/reports/adm001',
     1,
     TRUE,
     TRUE,
@@ -382,6 +486,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Administration'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Comprehensive audit trail of all system changes',
+    '/reports/adm002',
     2,
     TRUE,
     TRUE,
@@ -396,6 +501,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Administration'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'User login and session history',
+    '/reports/adm003',
     3,
     TRUE,
     TRUE,
@@ -410,6 +516,7 @@ SELECT
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Administration'),
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
     'Permission matrix showing roles and their report access',
+    '/reports/adm004',
     4,
     FALSE,
     TRUE,
@@ -663,7 +770,7 @@ INSERT INTO permission (
 )
 SELECT
     'Report Catalog' as module_name,
-    rc.report_code,
+    'REPORT_' || rc.report_code,
     'View ' || rc.report_name,
     'Access to report: ' || rc.report_name,
     TRUE,
@@ -672,7 +779,7 @@ FROM report_catalog rc
 WHERE rc.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM permission p
-        WHERE p.module_name = 'Report Catalog' AND p.permission_code = rc.report_code
+        WHERE p.module_name = 'Report Catalog' AND p.permission_code = 'REPORT_' || rc.report_code
     )
 ON CONFLICT (module_name, permission_code) DO NOTHING;
 
@@ -718,7 +825,7 @@ CROSS JOIN permission p
 WHERE r.role_code IN ('INV_STAFF', 'INV_SUPERVISOR')
     AND r.is_deleted = FALSE
     AND p.module_name = 'Report Catalog'
-    AND p.permission_code IN ('INV001', 'INV002', 'INV003', 'INV004', 'INV005', 'INV006', 'INV007')
+    AND p.permission_code IN ('REPORT_INV001', 'REPORT_INV002', 'REPORT_INV003', 'REPORT_INV004', 'REPORT_INV005', 'REPORT_INV006', 'REPORT_INV007')
     AND p.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM role_permission rp
@@ -743,7 +850,7 @@ CROSS JOIN permission p
 WHERE r.role_code IN ('PURCH_STAFF', 'PURCH_SUPERVISOR')
     AND r.is_deleted = FALSE
     AND p.module_name = 'Report Catalog'
-    AND p.permission_code IN ('PUR001', 'PUR002', 'PUR003', 'PUR004', 'PUR005')
+    AND p.permission_code IN ('REPORT_PUR001', 'REPORT_PUR002', 'REPORT_PUR003', 'REPORT_PUR004', 'REPORT_PUR005')
     AND p.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM role_permission rp
@@ -768,7 +875,7 @@ CROSS JOIN permission p
 WHERE r.role_code IN ('WAREHOUSE_STAFF', 'WAREHOUSE_SUPERVISOR')
     AND r.is_deleted = FALSE
     AND p.module_name = 'Report Catalog'
-    AND p.permission_code IN ('WAR001', 'WAR002', 'WAR003', 'WAR004')
+    AND p.permission_code IN ('REPORT_WAR001', 'REPORT_WAR002', 'REPORT_WAR003', 'REPORT_WAR004', 'REPORT_WH001', 'REPORT_WH002')
     AND p.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM role_permission rp
@@ -793,7 +900,7 @@ CROSS JOIN permission p
 WHERE r.role_code IN ('COORD_STAFF', 'COORD_SUPERVISOR')
     AND r.is_deleted = FALSE
     AND p.module_name = 'Report Catalog'
-    AND p.permission_code IN ('PRO001', 'PRO002', 'PRO003')
+    AND p.permission_code IN ('REPORT_PRO001', 'REPORT_PRO002', 'REPORT_PRO003', 'REPORT_PRJ001', 'REPORT_PRJ002')
     AND p.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM role_permission rp
@@ -818,7 +925,7 @@ CROSS JOIN permission p
 WHERE r.role_code IN ('ACCOUNTING_STAFF', 'ACCOUNTING_SUPERVISOR')
     AND r.is_deleted = FALSE
     AND p.module_name = 'Report Catalog'
-    AND p.permission_code IN ('ACC001', 'ACC002', 'ACC003', 'ACC004')
+    AND p.permission_code IN ('REPORT_ACC001', 'REPORT_ACC002', 'REPORT_ACC003', 'REPORT_ACC004')
     AND p.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM role_permission rp
@@ -843,7 +950,7 @@ CROSS JOIN permission p
 WHERE r.role_code IN ('AUDITOR', 'ADMIN', 'SUPER_ADMIN')
     AND r.is_deleted = FALSE
     AND p.module_name = 'Report Catalog'
-    AND p.permission_code IN ('ADM001', 'ADM002', 'ADM003', 'ADM004')
+    AND p.permission_code IN ('REPORT_ADM001', 'REPORT_ADM002', 'REPORT_ADM003', 'REPORT_ADM004')
     AND p.is_deleted = FALSE
     AND NOT EXISTS (
         SELECT 1 FROM role_permission rp

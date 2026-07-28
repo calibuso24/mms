@@ -188,3 +188,11 @@ export const materialApi = {
   update: (id: number, data: any) => ApiClient.put(`/materials/${id}`, data),
   delete: (id: number) => ApiClient.delete(`/materials/${id}`),
 };
+
+// Navigation API
+export const navigationApi = {
+  getMain: () => ApiClient.get('/navigation/main'),
+  getReports: () => ApiClient.get('/navigation/reports'),
+  getByContext: (context: string) => ApiClient.get(`/navigation/context/${context}`),
+  getReportCatalogSidebar: () => ApiClient.get('/navigation/report-catalog-sidebar'),
+};
