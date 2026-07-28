@@ -3,7 +3,7 @@
 # Dependencies
 node_modules/
 
-*-lock.json
+**/package-lock.json
 
 # Logs
 logs
