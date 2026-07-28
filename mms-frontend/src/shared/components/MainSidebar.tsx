@@ -104,9 +104,12 @@ const MenuItem: React.FC<MenuItemProps> = ({
     }
   };
 
+  // Top-level items that are not groups should match group header styling
+  const isTopLevelItem = item.parent_navigation_id === null && item.navigation_type !== 'GROUP';
+
   return (
     <button
-      className="menu-item"
+      className={`menu-item${isTopLevelItem ? ' top-level' : ''}`}
       style={{ marginLeft: `${level * 12}px` }}
       onClick={handleClick}
       title={item.title}
