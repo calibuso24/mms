@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import AppLayout from './shared/components/AppLayout';
+import AppLayout from './shared/components/AppLayout.js';
+import LoginPage from './pages/Login.js';
+import MaterialsPage from './pages/Materials.js';
+import { AuthProvider, useAuth } from './shared/contexts/auth.js';
 import './shared/styles/theme.css';
+import './shared/styles/auth.css';
 
 type MenuKey = 'dashboard' | 'purchasing' | 'inventory' | 'reports' | 'masterlist' | 'settings';
 
@@ -56,12 +60,7 @@ function ReportsPage() {
 }
 
 function MasterlistPage() {
-  return (
-    <div className="page-card">
-      <div className="page-title">Masterlist</div>
-      <p className="page-copy">Materials, categories, brands, and UOM catalog management will be added here.</p>
-    </div>
-  );
+  return <MaterialsPage />;
 }
 
 function SettingsPage() {
@@ -73,47 +72,13 @@ function SettingsPage() {
   );
 }
 
-function LoginPage({ onLogin }: { onLogin: (username: string, password: string) => void }) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    onLogin(username, password);
-  };
-
-  return (
-    <div className="app-bg login-bg">
-      <div className="login-shell">
-        <div className="login-card">
-          <div className="login-title">Materials Management System</div>
-          <p className="login-subtitle">Sign in to continue to the operations workspace</p>
-          <form onSubmit={handleSubmit} className="login-form">
-            <label className="field-label" htmlFor="username">Username</label>
-            <input id="username" className="input" value={username} onChange={(event) => setUsername(event.target.value)} />
-            <label className="field-label" htmlFor="password">Password</label>
-            <input id="password" className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-            <button className="btn primary" type="submit">Sign In</button>
-          </form>
-          <div className="login-hint">Demo login: admin / admin</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AppShell() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isLoggedIn, logout, account } = useAuth();
   const [activeMenu, setActiveMenu] = useState<MenuKey>('dashboard');
   const navigate = useNavigate();
 
-  const handleLogin = (_username: string, _password: string) => {
-    setIsAuthenticated(true);
-    navigate('/app');
-  };
-
   const handleLogout = () => {
-    setIsAuthenticated(false);
+    logout();
     navigate('/login');
   };
 
@@ -137,12 +102,17 @@ function AppShell() {
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/app" replace /> : <LoginPage onLogin={handleLogin} />} />
+      <Route path="/login" element={isLoggedIn ? <Navigate to="/app" replace /> : <LoginPage />} />
       <Route
         path="/app"
         element={
-          isAuthenticated ? (
-            <AppLayout activeMenu={activeMenu} onSelectMenu={setActiveMenu} onLogout={handleLogout}>
+          isLoggedIn ? (
+            <AppLayout
+              activeMenu={activeMenu}
+              onSelectMenu={setActiveMenu}
+              onLogout={handleLogout}
+              userName={account?.full_name || account?.account_name || 'User'}
+            >
               {renderContent()}
             </AppLayout>
           ) : (
@@ -150,8 +120,8 @@ function AppShell() {
           )
         }
       />
-      <Route path="/" element={<Navigate to={isAuthenticated ? '/app' : '/login'} replace />} />
-      <Route path="*" element={<Navigate to={isAuthenticated ? '/app' : '/login'} replace />} />
+      <Route path="/" element={<Navigate to={isLoggedIn ? '/app' : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={isLoggedIn ? '/app' : '/login'} replace />} />
     </Routes>
   );
 }
@@ -159,7 +129,9 @@ function AppShell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

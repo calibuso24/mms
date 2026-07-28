@@ -7,6 +7,7 @@ interface AppLayoutProps {
   activeMenu: MenuKey;
   onSelectMenu: (menu: MenuKey) => void;
   onLogout: () => void;
+  userName: string;
   children: React.ReactNode;
 }
 
@@ -19,7 +20,7 @@ const menuItems: Array<{ key: MenuKey; label: string }> = [
   { key: 'settings', label: 'Settings' },
 ];
 
-export default function AppLayout({ activeMenu, onSelectMenu, onLogout, children }: AppLayoutProps) {
+export default function AppLayout({ activeMenu, onSelectMenu, onLogout, userName, children }: AppLayoutProps) {
   return (
     <div className="app-bg">
       <div className="app-shell">
@@ -46,7 +47,7 @@ export default function AppLayout({ activeMenu, onSelectMenu, onLogout, children
         <main className="content">
           <header className="header">
             <div>{menuItems.find((item) => item.key === activeMenu)?.label ?? 'Dashboard'}</div>
-            <div className="header-user">Admin User</div>
+            <div className="header-user">{userName}</div>
           </header>
 
           <div className="canvas">{children}</div>
