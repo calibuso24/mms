@@ -1,0 +1,11 @@
+{
+  "name": "mms",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm --prefix mms-backend run dev\" \"npm --prefix mms-frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

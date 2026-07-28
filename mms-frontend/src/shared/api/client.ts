@@ -29,6 +29,7 @@ export class ApiClient {
     const requestOptions: RequestInit = {
       method: options.method || 'GET',
       headers: this.getHeaders(),
+      credentials: 'include',
     };
 
     if (options.body) {
