@@ -65,6 +65,9 @@ export class MaterialRepository {
   async findAll(limit?: number, offset?: number, filters?: {
     search?: string;
     category_id?: number;
+    sub_category_id?: number;
+    status_id?: number;
+    uom_id?: number;
     brand_id?: number;
   }): Promise<MaterialWithDetails[]> {
     let query = `SELECT 
@@ -93,6 +96,24 @@ export class MaterialRepository {
     if (filters?.category_id) {
       query += ` AND m.category_id = $${paramIndex}`;
       params.push(filters.category_id);
+      paramIndex++;
+    }
+
+    if (filters?.sub_category_id) {
+      query += ` AND m.sub_category_id = $${paramIndex}`;
+      params.push(filters.sub_category_id);
+      paramIndex++;
+    }
+
+    if (filters?.status_id) {
+      query += ` AND m.status_id = $${paramIndex}`;
+      params.push(filters.status_id);
+      paramIndex++;
+    }
+
+    if (filters?.uom_id) {
+      query += ` AND m.stock_uom_id = $${paramIndex}`;
+      params.push(filters.uom_id);
       paramIndex++;
     }
 

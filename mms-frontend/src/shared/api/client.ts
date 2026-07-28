@@ -180,6 +180,9 @@ export const materialApi = {
     if (offset) params.append('offset', offset.toString());
     if (filters?.search) params.append('search', filters.search);
     if (filters?.category_id) params.append('category_id', filters.category_id.toString());
+    if (filters?.sub_category_id) params.append('sub_category_id', filters.sub_category_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.uom_id) params.append('uom_id', filters.uom_id.toString());
     if (filters?.brand_id) params.append('brand_id', filters.brand_id.toString());
     return ApiClient.get(`/materials?${params.toString()}`);
   },
@@ -187,6 +190,16 @@ export const materialApi = {
   create: (data: any) => ApiClient.post('/materials', data),
   update: (id: number, data: any) => ApiClient.put(`/materials/${id}`, data),
   delete: (id: number) => ApiClient.delete(`/materials/${id}`),
+};
+
+// Lookup API
+export const lookupApi = {
+  listByType: (type: string, limit?: number, offset?: number) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset) params.append('offset', offset.toString());
+    return ApiClient.get(`/lookups/${type}?${params.toString()}`);
+  },
 };
 
 // Navigation API

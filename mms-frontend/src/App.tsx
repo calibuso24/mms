@@ -38,6 +38,10 @@ function DynamicPage({ route }: { route: string | null }) {
     return <DefaultPage />;
   }
 
+  if (route?.includes('dashboard')) {
+    return <DefaultPage />;
+  }
+
   if (route?.includes('product-management')) {
     return <MaterialsPage />;
   }

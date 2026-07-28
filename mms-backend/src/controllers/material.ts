@@ -25,6 +25,15 @@ export class MaterialController {
       const category_id = req.query.category_id
         ? parseInt(req.query.category_id as string)
         : undefined;
+      const sub_category_id = req.query.sub_category_id
+        ? parseInt(req.query.sub_category_id as string)
+        : undefined;
+      const status_id = req.query.status_id
+        ? parseInt(req.query.status_id as string)
+        : undefined;
+      const uom_id = req.query.uom_id
+        ? parseInt(req.query.uom_id as string)
+        : undefined;
       const brand_id = req.query.brand_id
         ? parseInt(req.query.brand_id as string)
         : undefined;
@@ -32,6 +41,9 @@ export class MaterialController {
       const materials = await this.materialService.listMaterials(limit, offset, {
         search,
         category_id,
+        sub_category_id,
+        status_id,
+        uom_id,
         brand_id,
       });
 
@@ -51,7 +63,9 @@ export class MaterialController {
         sub_category_id,
         stock_uom_id,
         status_id,
+        brand_id,
         notes,
+        material_specification,
       } = req.body;
 
       if (!product_code || !product_name) {
@@ -66,7 +80,9 @@ export class MaterialController {
         sub_category_id,
         stock_uom_id,
         status_id,
+        brand_id,
         notes,
+        material_specification,
       });
 
       res.status(201).json(material);

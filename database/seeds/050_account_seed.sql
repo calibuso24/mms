@@ -6,8 +6,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 INSERT INTO account (account_name, password_hash, full_name, profile, is_active, log_date_created)
 VALUES
-  ('superuser', crypt('superuser123', gen_salt('bf')), 'SuperUser', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
-  ('admin', crypt('admin123', gen_salt('bf')), 'Admin', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now())
+  ('superuser', crypt('superuser', gen_salt('bf')), 'SuperUser', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
+  ('admin', crypt('admin', gen_salt('bf')), 'Admin', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
+  ('auditor', crypt('auditor', gen_salt('bf')), 'Auditor', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now())
 ON CONFLICT (account_name) DO UPDATE
   SET full_name = EXCLUDED.full_name,
       profile = EXCLUDED.profile,
@@ -81,10 +82,14 @@ SELECT r.role_code, r.role_name, p.module_name, p.permission_name
 FROM role r 
 JOIN role_permission rp ON rp.role_id = r.role_id
 JOIN permission p ON p.permission_id = rp.permission_id
+
+SELECT DISTINCT r.role_code, r.role_name
+FROM role r 
+JOIN role_permission rp ON rp.role_id = r.role_id
+JOIN permission p ON p.permission_id = rp.permission_id
 ==================================================*/
 
 INSERT INTO account_role(account_id,role_id)
-
 SELECT DISTINCT a.account_id, r.role_id
 FROM account a, role r
 WHERE full_name ilike 'SuperUser'
@@ -92,9 +97,15 @@ AND r.role_code = 'SUPER_ADMIN'
 ;
 
 INSERT INTO account_role(account_id,role_id)
-
 SELECT DISTINCT a.account_id, r.role_id
 FROM account a, role r
 WHERE full_name ilike 'Admin'
 AND r.role_code = 'ADMIN'
+;
+
+INSERT INTO account_role(account_id,role_id)
+SELECT DISTINCT a.account_id, r.role_id
+FROM account a, role r
+WHERE full_name ilike 'auditor'
+AND r.role_code = 'AUDITOR'
 ;

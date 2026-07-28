@@ -4,6 +4,7 @@ import { BrandController } from '../controllers/brand.js';
 import { UnitOfMeasureController } from '../controllers/unitOfMeasure.js';
 import { SubCategoryController } from '../controllers/subCategory.js';
 import { MaterialController } from '../controllers/material.js';
+import { LookupController } from '../controllers/lookup.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ const brandController = new BrandController();
 const uomController = new UnitOfMeasureController();
 const subCategoryController = new SubCategoryController();
 const materialController = new MaterialController();
+const lookupController = new LookupController();
 
 // Categories
 router.get('/categories', (req, res, next) => categoryController.listCategories(req, res, next));
@@ -70,6 +72,14 @@ router.put('/subcategories/:id', (req, res, next) =>
 );
 router.delete('/subcategories/:id', (req, res, next) =>
   subCategoryController.deleteSubCategory(req, res, next)
+);
+
+// Lookups
+router.get('/lookups/:type', (req, res, next) =>
+  lookupController.getLookupsByType(req, res, next)
+);
+router.get('/lookups/:type/:id', (req, res, next) =>
+  lookupController.getLookupById(req, res, next)
 );
 
 // Materials
