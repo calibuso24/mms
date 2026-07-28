@@ -27,17 +27,17 @@ const ReportMenuItem: React.FC<ReportMenuItemProps> = ({ report, onNavigate }) =
 
 interface ReportGroupItemProps {
   group: ReportGroup;
+  isExpanded: boolean;
+  onToggle: (groupId: number) => void;
   onNavigate?: (route: string) => void;
 }
 
-const ReportGroupItem: React.FC<ReportGroupItemProps> = ({ group, onNavigate }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+const ReportGroupItem: React.FC<ReportGroupItemProps> = ({ group, isExpanded, onToggle, onNavigate }) => {
   return (
     <div className="report-group-container">
       <button
         className="menu-group"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => onToggle(group.group_id)}
       >
         {group.icon && <span className="menu-icon">{getIcon(group.icon)}</span>}
         <span className="menu-label">{group.group_name}</span>
@@ -67,6 +67,12 @@ interface ReportsSidebarProps {
 
 export const ReportsSidebar: React.FC<ReportsSidebarProps> = ({ onNavigate, onBack }) => {
   const { reportGroups, loading } = useNavigation();
+  const [expandedGroupId, setExpandedGroupId] = useState<number | null>(null);
+
+  // Toggle report group with accordion behavior
+  const handleToggleGroup = (groupId: number) => {
+    setExpandedGroupId((current) => (current === groupId ? null : groupId));
+  };
 
   if (loading) {
     return (
@@ -89,6 +95,8 @@ export const ReportsSidebar: React.FC<ReportsSidebarProps> = ({ onNavigate, onBa
           <ReportGroupItem
             key={group.group_id}
             group={group}
+            isExpanded={expandedGroupId === group.group_id}
+            onToggle={handleToggleGroup}
             onNavigate={onNavigate}
           />
         ))}

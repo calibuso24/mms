@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigation, NavigationItem } from '../contexts/navigation.js';
 import { getIcon } from '../utils/icons.js';
 import '../styles/sidebar.css';
@@ -6,11 +6,22 @@ import '../styles/sidebar.css';
 interface MenuItemProps {
   item: NavigationItem;
   level: number;
+  isTopLevelOpen?: boolean;
+  isTopLevel?: boolean;
+  onToggleTopLevel?: (id: number) => void;
   onNavigate?: (route: string) => void;
   onReportsClick?: () => void;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ item, level, onNavigate, onReportsClick }) => {
+const MenuItem: React.FC<MenuItemProps> = ({
+  item,
+  level,
+  isTopLevelOpen = true,
+  isTopLevel = false,
+  onToggleTopLevel,
+  onNavigate,
+  onReportsClick,
+}) => {
   const { expandedItems, toggleExpandedItem } = useNavigation();
   const isExpanded = expandedItems.has(item.navigation_id);
   const hasChildren = item.children && item.children.length > 0;
@@ -20,6 +31,40 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, level, onNavigate, onReportsC
   }
 
   if (item.navigation_type === 'GROUP') {
+    // For top-level groups, use accordion behavior
+    if (isTopLevel && onToggleTopLevel) {
+      return (
+        <div className="menu-group-container" style={{ marginLeft: `${level * 12}px` }}>
+          <button
+            className="menu-group"
+            onClick={() => onToggleTopLevel(item.navigation_id)}
+          >
+            {item.icon && <span className="menu-icon">{getIcon(item.icon)}</span>}
+            <span className="menu-label">{item.title}</span>
+            {hasChildren && (
+              <span className={`menu-chevron ${isTopLevelOpen ? 'expanded' : ''}`}>
+                ▶
+              </span>
+            )}
+          </button>
+          {isTopLevelOpen && hasChildren && (
+            <div className="menu-children">
+              {item.children?.map((child) => (
+                <MenuItem
+                  key={child.navigation_id}
+                  item={child}
+                  level={level + 1}
+                  onNavigate={onNavigate}
+                  onReportsClick={onReportsClick}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // For nested groups, use normal expand/collapse behavior
     return (
       <div className="menu-group-container" style={{ marginLeft: `${level * 12}px` }}>
         <button
@@ -84,6 +129,18 @@ export const MainSidebar: React.FC<MainSidebarProps> = ({
   onReportsClick,
 }) => {
   const { mainNavigation, loading } = useNavigation();
+  const [expandedTopLevelGroupId, setExpandedTopLevelGroupId] = useState<number | null>(null);
+
+  // Identify top-level groups (parent_navigation_id === null and navigation_type === 'GROUP')
+  const topLevelGroups = useMemo(
+    () => mainNavigation.filter((item) => item.parent_navigation_id === null && item.navigation_type === 'GROUP'),
+    [mainNavigation]
+  );
+
+  // Toggle top-level group with accordion behavior
+  const handleToggleTopLevelGroup = (groupId: number) => {
+    setExpandedTopLevelGroupId((current) => (current === groupId ? null : groupId));
+  };
 
   if (loading) {
     return (
@@ -103,6 +160,13 @@ export const MainSidebar: React.FC<MainSidebarProps> = ({
             key={item.navigation_id}
             item={item}
             level={0}
+            isTopLevel={item.parent_navigation_id === null && item.navigation_type === 'GROUP'}
+            isTopLevelOpen={expandedTopLevelGroupId === item.navigation_id}
+            onToggleTopLevel={
+              item.parent_navigation_id === null && item.navigation_type === 'GROUP'
+                ? handleToggleTopLevelGroup
+                : undefined
+            }
             onNavigate={onNavigate}
             onReportsClick={onReportsClick}
           />
