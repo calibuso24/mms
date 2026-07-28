@@ -89,6 +89,8 @@ apply_sql_folder() {
 
 apply_sql_folder "$SCRIPT_DIR/migrations"
 apply_sql_folder "$SCRIPT_DIR/seeds"
+apply_sql_folder "$SCRIPT_DIR/views"
+apply_sql_folder "$SCRIPT_DIR/functions"
 
 echo
 echo "Deployment completed successfully."

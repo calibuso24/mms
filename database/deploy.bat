@@ -94,5 +94,25 @@ for /f "delims=" %%F in ('dir /b /s /o:n "%SCRIPT_DIR%seeds\*.sql" 2^>nul') do (
     )
 )
 
+for /f "delims=" %%F in ('dir /b /s /o:n "%SCRIPT_DIR%views\*.sql" 2^>nul') do (
+    echo Applying %%~fF
+    "%PSQL_EXE%" -v ON_ERROR_STOP=1 -w -h "%DB_HOST%" -p "%DB_PORT%" -U "%DB_USER%" -d "%DB_NAME%" -f "%%~fF"
+    if errorlevel 1 (
+        echo Failed while applying %%~fF
+        exit /b 1
+    )
+)
+
+for /f "delims=" %%F in ('dir /b /s /o:n "%SCRIPT_DIR%functions\*.sql" 2^>nul') do (
+    echo Applying %%~fF
+    "%PSQL_EXE%" -v ON_ERROR_STOP=1 -w -h "%DB_HOST%" -p "%DB_PORT%" -U "%DB_USER%" -d "%DB_NAME%" -f "%%~fF"
+    if errorlevel 1 (
+        echo Failed while applying %%~fF
+        exit /b 1
+    )
+)
+
 echo Deployment completed.
 endlocal
+
+pause
