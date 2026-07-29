@@ -36,10 +36,12 @@ interface NavigationContextType {
   reportsNavigation: NavigationItem[];
   reportGroups: ReportGroup[];
   currentContext: 'MAIN' | 'REPORTS';
+  pageTitle: string;
   expandedItems: Set<number>;
   loading: boolean;
   error: string | null;
   setCurrentContext: (context: 'MAIN' | 'REPORTS') => void;
+  setPageTitle: (title: string) => void;
   toggleExpandedItem: (id: number) => void;
   setExpandedItems: (ids: Set<number>) => void;
   refreshNavigation: () => Promise<void>;
@@ -52,6 +54,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [reportsNavigation, setReportsNavigation] = useState<NavigationItem[]>([]);
   const [reportGroups, setReportGroups] = useState<ReportGroup[]>([]);
   const [currentContext, setCurrentContext] = useState<'MAIN' | 'REPORTS'>('MAIN');
+  const [pageTitle, setPageTitleState] = useState<string>('Dashboard');
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +109,10 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentContext(context);
   };
 
+  const handleSetPageTitle = (title: string) => {
+    setPageTitleState(title);
+  };
+
   const refreshNavigation = async () => {
     await loadNavigation();
   };
@@ -115,10 +122,12 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     reportsNavigation,
     reportGroups,
     currentContext,
+    pageTitle,
     expandedItems,
     loading,
     error,
     setCurrentContext: handleSetCurrentContext,
+    setPageTitle: handleSetPageTitle,
     toggleExpandedItem: handleToggleExpandedItem,
     setExpandedItems,
     refreshNavigation,

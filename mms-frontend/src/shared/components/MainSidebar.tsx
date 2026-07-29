@@ -9,7 +9,7 @@ interface MenuItemProps {
   isTopLevelOpen?: boolean;
   isTopLevel?: boolean;
   onToggleTopLevel?: (id: number) => void;
-  onNavigate?: (route: string) => void;
+  onNavigate?: (route: string, title: string) => void;
   onReportsClick?: () => void;
 }
 
@@ -100,7 +100,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
     if (item.title === 'Reports' && onReportsClick) {
       onReportsClick();
     } else if (item.route && onNavigate) {
-      onNavigate(item.route);
+      onNavigate(item.route, item.title);
     }
   };
 

@@ -56,19 +56,34 @@ function DynamicPage({ route }: { route: string | null }) {
 
 function AppShell() {
   const { isLoggedIn, logout, account } = useAuth();
-  const { currentContext, setCurrentContext } = useNavigation();
+  const { currentContext, setCurrentContext, pageTitle, setPageTitle } = useNavigation();
   const navigate = useNavigate();
   const [currentRoute, setCurrentRoute] = useState('/dashboard');
-  const [pageTitle, setPageTitle] = useState('Dashboard');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const handleNavigate = (route: string) => {
+  const handleNavigate = (route: string, title?: string) => {
     setCurrentRoute(route);
     navigate(`/app${route}`);
+    
+    // Update page title - use provided title or derive from route
+    if (title) {
+      setPageTitle(title);
+    } else {
+      const routeParts = route.split('/').filter(Boolean);
+      if (routeParts.length > 0) {
+        const derivedTitle = routeParts[0]
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        setPageTitle(derivedTitle);
+      } else {
+        setPageTitle('Dashboard');
+      }
+    }
   };
 
   const handleReportsClick = () => {
@@ -79,6 +94,7 @@ function AppShell() {
   const handleBackToMain = () => {
     setCurrentContext('MAIN');
     setCurrentRoute('/dashboard');
+    setPageTitle('Dashboard');
     navigate('/app/dashboard');
   };
 

@@ -5,7 +5,7 @@ import '../styles/sidebar.css';
 
 interface ReportMenuItemProps {
   report: ReportItem;
-  onNavigate?: (route: string) => void;
+  onNavigate?: (route: string, title: string) => void;
 }
 
 const ReportMenuItem: React.FC<ReportMenuItemProps> = ({ report, onNavigate }) => {
@@ -14,7 +14,7 @@ const ReportMenuItem: React.FC<ReportMenuItemProps> = ({ report, onNavigate }) =
       className="menu-item report-item"
       onClick={() => {
         if (report.route && onNavigate) {
-          onNavigate(report.route);
+          onNavigate(report.route, report.report_name);
         }
       }}
       title={report.report_name}
@@ -61,7 +61,7 @@ const ReportGroupItem: React.FC<ReportGroupItemProps> = ({ group, isExpanded, on
 };
 
 interface ReportsSidebarProps {
-  onNavigate?: (route: string) => void;
+  onNavigate?: (route: string, title: string) => void;
   onBack?: () => void;
 }
 
