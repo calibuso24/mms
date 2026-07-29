@@ -1,6 +1,6 @@
 /* Masterlist Styles */
 .masterlist-container {
-  padding: 2rem;
+  padding: 16px;
   background-color: #f5f5f5;
   min-height: calc(100vh - 80px);
 }
@@ -9,9 +9,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   background: white;
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }

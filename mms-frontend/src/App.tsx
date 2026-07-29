@@ -73,6 +73,7 @@ function AppShell() {
 
   const handleReportsClick = () => {
     setCurrentContext('REPORTS');
+    setPageTitle('REPORTS');
   };
 
   const handleBackToMain = () => {
