@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Typography,
+  Alert,
+  CircularProgress,
+  Container,
+  Paper,
+} from '@mui/material';
 import { useAuth } from '../shared/contexts/auth.js';
-import '../shared/styles/auth.css';
 
 export default function LoginPage() {
   const { login, isLoading } = useAuth();
@@ -20,55 +31,128 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
-          <h1>Materials Management System</h1>
-          <p className="login-subtitle">Sign in to continue</p>
-        </div>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#F5F7FA',
+        backgroundImage: 'linear-gradient(135deg, rgba(15, 59, 104, 0.05) 0%, rgba(0, 120, 212, 0.05) 100%)',
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card
+          elevation={0}
+          sx={{
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E1DFDD',
+            borderRadius: 2,
+          }}
+        >
+          <CardContent sx={{ p: 4 }}>
+            {/* Header */}
+            <Box sx={{ mb: 3, textAlign: 'center' }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  color: '#0b2748',
+                  mb: 1,
+                }}
+              >
+                Materials Management System
+              </Typography>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  color: '#666666',
+                }}
+              >
+                Sign in to continue
+              </Typography>
+            </Box>
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          {error && <div className="login-error">{error}</div>}
+            {/* Form */}
+            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {error && (
+                <Alert severity="error" onClose={() => setError('')}>
+                  {error}
+                </Alert>
+              )}
 
-          <div className="form-group">
-            <label htmlFor="accountName">Account Name</label>
-            <input
-              id="accountName"
-              type="text"
-              value={accountName}
-              onChange={(e) => setAccountName(e.target.value)}
-              placeholder="Enter your account name"
-              disabled={isLoading}
-              required
-            />
-          </div>
+              <TextField
+                id="accountName"
+                label="Account Name"
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="Enter your account name"
+                disabled={isLoading}
+                required
+                fullWidth
+                variant="outlined"
+                size="medium"
+                autoComplete="username"
+              />
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              disabled={isLoading}
-              required
-            />
-          </div>
+              <TextField
+                id="password"
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                disabled={isLoading}
+                required
+                fullWidth
+                variant="outlined"
+                size="medium"
+                autoComplete="current-password"
+              />
 
-          <button
-            type="submit"
-            className="login-button"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                color="primary"
+                disabled={isLoading}
+                sx={{
+                  mt: 1,
+                  py: 1.2,
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                }}
+              >
+                {isLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={20} color="inherit" />
+                    Signing in...
+                  </Box>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+            </Box>
 
-        <div className="login-footer">
-          <p>Demo accounts: superuser, admin</p>
-        </div>
-      </div>
-    </div>
+            {/* Footer */}
+            <Paper
+              elevation={0}
+              sx={{
+                mt: 3,
+                p: 2,
+                backgroundColor: '#F5F7FA',
+                borderRadius: 1,
+                textAlign: 'center',
+              }}
+            >
+              <Typography variant="caption" sx={{ color: '#666666' }}>
+                Demo accounts: <strong>superuser</strong>, <strong>admin</strong>
+              </Typography>
+            </Paper>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }

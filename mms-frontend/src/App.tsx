@@ -1,39 +1,59 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import { Box, Container, CssBaseline, Paper } from '@mui/material';
 import { AuthProvider, useAuth } from './shared/contexts/auth.js';
 import { NavigationProvider, useNavigation } from './shared/contexts/navigation.js';
-import { MainSidebar } from './shared/components/MainSidebar.js';
-import { ReportsSidebar } from './shared/components/ReportsSidebar.js';
+import { MainSidebar } from './shared/components/Sidebar.js';
+import { ReportsSidebar } from './shared/components/ReportsSidebarMUI.js';
+import { TopBar } from './shared/components/TopBar.js';
+import { KPICard } from './shared/components/KPICard.js';
+import { muiTheme } from './shared/theme/muiTheme.js';
 import LoginPage from './pages/Login.js';
 import MaterialsPage from './pages/Materials.js';
-import './shared/styles/theme.css';
-import './shared/styles/auth.css';
-import './shared/styles/sidebar.css';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 function DefaultPage() {
   return (
-    <div className="page-card">
-      <div className="page-title">Dashboard</div>
-      <p className="page-copy">Welcome to the MMS shell. This is the first layout milestone for module-based development.</p>
-      <div className="stat-grid">
-        <div className="stat-box">
-          <div className="stat-label">Open Requests</div>
-          <div className="stat-value">24</div>
-        </div>
-        <div className="stat-box">
-          <div className="stat-label">Pending POs</div>
-          <div className="stat-value">8</div>
-        </div>
-        <div className="stat-box">
-          <div className="stat-label">Stock Transfers</div>
-          <div className="stat-value">15</div>
-        </div>
-      </div>
-    </div>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            md: 'repeat(3, 1fr)',
+          },
+          gap: 2,
+        }}>
+          <KPICard
+            label="Open Requests"
+            value="24"
+            icon={<TrendingUpIcon />}
+            color="info"
+          />
+          <KPICard
+            label="Pending POs"
+            value="8"
+            icon={<PendingActionsIcon />}
+            color="warning"
+          />
+          <KPICard
+            label="Stock Transfers"
+            value="15"
+            icon={<SwapHorizIcon />}
+            color="info"
+          />
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
 function DynamicPage({ route }: { route: string | null }) {
+  const { pageTitle } = useNavigation();
   if (!route) {
     return <DefaultPage />;
   }
@@ -47,10 +67,9 @@ function DynamicPage({ route }: { route: string | null }) {
   }
 
   return (
-    <div className="page-card">
-      <div className="page-title">{route}</div>
-      <p className="page-copy">This page is under development.</p>
-    </div>
+    <Paper sx={{ p: 3 }}>
+      <Box>This page is under development.</Box>
+    </Paper>
   );
 }
 
@@ -59,6 +78,7 @@ function AppShell() {
   const { currentContext, setCurrentContext, pageTitle, setPageTitle } = useNavigation();
   const navigate = useNavigate();
   const [currentRoute, setCurrentRoute] = useState('/dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -68,8 +88,8 @@ function AppShell() {
   const handleNavigate = (route: string, title?: string) => {
     setCurrentRoute(route);
     navigate(`/app${route}`);
+    setSidebarOpen(false);
     
-    // Update page title - use provided title or derive from route
     if (title) {
       setPageTitle(title);
     } else {
@@ -88,7 +108,7 @@ function AppShell() {
 
   const handleReportsClick = () => {
     setCurrentContext('REPORTS');
-    setPageTitle('REPORTS');
+    setPageTitle('Reports');
   };
 
   const handleBackToMain = () => {
@@ -100,9 +120,16 @@ function AppShell() {
 
   const sidebarContent =
     currentContext === 'REPORTS' ? (
-      <ReportsSidebar onNavigate={handleNavigate} onBack={handleBackToMain} />
+      <ReportsSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNavigate={handleNavigate}
+        onBack={handleBackToMain}
+      />
     ) : (
       <MainSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
         onReportsClick={handleReportsClick}
@@ -110,23 +137,42 @@ function AppShell() {
     );
 
   return (
-    <div className="app-bg">
-      <div className="app-shell">
-        {sidebarContent}
-        <main className="content">
-          <header className="header">
-            <div>{pageTitle}</div>
-            <div className="header-user">{account?.full_name || account?.account_name || 'User'}</div>
-          </header>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#F5F7FA' }}>
+      <TopBar
+        onMenuClick={() => setSidebarOpen(true)}
+        pageTitle={pageTitle}
+        userName={account?.full_name || account?.account_name || 'User'}
+        onLogout={handleLogout}
+      />
 
-          <div className="canvas">
-            <DynamicPage route={currentRoute} />
-          </div>
+      {sidebarContent}
 
-          <footer className="footer">MMS Operations Portal | Procurement | Inventory | Reporting</footer>
-        </main>
-      </div>
-    </div>
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          p: 3,
+        }}
+      >
+        <Container maxWidth="xl">
+          <DynamicPage route={currentRoute} />
+        </Container>
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{
+          backgroundColor: '#FFFFFF',
+          borderTop: '1px solid #E1DFDD',
+          p: 1.5,
+          textAlign: 'center',
+          fontSize: '0.85rem',
+          color: '#666666',
+        }}
+      >
+        MMS Operations Portal | Procurement | Inventory | Reporting
+      </Paper>
+    </Box>
   );
 }
 
@@ -145,12 +191,15 @@ function AppShellWrapper() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <NavigationProvider>
-          <AppShellWrapper />
-        </NavigationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider theme={muiTheme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <AuthProvider>
+          <NavigationProvider>
+            <AppShellWrapper />
+          </NavigationProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
