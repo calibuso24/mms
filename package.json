@@ -2,11 +2,12 @@
   "name": "mms",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
+ "scripts": {
     "dev": "concurrently \"npm --prefix mms-backend run dev\" \"npm --prefix mms-frontend run dev\"",
-    "rebuild": "rm -rf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install"
+    "rebuild": "rimraf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "rimraf": "^6.1.3"
   }
 }

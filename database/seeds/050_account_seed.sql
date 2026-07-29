@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 INSERT INTO account (account_name, password_hash, full_name, profile, is_active, log_date_created)
 VALUES
   ('superuser', crypt('superuser', gen_salt('bf')), 'SuperUser', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
-  ('admin', crypt('admin', gen_salt('bf')), 'Admin', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
+  --('admin', crypt('admin', gen_salt('bf')), 'Admin', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
   ('auditor', crypt('auditor', gen_salt('bf')), 'Auditor', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now())
 ON CONFLICT (account_name) DO UPDATE
   SET full_name = EXCLUDED.full_name,
