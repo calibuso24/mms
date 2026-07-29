@@ -19,7 +19,8 @@ VALUES
     ('REPORT_CATEGORY', 'WH', 'Warehouse', 'Warehouse reports', 2, true, CURRENT_TIMESTAMP),
     ('REPORT_CATEGORY', 'PRJ', 'Projects', 'Project reports', 3, true, CURRENT_TIMESTAMP),
     ('REPORT_CATEGORY', 'ACC', 'Accounting', 'Accounting reports', 4, true, CURRENT_TIMESTAMP),
-    ('REPORT_CATEGORY', 'ADM', 'Administration', 'Administration reports', 5, true, CURRENT_TIMESTAMP)
+    ('REPORT_CATEGORY', 'MLS', 'Masterlist', 'Masterlist reports', 5, true, CURRENT_TIMESTAMP),
+    ('REPORT_CATEGORY', 'ADM', 'Administration', 'Administration reports', 6, true, CURRENT_TIMESTAMP)
 ON CONFLICT (look_up_type, name) DO NOTHING;
 
 -- Create index for report category lookups
@@ -521,7 +522,54 @@ SELECT
     FALSE,
     TRUE,
     'report_catalog'
-WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'ADM004');
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'ADM004')
+
+-- MASTERLIST REPORTS (Category: Masterlist)
+UNION ALL
+
+SELECT
+    'MLS001',
+    'Product List',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Masterlist'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Overview of all masterlist items',
+    '/reports/mls001',
+    1,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'MLS001')
+
+UNION ALL
+
+SELECT
+    'MLS002',
+    'Supplier List',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Masterlist'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Overview of all suppliers',
+    '/reports/mls002',
+    2,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'MLS002')
+
+UNION ALL
+
+SELECT
+    'MLS003',
+    'Project List',
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_CATEGORY' AND name = 'Masterlist'),
+    (SELECT look_up_id FROM look_up WHERE look_up_type = 'REPORT_TYPE' AND name = 'SQL'),
+    'Overview of all projects',
+    '/reports/mls003',
+    3,
+    TRUE,
+    TRUE,
+    'report_catalog'
+WHERE NOT EXISTS (SELECT 1 FROM report_catalog WHERE report_code = 'MLS003')
+;
 
 -- ============================================================================
 -- SECTION 2: SEED REPORT PARAMETERS

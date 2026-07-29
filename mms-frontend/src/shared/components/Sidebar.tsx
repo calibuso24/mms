@@ -222,7 +222,7 @@ export const MainSidebar: React.FC<MainSidebarProps> = ({
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Box sx={{ p: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-          MMS
+          Material Management System
         </Typography>
       </Box>
 
