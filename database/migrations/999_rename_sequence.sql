@@ -25,9 +25,9 @@ BEGIN
             new_name
         );
 
-        RAISE NOTICE 'Renamed %.% -> %',
-            r.schema_name,
-            r.sequence_name,
-            new_name;
+        -- RAISE NOTICE 'Renamed %.% -> %',
+        --     r.schema_name,
+        --     r.sequence_name,
+        --     new_name;
     END LOOP;
 END $$;

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { Box, Container, CssBaseline, Paper } from '@mui/material';
 import { AuthProvider, useAuth } from './shared/contexts/auth.js';
@@ -11,6 +11,7 @@ import { KPICard } from './shared/components/KPICard.js';
 import { muiTheme } from './shared/theme/muiTheme.js';
 import LoginPage from './pages/Login.js';
 import MaterialsPage from './pages/Materials.js';
+import ManageUsersPage from './pages/ManageUsers.js';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -66,6 +67,10 @@ function DynamicPage({ route }: { route: string | null }) {
     return <MaterialsPage />;
   }
 
+  if (route?.includes('manage-users')) {
+    return <ManageUsersPage />;
+  }
+
   return (
     <Paper sx={{ p: 3 }}>
       <Box>This page is under development.</Box>
@@ -77,8 +82,29 @@ function AppShell() {
   const { isLoggedIn, logout, account } = useAuth();
   const { currentContext, setCurrentContext, pageTitle, setPageTitle } = useNavigation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentRoute, setCurrentRoute] = useState('/dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const routeFromUrl = location.pathname.startsWith('/app')
+      ? location.pathname.slice(4) || '/dashboard'
+      : '/dashboard';
+
+    setCurrentRoute(routeFromUrl);
+
+    const routeParts = routeFromUrl.split('/').filter(Boolean);
+    if (routeParts.length === 0 || routeParts[0] === 'dashboard') {
+      setPageTitle('Dashboard');
+      return;
+    }
+
+    const derivedTitle = routeParts[routeParts.length - 1]
+      .split('-')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    setPageTitle(derivedTitle);
+  }, [location.pathname, setPageTitle]);
 
   const handleLogout = () => {
     logout();

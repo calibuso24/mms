@@ -38,8 +38,9 @@ export class AccountController {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const offset = parseInt(req.query.offset as string) || 0;
+      const search = (req.query.search as string) || undefined;
 
-      const result = await this.accountService.listAccounts(limit, offset);
+      const result = await this.accountService.listAccounts(limit, offset, search);
       res.json(result);
     } catch (error) {
       next(error);
@@ -48,7 +49,11 @@ export class AccountController {
 
   async createAccount(req: Request, res: Response, next: NextFunction) {
     try {
-      const requestBody: CreateAccountRequest = req.body;
+      const requestBody: CreateAccountRequest = {
+        ...req.body,
+        user_name: req.body.user_name ?? req.body.userName,
+        full_name: req.body.full_name ?? req.body.fullName,
+      };
 
       const account = await this.accountService.createAccount(requestBody, req.accountId);
       res.status(201).json(account);
@@ -66,7 +71,11 @@ export class AccountController {
         throw new ValidationError('Invalid account ID');
       }
 
-      const requestBody: UpdateAccountRequest = req.body;
+      const requestBody: UpdateAccountRequest = {
+        ...req.body,
+        user_name: req.body.user_name ?? req.body.userName,
+        full_name: req.body.full_name ?? req.body.fullName,
+      };
       const account = await this.accountService.updateAccount(accountId, requestBody, req.accountId);
       res.json(account);
     } catch (error) {
@@ -93,14 +102,15 @@ export class AccountController {
   async assignRole(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { role_code } = req.body;
+      const { role_code, roleCode } = req.body;
       const accountId = parseInt(id, 10);
+      const normalizedRoleCode = role_code || roleCode;
 
-      if (isNaN(accountId) || !role_code) {
+      if (isNaN(accountId) || !normalizedRoleCode) {
         throw new ValidationError('Invalid account ID or role code');
       }
 
-      await this.accountService.assignRole(accountId, role_code, req.accountId);
+      await this.accountService.assignRole(accountId, normalizedRoleCode, req.accountId);
       res.json({ message: 'Role assigned successfully' });
     } catch (error) {
       next(error);
@@ -123,18 +133,42 @@ export class AccountController {
     }
   }
 
+  async listRoles(req: Request, res: Response, next: NextFunction) {
+    try {
+      const roles = await this.accountService.listRoles();
+      res.json(roles);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAccountPermissions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const accountId = parseInt(id, 10);
+
+      if (isNaN(accountId)) {
+        throw new ValidationError('Invalid account ID');
+      }
+
+      const permissions = await this.accountService.getAccountPermissions(accountId);
+      res.json(permissions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Address management
   async createAddress(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { address, label, is_primary } = req.body;
       const accountId = parseInt(id, 10);
 
-      if (isNaN(accountId) || !address) {
-        throw new ValidationError('Invalid account ID or address');
+      if (isNaN(accountId)) {
+        throw new ValidationError('Invalid account ID');
       }
 
-      const result = await this.accountService.createAddress(accountId, address, label, is_primary);
+      const result = await this.accountService.createAddress(accountId, req.body);
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -179,14 +213,19 @@ export class AccountController {
   async createPhone(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { phone_number, label, is_primary } = req.body;
+      const { phone_number, phone_type_id, is_primary } = req.body;
       const accountId = parseInt(id, 10);
 
       if (isNaN(accountId) || !phone_number) {
         throw new ValidationError('Invalid account ID or phone number');
       }
 
-      const result = await this.accountService.createPhone(accountId, phone_number, label, is_primary);
+      const result = await this.accountService.createPhone(
+        accountId,
+        phone_number,
+        phone_type_id,
+        is_primary
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -231,14 +270,19 @@ export class AccountController {
   async createEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { email_address, label, is_primary } = req.body;
+      const { email_address, email_type_id, is_primary } = req.body;
       const accountId = parseInt(id, 10);
 
       if (isNaN(accountId) || !email_address) {
         throw new ValidationError('Invalid account ID or email address');
       }
 
-      const result = await this.accountService.createEmail(accountId, email_address, label, is_primary);
+      const result = await this.accountService.createEmail(
+        accountId,
+        email_address,
+        email_type_id,
+        is_primary
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
