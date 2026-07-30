@@ -16,7 +16,7 @@ SELECT contact_id, name,
 FROM source.tbluser
 ;
 
-INSERT INTO account(account_id, account_name, password_hash, log_date_created, log_date_updated, is_active, contact_id)
+INSERT INTO account(account_id, user_name, password, log_date_created, log_date_updated, is_active, contact_id)
 SELECT account_id,userid,crypt(password, gen_salt('bf')),datecreated,datemodified,
 CASE WHEN status = 1 THEN true ELSE false END as status,
 contact_id

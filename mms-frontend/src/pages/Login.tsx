@@ -15,7 +15,7 @@ import { useAuth } from '../shared/contexts/auth.js';
 
 export default function LoginPage() {
   const { login, isLoading } = useAuth();
-  const [accountName, setAccountName] = useState('');
+  const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -24,7 +24,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await login(accountName, password);
+      await login(userName, password);
     } catch (err: any) {
       setError(err.message || 'Login failed');
     }
@@ -82,12 +82,12 @@ export default function LoginPage() {
               )}
 
               <TextField
-                id="accountName"
-                label="Account Name"
+                id="userName"
+                label="User Name"
                 type="text"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="Enter your account name"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                placeholder="Enter your user name"
                 disabled={isLoading}
                 required
                 fullWidth
@@ -136,7 +136,7 @@ export default function LoginPage() {
             </Box>
 
             {/* Footer */}
-            <Paper
+            {/* <Paper
               elevation={0}
               sx={{
                 mt: 3,
@@ -149,7 +149,7 @@ export default function LoginPage() {
               <Typography variant="caption" sx={{ color: '#666666' }}>
                 Demo accounts: <strong>superuser</strong>, <strong>admin</strong>
               </Typography>
-            </Paper>
+            </Paper> */}
           </CardContent>
         </Card>
       </Container>

@@ -66,8 +66,8 @@ export class ApiClient {
 
 // Auth API
 export const authApi = {
-  login: (accountName: string, password: string) =>
-    ApiClient.post('/auth/login', { account_name: accountName, password }),
+  login: (userName: string, password: string) =>
+    ApiClient.post('/auth/login', { user_name: userName, password }),
   setPassword: (password: string, currentPassword?: string) =>
     ApiClient.post('/auth/set-password', { password, current_password: currentPassword }),
 };

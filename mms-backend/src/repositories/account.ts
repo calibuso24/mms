@@ -2,8 +2,8 @@ import { pool } from '../config/database.js';
 
 export interface Account {
   account_id: number;
-  account_name: string;
-  password_hash: string | null;
+  user_name: string;
+  password: string | null;
   full_name: string;
   contact_id: number | null;
   is_active: boolean;
@@ -15,10 +15,10 @@ export interface Account {
 }
 
 export class AccountRepository {
-  async findByAccountName(accountName: string): Promise<Account | null> {
+  async findByUserName(userName: string): Promise<Account | null> {
     const result = await pool.query(
-      'SELECT * FROM account WHERE account_name = $1 AND is_deleted = false',
-      [accountName]
+      'SELECT * FROM account WHERE user_name = $1 AND is_deleted = false',
+      [userName]
     );
     return result.rows[0] || null;
   }
@@ -68,25 +68,25 @@ export class AccountRepository {
   }
 
   async create(
-    accountName: string,
+    userName: string,
     fullName: string,
-    passwordHash: string | null,
+    password: string | null,
     contactId: number | null = null,
     createdByAccountId: number | null = null
   ): Promise<Account> {
     const result = await pool.query(
       `INSERT INTO account 
-       (account_name, password_hash, full_name, contact_id, is_active, log_date_created, log_created_by_account_id, log_module_created)
+       (user_name, password, full_name, contact_id, is_active, log_date_created, log_created_by_account_id, log_module_created)
        VALUES ($1, $2, $3, $4, true, now(), $5, 'auth')
        RETURNING *`,
-      [accountName, passwordHash, fullName, contactId, createdByAccountId]
+      [userName, password, fullName, contactId, createdByAccountId]
     );
     return result.rows[0];
   }
 
   async update(
     accountId: number,
-    updates: Partial<Pick<Account, 'full_name' | 'is_active' | 'password_hash'>>,
+    updates: Partial<Pick<Account, 'full_name' | 'is_active' | 'password'>>,
     updatedByAccountId: number | null = null
   ): Promise<Account> {
     const fields: string[] = [];
@@ -101,9 +101,9 @@ export class AccountRepository {
       fields.push(`is_active = $${paramCount++}`);
       values.push(updates.is_active);
     }
-    if (updates.password_hash !== undefined) {
-      fields.push(`password_hash = $${paramCount++}`);
-      values.push(updates.password_hash);
+    if (updates.password !== undefined) {
+      fields.push(`password = $${paramCount++}`);
+      values.push(updates.password);
     }
 
     fields.push(`log_date_updated = now()`);

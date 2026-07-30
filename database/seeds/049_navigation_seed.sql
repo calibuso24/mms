@@ -54,9 +54,10 @@ VALUES
 -- Administrator submenu
 INSERT INTO navigation (parent_navigation_id, context, navigation_type, title, route, icon, display_order, is_visible, is_deleted)
 VALUES
-    (7, 'MAIN', 'MENU', 'Manage User', '/admin/manage-user', 'users', 0, true, false),
-    (7, 'MAIN', 'MENU', 'Role Permission', '/admin/role-permission', 'lock', 1, true, false),
-    (7, 'MAIN', 'MENU', 'System Configuration', '/admin/system-config', 'settings', 2, true, false);
+    (7, 'MAIN', 'MENU', 'Manage Users', '/admin/manage-users', 'users', 0, true, false),
+    (7, 'MAIN', 'MENU', 'Manage Roles', '/admin/manage-roles', 'admin-panel-settings', 1, true, false),
+    (7, 'MAIN', 'MENU', 'Audit Logs', '/admin/audit-logs', 'history', 2, true, false),
+    (7, 'MAIN', 'MENU', 'System Settings', '/admin/system-settings', 'settings', 3, true, false);
 
 -- REPORTS Context Navigation
 -- Reports main categories
