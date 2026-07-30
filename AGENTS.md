@@ -28,3 +28,17 @@ Before generating code:
 8. If the request conflicts with the existing architecture, explain the conflict instead of generating incorrect code.
 
 9. Never generate unnecessary markdown documentation unless explicitly requested.
+
+Database Rule
+
+The ERD is the single source of truth.
+
+AI must never redesign the database.
+
+Before generating code:
+1. Read the ERD.
+2. Match the existing database schema.
+3. Reuse existing tables.
+4. Reuse existing foreign keys.
+5. Reuse existing lookup tables.
+6. If the requested feature requires a schema change not present in the ERD, stop and request approval instead of modifying the design.

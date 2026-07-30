@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import accountRoutes from './routes/account.js';
 import productRoutes from './routes/product.js';
 import navigationRoutes from './routes/navigation.js';
+import roleRoutes from './routes/roles.js';
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.get('/health', (req: Request, res: Response) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/accounts', authMiddleware, accountRoutes);
+app.use('/api/roles', authMiddleware, roleRoutes);
 app.use('/api/navigation', authMiddleware, navigationRoutes);
 app.use('/api', authMiddleware, productRoutes);
 
