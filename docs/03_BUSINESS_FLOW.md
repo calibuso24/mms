@@ -6,7 +6,7 @@ MMS covers five major operational flows:
 
 1. **Material Request** — Site/project raises a request for materials
 2. **Purchasing** — Office creates a PO when materials are not in stock
-3. **Inventory Movement** — Physical movement is logged in stock transfer
+3. **Inventory Movement** — Physical movement is logged in stock transfer and stock movement receipts
 4. **Job Order** — Materials sent to a service shop for fabrication or work
 5. **Audit & Adjustment** — Quarterly physical count and stock correction
 
@@ -29,8 +29,9 @@ MMS covers five major operational flows:
 
 **If material is NOT available:**
 - Create a `purchase_order` linked to the `material_request_id`.
-- Route through supplier delivery → `delivery_advice` → `delivery_receipt`.
-- Receive goods → update stock.
+- Supplier issues one or more `delivery_advice` documents.
+- Warehouse creates `supplier_delivery` linked to the approved purchase order and delivery advice references.
+- Posting `supplier_delivery` updates stock and purchase order received quantities.
 
 ---
 
@@ -47,12 +48,17 @@ MMS covers five major operational flows:
 - Supports partial deliveries over multiple advice documents.
 
 ### 2.3 Goods Receipt
-- Physical receipt recorded in `delivery_receipt` + `delivery_receipt_item`.
-- If from supplier: `purchase_order_id` is set.
-- If internal warehouse issue: `purchase_order_id` is NULL.
-- Receipt triggers stock updates.
+- Supplier receipt is recorded in `supplier_delivery` + `supplier_delivery_item`.
+- One supplier delivery can include multiple `delivery_advice` references via `supplier_delivery_advice`.
+- Supplier delivery must reference an approved purchase order.
+- Stock is increased only when supplier delivery is posted.
 
-### 2.4 Site Purchase
+### 2.4 Delivery Receipt (Project/Warehouse Issue)
+- Physical issue/receipt to project remains recorded in `delivery_receipt` + `delivery_receipt_item`.
+- If internal warehouse issue: `purchase_order_id` is NULL.
+- This document is separate from supplier-to-warehouse receiving.
+
+### 2.5 Site Purchase
 - `site_purchase` handles direct purchasing at site level without a formal PO.
 
 ---
@@ -133,6 +139,7 @@ All inventory consumption goes through this PostgreSQL function:
 | Status and type values come from `look_up` | FK to `look_up_id` |
 | Username must be unique among non-deleted accounts | Partial unique index |
 | Physical count does not auto-adjust stock | Application logic |
+| Supplier delivery posts inventory only on post action | `post_supplier_delivery()` database function |
 
 
 # MMS — Navigation System

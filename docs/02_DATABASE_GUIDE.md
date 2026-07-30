@@ -48,6 +48,7 @@ All migrations run in numeric order from `database/migrations/`.
 | `041_site_purchase.sql` | `site_purchase` |
 | `042_physical_count.sql` | `physical_count` |
 | `043_material_adjustment.sql` | `material_adjustment` |
+| `044_supplier_delivery.sql` | `supplier_delivery`, `supplier_delivery_item`, `supplier_delivery_advice` |
 | `046_report_catalog.sql` | `report_catalog` |
 | `047_report_parameter.sql` | `report_parameter` |
 | `048_report_history.sql` | `report_history` |
@@ -464,6 +465,51 @@ Records goods received (from supplier or internal warehouse).
 ### `delivery_receipt_item`
 Line items for `delivery_receipt`.
 
+### `supplier_delivery`
+Supplier-to-warehouse inventory receipt transaction. One purchase order can have multiple supplier delivery records (partial deliveries).
+| Column | Type |
+|---|---|
+| `supplier_delivery_id` | BIGINT PK |
+| `supplier_delivery_number` | TEXT UNIQUE |
+| `purchase_order_id` | BIGINT → `purchase_order` |
+| `supplier_party_id` | BIGINT → `party` |
+| `warehouse_party_id` | BIGINT → `party` |
+| `received_by_account_id` | BIGINT → `account` |
+| `delivery_date` | TIMESTAMPTZ |
+| `status_id` | BIGINT → `look_up` (`supplier_delivery_status`) |
+| `posted_at` | TIMESTAMPTZ (nullable) |
+| `posted_by_account_id` | BIGINT → `account` (nullable) |
+| `reference_code` | TEXT |
+| `notes` | TEXT |
+| audit fields + soft delete | |
+
+### `supplier_delivery_item`
+Line items for supplier deliveries. Only `accepted_quantity` is posted to inventory.
+| Column | Type |
+|---|---|
+| `supplier_delivery_item_id` | BIGINT PK |
+| `supplier_delivery_id` | BIGINT → `supplier_delivery` |
+| `purchase_order_item_id` | BIGINT → `purchase_order_item` |
+| `material_id` | BIGINT → `material` |
+| `material_brand_id` | BIGINT → `material_brand` (nullable) |
+| `uom_id` | BIGINT → `unit_of_measure` |
+| `delivered_quantity` | NUMERIC |
+| `accepted_quantity` | NUMERIC |
+| `rejected_quantity` | NUMERIC |
+| `stock_movement_id` | BIGINT → `stock_movement` (nullable; set when posted) |
+| `notes` | TEXT |
+| audit fields + soft delete | |
+
+### `supplier_delivery_advice`
+Junction table that links one supplier delivery record to one or more delivery advice documents.
+| Column | Type |
+|---|---|
+| `supplier_delivery_advice_id` | BIGINT PK |
+| `supplier_delivery_id` | BIGINT → `supplier_delivery` |
+| `delivery_advice_id` | BIGINT → `delivery_advice` |
+| `notes` | TEXT |
+| audit fields + soft delete | |
+
 ---
 
 ## Module 6 — Job Order & Service
@@ -575,6 +621,22 @@ FUNCTION stock_movement_consume(
 ```
 Atomically consumes inventory using FIFO or LIFO, updates `stock_layer`, and writes to `stock_movement`.
 
+### Supplier Delivery Functions and Triggers (`migrations/044_supplier_delivery.sql`)
+- `post_supplier_delivery(p_supplier_delivery_id, p_posted_by_account_id)`
+  - Posts a draft supplier delivery.
+  - Creates `stock_movement` rows for accepted quantities only.
+  - Updates `stock_balance` and creates `stock_layer` rows.
+  - Updates `purchase_order_item.received_quantity` and derives PO status (`partially_delivered` or `delivered`).
+
+- `validate_supplier_delivery_header()` trigger function
+  - Enforces that supplier delivery supplier matches the supplier on the referenced purchase order.
+
+- `validate_supplier_delivery_item()` trigger function
+  - Enforces that each delivery item belongs to the same purchase order and matches PO item material/UOM.
+
+- `validate_supplier_delivery_advice()` trigger function
+  - Enforces that linked delivery advice documents belong to the same purchase order as the supplier delivery.
+
 ---
 
 ## Seed Data
@@ -597,6 +659,8 @@ Atomically consumes inventory using FIFO or LIFO, updates `stock_layer`, and wri
 | `material_status` | `active`, `inactive` |
 | `stock_movement_type` | `transfer`, `issue`, `receipt`, `adjustment`, `return` |
 | `stock_movement_status` | `pending`, `completed`, `cancelled`, `failed` |
+| `purchase_order_status` | `draft`, `approved`, `partially_delivered`, `delivered`, `cancelled` |
+| `supplier_delivery_status` | `draft`, `posted`, `cancelled` |
 | `address_type` | `home`, `office`, `warehouse`, `billing`, `shipping`, `project_site` |
 | `PHONE_TYPE` | `mobile`, `home`, `office`, `fax`, `whatsapp`, `emergency` |
 | `EMAIL_TYPE` | `personal`, `work`, `billing`, `support`, `notification` |
