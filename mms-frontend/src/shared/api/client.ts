@@ -205,6 +205,24 @@ export const lookupApi = {
   },
 };
 
+// Role Management API
+export const roleManagementApi = {
+  list: (params?: { limit?: number; offset?: number; search?: string; sort_by?: string; sort_dir?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.append('limit', params.limit.toString());
+    if (params?.offset !== undefined) qs.append('offset', params.offset.toString());
+    if (params?.search) qs.append('search', params.search);
+    if (params?.sort_by) qs.append('sort_by', params.sort_by);
+    if (params?.sort_dir) qs.append('sort_dir', params.sort_dir);
+    return ApiClient.get(`/roles?${qs.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/roles/${id}`),
+  create: (data: any) => ApiClient.post('/roles', data),
+  update: (id: number, data: any) => ApiClient.put(`/roles/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/roles/${id}`),
+  listPermissions: () => ApiClient.get('/roles/meta/permissions'),
+};
+
 // Navigation API
 export const navigationApi = {
   getMain: () => ApiClient.get('/navigation/main'),
