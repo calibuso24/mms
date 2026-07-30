@@ -472,8 +472,8 @@ Supplier-to-warehouse inventory receipt transaction. One purchase order can have
 | `supplier_delivery_id` | BIGINT PK |
 | `supplier_delivery_number` | TEXT UNIQUE |
 | `purchase_order_id` | BIGINT → `purchase_order` |
-| `supplier_party_id` | BIGINT → `party` |
-| `warehouse_party_id` | BIGINT → `party` |
+| `supplier_id` | BIGINT → `party` |
+| `project_id` | BIGINT → `party` |
 | `received_by_account_id` | BIGINT → `account` |
 | `delivery_date` | TIMESTAMPTZ |
 | `status_id` | BIGINT → `look_up` (`supplier_delivery_status`) |
