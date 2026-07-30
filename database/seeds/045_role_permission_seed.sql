@@ -74,7 +74,13 @@ VALUES
     ('Site', 'UPDATE', 'Update Sites', 'Update site information', TRUE),
     ('Site', 'DELETE', 'Delete Sites', 'Delete sites', TRUE),
     ('Site', 'APPROVE', 'Approve Sites', 'Approve site operations', TRUE),
-    ('Site', 'PRINT', 'Print Sites', 'Print site information', TRUE)
+    ('Site', 'PRINT', 'Print Sites', 'Print site information', TRUE),
+    ('Project Management', 'VIEW', 'View Projects', 'View project information', TRUE),
+    ('Project Management', 'CREATE', 'Create Projects', 'Create new projects', TRUE),
+    ('Project Management', 'UPDATE', 'Update Projects', 'Update project information', TRUE),
+    ('Project Management', 'DELETE', 'Delete Projects', 'Delete projects', TRUE),
+    ('Project Management', 'EXPORT', 'Export Projects', 'Export project data', TRUE),
+    ('Project Management', 'PRINT', 'Print Projects', 'Print project information', TRUE)
 ON CONFLICT (module_name, permission_code) DO NOTHING;
 
 -- Insert permission codes for Purchasing modules
@@ -338,7 +344,7 @@ SELECT
 FROM role r
 JOIN permission p ON p.is_active = TRUE
 WHERE r.role_name = 'Coordinating Staff'
-  AND p.module_name IN ('Material Request', 'Job Order', 'Site', 'Dashboard', 'Profile', 'Notifications')
+  AND p.module_name IN ('Material Request', 'Job Order', 'Site', 'Project Management', 'Dashboard', 'Profile', 'Notifications')
   AND p.permission_code IN ('VIEW', 'CREATE', 'UPDATE', 'PRINT', 'EXPORT')
   AND NOT EXISTS (
       SELECT 1
@@ -361,7 +367,7 @@ SELECT
 FROM role r
 JOIN permission p ON p.is_active = TRUE
 WHERE r.role_name = 'Coordinating Supervisor'
-  AND p.module_name IN ('Material Request', 'Job Order', 'Site', 'Dashboard', 'Profile', 'Notifications')
+  AND p.module_name IN ('Material Request', 'Job Order', 'Site', 'Project Management', 'Dashboard', 'Profile', 'Notifications')
   AND p.permission_code IN ('VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'PRINT', 'EXPORT')
   AND NOT EXISTS (
       SELECT 1

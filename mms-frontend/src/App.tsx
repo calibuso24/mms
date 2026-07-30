@@ -13,6 +13,7 @@ import LoginPage from './pages/Login.js';
 import MaterialsPage from './pages/Materials.js';
 import ManageUsersPage from './pages/ManageUsers.js';
 import ManageRolesPage from './pages/ManageRoles.js';
+import { ProjectManagementPage, SupplierManagementPage } from './pages/PartyManagement.js';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -74,6 +75,14 @@ function DynamicPage({ route }: { route: string | null }) {
 
   if (route?.includes('manage-roles')) {
     return <ManageRolesPage />;
+  }
+
+  if (route?.includes('project-management')) {
+    return <ProjectManagementPage />;
+  }
+
+  if (route?.includes('supplier-management')) {
+    return <SupplierManagementPage />;
   }
 
   return (

@@ -195,6 +195,36 @@ export const materialApi = {
   delete: (id: number) => ApiClient.delete(`/materials/${id}`),
 };
 
+// Project Management API
+export const projectApi = {
+  list: (limit?: number, offset?: number, search?: string) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
+    return ApiClient.get(`/projects?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/projects/${id}`),
+  create: (data: any) => ApiClient.post('/projects', data),
+  update: (id: number, data: any) => ApiClient.put(`/projects/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/projects/${id}`),
+};
+
+// Supplier Management API
+export const supplierApi = {
+  list: (limit?: number, offset?: number, search?: string) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
+    return ApiClient.get(`/suppliers?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/suppliers/${id}`),
+  create: (data: any) => ApiClient.post('/suppliers', data),
+  update: (id: number, data: any) => ApiClient.put(`/suppliers/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/suppliers/${id}`),
+};
+
 // Lookup API
 export const lookupApi = {
   listByType: (type: string, limit?: number, offset?: number) => {
