@@ -10,6 +10,7 @@ import {
   UpdateProjectDto,
   CreateSupplierDto,
   UpdateSupplierDto,
+  SupplierBusinessHourDto,
 } from '../modules/party/dtos.js';
 import {
   PartyListViewModel,
@@ -17,6 +18,7 @@ import {
   SupplierListItemViewModel,
   ProjectDetailViewModel,
   SupplierDetailViewModel,
+  SupplierBusinessHourViewModel,
 } from '../modules/party/viewModels.js';
 import {
   AddressDto,
@@ -40,6 +42,7 @@ const PARTY_TYPE_LOOKUP = 'party_type';
 const PARTY_STATUS_LOOKUP = 'party_status';
 const PROJECT_TYPE_LOOKUP = 'project_type';
 const PAYMENT_TERMS_LOOKUP = 'payment_terms';
+const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 7];
 
 export class PartyService {
   private partyRepository = new PartyRepository();
@@ -306,9 +309,22 @@ export class PartyService {
   ): Promise<PartyListViewModel<SupplierListItemViewModel>> {
     const supplierTypeId = await this.requireLookupIdByCode(PARTY_TYPE_LOOKUP, 'supplier');
     const { rows, total } = await this.partyRepository.findAllByType(supplierTypeId, limit, offset, search);
+    const schedules = await this.partyRepository.listBusinessHoursBySupplierIds(rows.map((row) => row.party_id));
+
+    const scheduleBySupplierId = new Map<number, SupplierBusinessHourViewModel[]>();
+    for (const row of schedules) {
+      const existing = scheduleBySupplierId.get(row.supplier_id) ?? [];
+      existing.push({
+        day_of_week: row.day_of_week,
+        is_closed: row.is_closed,
+        opening_time: row.opening_time,
+        closing_time: row.closing_time,
+      });
+      scheduleBySupplierId.set(row.supplier_id, existing);
+    }
 
     return {
-      items: rows.map((row) => this.mapSupplierListRow(row)),
+      items: rows.map((row) => this.mapSupplierListRow(row, scheduleBySupplierId.get(row.party_id) ?? [])),
       total,
     };
   }
@@ -322,6 +338,7 @@ export class PartyService {
     createdByAccountId?: number
   ): Promise<SupplierDetailViewModel> {
     this.validateSupplierCreate(dto);
+    const schedule = this.normalizeSupplierSchedule(dto.business_hours_schedule);
 
     const existingByCode = await this.partyRepository.findByCode(dto.supplier_code);
     if (existingByCode) {
@@ -360,8 +377,16 @@ export class PartyService {
           description: dto.description ?? null,
           project_type_id: null,
           payment_terms_id: dto.payment_terms_id ?? null,
-          business_hours: dto.business_hours ?? null,
+          business_hours: null,
         },
+        createdByAccountId ?? null,
+        'supplier_management',
+        client
+      );
+
+      await this.partyRepository.replaceBusinessHoursForSupplier(
+        created.party_id,
+        schedule,
         createdByAccountId ?? null,
         'supplier_management',
         client
@@ -390,7 +415,7 @@ export class PartyService {
             supplier_name: dto.supplier_name,
             status_id: statusId,
             payment_terms_id: dto.payment_terms_id ?? null,
-            business_hours: dto.business_hours ?? null,
+            business_hours_schedule: schedule,
           },
           transactionId,
           notes: 'Supplier created via Supplier Management',
@@ -416,6 +441,9 @@ export class PartyService {
   ): Promise<SupplierDetailViewModel> {
     const existing = await this.getSupplierByPartyId(supplierId);
     const existingCode = existing.supplier_code;
+    const schedule = this.normalizeSupplierSchedule(
+      dto.business_hours_schedule ?? existing.business_hours_schedule
+    );
 
     if (dto.supplier_name !== undefined && dto.supplier_name.trim().length === 0) {
       throw new ValidationError('Supplier name is required');
@@ -455,9 +483,17 @@ export class PartyService {
           status_id: dto.status_id,
           description: dto.description,
           payment_terms_id: dto.payment_terms_id,
-          business_hours: dto.business_hours,
+          business_hours: null,
           project_type_id: null,
         },
+        updatedByAccountId ?? null,
+        'supplier_management',
+        client
+      );
+
+      await this.partyRepository.replaceBusinessHoursForSupplier(
+        supplierId,
+        schedule,
         updatedByAccountId ?? null,
         'supplier_management',
         client
@@ -568,6 +604,7 @@ export class PartyService {
     if (!dto.supplier_name || dto.supplier_name.trim().length === 0) {
       throw new ValidationError('Supplier name is required');
     }
+    this.normalizeSupplierSchedule(dto.business_hours_schedule);
   }
 
   private async getProjectByPartyId(
@@ -634,6 +671,15 @@ export class PartyService {
     client?: PoolClient
   ): Promise<SupplierDetailViewModel> {
     const related = await this.buildContactGraph(row.contact_id, client);
+    const scheduleRows = await this.partyRepository.listBusinessHoursBySupplierIds([row.party_id], client);
+    const schedule = this.normalizeSupplierSchedule(
+      scheduleRows.map((item) => ({
+        day_of_week: item.day_of_week,
+        is_closed: item.is_closed,
+        opening_time: item.opening_time,
+        closing_time: item.closing_time,
+      }))
+    );
 
     return {
       party_id: row.party_id,
@@ -644,7 +690,7 @@ export class PartyService {
       supplier_name: row.party_name,
       payment_terms_id: row.payment_terms_id,
       payment_terms_name: row.payment_terms_name,
-      business_hours: row.business_hours,
+      business_hours_schedule: schedule,
       description: row.description,
       addresses: related.addresses,
       phones: related.phones,
@@ -670,7 +716,10 @@ export class PartyService {
     };
   }
 
-  private mapSupplierListRow(row: PartyListRow): SupplierListItemViewModel {
+  private mapSupplierListRow(
+    row: PartyListRow,
+    businessHoursSchedule: SupplierBusinessHourViewModel[]
+  ): SupplierListItemViewModel {
     return {
       party_id: row.party_id,
       party_code: row.party_code,
@@ -681,9 +730,97 @@ export class PartyService {
       supplier_name: row.party_name,
       payment_terms_id: row.payment_terms_id,
       payment_terms_name: row.payment_terms_name,
-      business_hours: row.business_hours,
+      business_hours_schedule: this.normalizeSupplierSchedule(businessHoursSchedule),
       created_at: row.log_date_created,
     };
+  }
+
+  private normalizeSupplierSchedule(
+    schedule?: SupplierBusinessHourDto[]
+  ): SupplierBusinessHourViewModel[] {
+    const defaultSchedule = WEEK_DAYS.map((day): SupplierBusinessHourViewModel => ({
+      day_of_week: day,
+      is_closed: true,
+      opening_time: null,
+      closing_time: null,
+    }));
+
+    if (!schedule || schedule.length === 0) {
+      return defaultSchedule;
+    }
+
+    const byDay = new Map<number, SupplierBusinessHourViewModel>();
+
+    for (const item of schedule) {
+      if (!Number.isInteger(item.day_of_week) || item.day_of_week < 1 || item.day_of_week > 7) {
+        throw new ValidationError('Each schedule row must use day_of_week from 1 to 7');
+      }
+
+      if (byDay.has(item.day_of_week)) {
+        throw new ValidationError('Each day can only appear once in business_hours_schedule');
+      }
+
+      const isClosed = !!item.is_closed;
+      const openingTime = item.opening_time?.trim() || null;
+      const closingTime = item.closing_time?.trim() || null;
+
+      if (isClosed) {
+        byDay.set(item.day_of_week, {
+          day_of_week: item.day_of_week,
+          is_closed: true,
+          opening_time: null,
+          closing_time: null,
+        });
+        continue;
+      }
+
+      if (!openingTime || !closingTime) {
+        throw new ValidationError('Open days must have both opening_time and closing_time');
+      }
+
+      const openingMinutes = this.timeToMinutes(openingTime);
+      const closingMinutes = this.timeToMinutes(closingTime);
+
+      if (openingMinutes >= closingMinutes) {
+        throw new ValidationError('opening_time must be earlier than closing_time for open days');
+      }
+
+      byDay.set(item.day_of_week, {
+        day_of_week: item.day_of_week,
+        is_closed: false,
+        opening_time: this.normalizeTimeString(openingTime),
+        closing_time: this.normalizeTimeString(closingTime),
+      });
+    }
+
+    return WEEK_DAYS.map((day) => byDay.get(day) ?? {
+      day_of_week: day,
+      is_closed: true,
+      opening_time: null,
+      closing_time: null,
+    });
+  }
+
+  private normalizeTimeString(value: string): string {
+    const normalized = value.trim();
+    if (/^\d{2}:\d{2}$/.test(normalized)) {
+      return `${normalized}:00`;
+    }
+    if (/^\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+      return normalized;
+    }
+    throw new ValidationError('Time values must use HH:MM or HH:MM:SS format');
+  }
+
+  private timeToMinutes(value: string): number {
+    const normalized = this.normalizeTimeString(value);
+    const [hours, minutes] = normalized.split(':').map((part) => parseInt(part, 10));
+
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      throw new ValidationError('Time values must be valid 24-hour times');
+    }
+
+    return (hours * 60) + minutes;
   }
 
   private async buildContactGraph(contactId: number, client?: PoolClient): Promise<{

@@ -26,7 +26,14 @@ export interface SupplierListItemViewModel extends PartyListItemViewModel {
   supplier_name: string;
   payment_terms_id: number | null;
   payment_terms_name: string | null;
-  business_hours: string | null;
+  business_hours_schedule: SupplierBusinessHourViewModel[];
+}
+
+export interface SupplierBusinessHourViewModel {
+  day_of_week: number;
+  is_closed: boolean;
+  opening_time: string | null;
+  closing_time: string | null;
 }
 
 export interface PartyDetailViewModel {
@@ -55,7 +62,7 @@ export interface SupplierDetailViewModel extends PartyDetailViewModel {
   supplier_name: string;
   payment_terms_id: number | null;
   payment_terms_name: string | null;
-  business_hours: string | null;
+  business_hours_schedule: SupplierBusinessHourViewModel[];
 }
 
 export interface PartyListViewModel<T> {

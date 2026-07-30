@@ -33,6 +33,16 @@ import {
 
 type Mode = 'project' | 'supplier';
 
+const WEEK_DAYS = [
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+  { value: 7, label: 'Sunday' },
+];
+
 interface LookupItem {
   look_up_id: number;
   name: string;
@@ -74,6 +84,13 @@ interface ContactInput {
   emails: EmailInput[];
 }
 
+interface BusinessHourInput {
+  day_of_week: number;
+  is_closed: boolean;
+  opening_time: string | null;
+  closing_time: string | null;
+}
+
 interface PartyFormState {
   status_id: string;
   description: string;
@@ -83,7 +100,7 @@ interface PartyFormState {
   supplier_code: string;
   supplier_name: string;
   payment_terms_id: string;
-  business_hours: string;
+  business_hours_schedule: BusinessHourInput[];
   addresses: AddressInput[];
   phones: PhoneInput[];
   emails: EmailInput[];
@@ -100,7 +117,7 @@ interface PartyListItem {
   supplier_code?: string;
   supplier_name?: string;
   payment_terms_name?: string | null;
-  business_hours?: string | null;
+  business_hours_schedule?: BusinessHourInput[];
 }
 
 interface PartyListResponse {
@@ -139,6 +156,54 @@ const emptyContact = (): ContactInput => ({
   emails: [],
 });
 
+const defaultBusinessHoursSchedule = (): BusinessHourInput[] => (
+  WEEK_DAYS.map((day) => ({
+    day_of_week: day.value,
+    is_closed: true,
+    opening_time: null,
+    closing_time: null,
+  }))
+);
+
+function normalizeTimeForInput(value?: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length >= 5) {
+    return trimmed.slice(0, 5);
+  }
+  return trimmed;
+}
+
+function normalizeScheduleFromApi(items?: BusinessHourInput[]): BusinessHourInput[] {
+  const defaults = defaultBusinessHoursSchedule();
+  if (!items || items.length === 0) {
+    return defaults;
+  }
+
+  const byDay = new Map<number, BusinessHourInput>();
+  items.forEach((item) => {
+    byDay.set(item.day_of_week, {
+      day_of_week: item.day_of_week,
+      is_closed: !!item.is_closed,
+      opening_time: normalizeTimeForInput(item.opening_time),
+      closing_time: normalizeTimeForInput(item.closing_time),
+    });
+  });
+
+  return defaults.map((item) => byDay.get(item.day_of_week) || item);
+}
+
+function summarizeBusinessHours(schedule?: BusinessHourInput[]): string {
+  const rows = schedule || [];
+  if (rows.length === 0) {
+    return '-';
+  }
+  const openDays = rows.filter((item) => !item.is_closed).length;
+  return openDays === 0 ? 'Closed all week' : `${openDays} open day${openDays > 1 ? 's' : ''}`;
+}
+
 const initialFormState = (): PartyFormState => ({
   status_id: '',
   description: '',
@@ -148,7 +213,7 @@ const initialFormState = (): PartyFormState => ({
   supplier_code: '',
   supplier_name: '',
   payment_terms_id: '',
-  business_hours: '',
+  business_hours_schedule: defaultBusinessHoursSchedule(),
   addresses: [],
   phones: [],
   emails: [],
@@ -292,7 +357,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
         supplier_code: detail.supplier_code || '',
         supplier_name: detail.supplier_name || '',
         payment_terms_id: detail.payment_terms_id ? String(detail.payment_terms_id) : '',
-        business_hours: detail.business_hours || '',
+        business_hours_schedule: normalizeScheduleFromApi(detail.business_hours_schedule),
         addresses: detail.addresses || [],
         phones: detail.phones || [],
         emails: detail.emails || [],
@@ -341,7 +406,12 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
           supplier_code: form.supplier_code.trim(),
           supplier_name: form.supplier_name.trim(),
           payment_terms_id: form.payment_terms_id ? parseInt(form.payment_terms_id, 10) : null,
-          business_hours: form.business_hours?.trim() || null,
+          business_hours_schedule: form.business_hours_schedule.map((item) => ({
+            day_of_week: item.day_of_week,
+            is_closed: item.is_closed,
+            opening_time: item.is_closed ? null : item.opening_time,
+            closing_time: item.is_closed ? null : item.closing_time,
+          })),
         };
 
         if (editingPartyId) {
@@ -424,7 +494,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                 <TableCell>{codeLabel}</TableCell>
                 <TableCell>{nameLabel}</TableCell>
                 {mode === 'project' ? <TableCell>Project Type</TableCell> : <TableCell>Payment Terms</TableCell>}
-                {mode === 'supplier' ? <TableCell>Business Hours</TableCell> : null}
+                {mode === 'supplier' ? <TableCell>Business Schedule</TableCell> : null}
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -439,7 +509,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                   ) : (
                     <TableCell>{item.payment_terms_name || '-'}</TableCell>
                   )}
-                  {mode === 'supplier' ? <TableCell>{item.business_hours || '-'}</TableCell> : null}
+                  {mode === 'supplier' ? <TableCell>{summarizeBusinessHours(item.business_hours_schedule)}</TableCell> : null}
                   <TableCell>{item.status_name}</TableCell>
                   <TableCell align="right">
                     <IconButton color="primary" onClick={() => void openEdit(item.party_id)}>
@@ -521,11 +591,6 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                       <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
                     ))}
                   </TextField>
-                  <TextField
-                    label="Business Hours"
-                    value={form.business_hours}
-                    onChange={(e) => setForm((prev) => ({ ...prev, business_hours: e.target.value }))}
-                  />
                 </>
               )}
 
@@ -550,6 +615,77 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                 minRows={2}
               />
             </Box>
+
+            {mode === 'supplier' ? (
+              <>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>Business Schedule</Typography>
+                <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Day</TableCell>
+                        <TableCell>Closed</TableCell>
+                        <TableCell>Opening Time</TableCell>
+                        <TableCell>Closing Time</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {form.business_hours_schedule.map((row, index) => {
+                        const day = WEEK_DAYS.find((item) => item.value === row.day_of_week);
+                        return (
+                          <TableRow key={`business-hour-${row.day_of_week}`}>
+                            <TableCell>{day?.label || row.day_of_week}</TableCell>
+                            <TableCell>
+                              <Checkbox
+                                checked={row.is_closed}
+                                onChange={(e) => {
+                                  const next = [...form.business_hours_schedule];
+                                  next[index] = {
+                                    ...next[index],
+                                    is_closed: e.target.checked,
+                                    opening_time: e.target.checked ? null : next[index].opening_time,
+                                    closing_time: e.target.checked ? null : next[index].closing_time,
+                                  };
+                                  setForm((prev) => ({ ...prev, business_hours_schedule: next }));
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                type="time"
+                                size="small"
+                                value={row.opening_time || ''}
+                                disabled={row.is_closed}
+                                onChange={(e) => {
+                                  const next = [...form.business_hours_schedule];
+                                  next[index] = { ...next[index], opening_time: e.target.value || null };
+                                  setForm((prev) => ({ ...prev, business_hours_schedule: next }));
+                                }}
+                                inputProps={{ step: 60 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                type="time"
+                                size="small"
+                                value={row.closing_time || ''}
+                                disabled={row.is_closed}
+                                onChange={(e) => {
+                                  const next = [...form.business_hours_schedule];
+                                  next[index] = { ...next[index], closing_time: e.target.value || null };
+                                  setForm((prev) => ({ ...prev, business_hours_schedule: next }));
+                                }}
+                                inputProps={{ step: 60 }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            ) : null}
 
             <Typography variant="subtitle1" sx={{ mb: 1 }}>Addresses</Typography>
             {(form.addresses || []).map((address, index) => (

@@ -23,6 +23,15 @@ export interface PartyListRow extends PartyRow {
   payment_terms_name: string | null;
 }
 
+export interface SupplierBusinessHourRow {
+  supplier_business_hours_id: number;
+  supplier_id: number;
+  day_of_week: number;
+  opening_time: string | null;
+  closing_time: string | null;
+  is_closed: boolean;
+}
+
 type QueryExecutor = {
   query: (text: string, params?: any[]) => Promise<any>;
 };
@@ -257,5 +266,82 @@ export class PartyRepository {
         AND is_deleted = false`,
       [partyId, deletedByAccountId, moduleName]
     );
+  }
+
+  async listBusinessHoursBySupplierIds(
+    supplierIds: number[],
+    client?: PoolClient
+  ): Promise<SupplierBusinessHourRow[]> {
+    if (supplierIds.length === 0) {
+      return [];
+    }
+
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        supplier_business_hours_id,
+        supplier_id,
+        day_of_week,
+        opening_time::TEXT,
+        closing_time::TEXT,
+        is_closed
+      FROM supplier_business_hours
+      WHERE supplier_id = ANY($1::BIGINT[])
+        AND is_deleted = false
+      ORDER BY supplier_id ASC, day_of_week ASC`,
+      [supplierIds]
+    );
+
+    return result.rows;
+  }
+
+  async replaceBusinessHoursForSupplier(
+    supplierId: number,
+    hours: Array<{
+      day_of_week: number;
+      opening_time: string | null;
+      closing_time: string | null;
+      is_closed: boolean;
+    }>,
+    actorAccountId: number | null,
+    moduleName: string,
+    client: PoolClient
+  ): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE supplier_business_hours
+      SET is_deleted = true,
+          log_date_deleted = NOW(),
+          log_deleted_by_account_id = $2,
+          log_module_updated = $3,
+          log_date_updated = NOW(),
+          log_updated_by_account_id = $2
+      WHERE supplier_id = $1
+        AND is_deleted = false`,
+      [supplierId, actorAccountId, moduleName]
+    );
+
+    for (const item of hours) {
+      await this.getExecutor(client).query(
+        `INSERT INTO supplier_business_hours (
+          supplier_id,
+          day_of_week,
+          opening_time,
+          closing_time,
+          is_closed,
+          log_date_created,
+          log_created_by_account_id,
+          log_module_created
+        )
+        VALUES ($1, $2, $3::TIME, $4::TIME, $5, NOW(), $6, $7)`,
+        [
+          supplierId,
+          item.day_of_week,
+          item.opening_time,
+          item.closing_time,
+          item.is_closed,
+          actorAccountId,
+          moduleName,
+        ]
+      );
+    }
   }
 }

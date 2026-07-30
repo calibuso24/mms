@@ -27,16 +27,23 @@ export interface UpdateProjectDto extends PartyBaseUpsertDto {
   project_type_id?: number | null;
 }
 
+export interface SupplierBusinessHourDto {
+  day_of_week: number;
+  is_closed: boolean;
+  opening_time?: string | null;
+  closing_time?: string | null;
+}
+
 export interface CreateSupplierDto extends PartyBaseUpsertDto {
   supplier_code: string;
   supplier_name: string;
   payment_terms_id?: number | null;
-  business_hours?: string | null;
+  business_hours_schedule?: SupplierBusinessHourDto[];
 }
 
 export interface UpdateSupplierDto extends PartyBaseUpsertDto {
   supplier_code?: string;
   supplier_name?: string;
   payment_terms_id?: number | null;
-  business_hours?: string | null;
+  business_hours_schedule?: SupplierBusinessHourDto[];
 }
