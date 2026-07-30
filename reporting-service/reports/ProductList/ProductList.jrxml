@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="ProductList" language="groovy" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="d60f8776-dbd1-418b-9522-71dde4f571f9">
+	<property name="ireport.zoom" value="1.0"/>
+	<property name="ireport.x" value="0"/>
+	<property name="ireport.y" value="0"/>
+	<queryString>
+		<![CDATA[SELECT
+    m.material_id,
+    m.product_code,
+    m.product_name,
+    m.source_description,
+    c.category_code,
+    c.category_name,
+    sc.sub_category_code,
+    sc.sub_category_name,
+    u.uom_name AS stock_uom_name,
+    u.abbreviation AS stock_uom_abbreviation,
+    status_lookup.name AS material_status,
+    specification.primary_size,
+    specification.secondary_size,
+    specification.alternate_size,
+    specification.thickness_or_gauge,
+    specification.width,
+    specification.length,
+    specification.schedule,
+    specification.pressure_or_load_rating,
+    specification.standard,
+    specification.pack_size,
+    specification.additional_specification,
+    brand_summary.brands,
+    fulfillment_summary.fulfillment_options,
+    m.notes
+FROM material m
+JOIN category c ON c.category_id = m.category_id
+LEFT JOIN sub_category sc ON sc.sub_category_id = m.sub_category_id
+JOIN unit_of_measure u ON u.uom_id = m.stock_uom_id
+JOIN look_up status_lookup ON status_lookup.look_up_id = m.status_id
+LEFT JOIN material_specification specification ON specification.material_id = m.material_id
+LEFT JOIN LATERAL (
+    SELECT STRING_AGG(b.brand_name, ', ' ORDER BY b.brand_name) AS brands
+    FROM material_brand mb
+    JOIN brand b ON b.brand_id = mb.brand_id
+    WHERE mb.material_id = m.material_id
+      AND mb.is_deleted = FALSE
+) AS brand_summary ON TRUE
+LEFT JOIN LATERAL (
+    SELECT STRING_AGG(option_record.option_name, ', ' ORDER BY option_record.option_name) AS fulfillment_options
+    FROM material_option option_record
+    WHERE option_record.material_id = m.material_id
+      AND option_record.is_deleted = FALSE
+      AND option_record.is_active = TRUE
+) AS fulfillment_summary ON TRUE
+WHERE m.is_deleted = FALSE;]]>
+	</queryString>
+	<field name="material_id" class="java.lang.Long"/>
+	<field name="product_code" class="java.lang.String"/>
+	<field name="product_name" class="java.lang.String"/>
+	<field name="source_description" class="java.lang.String"/>
+	<field name="category_code" class="java.lang.String"/>
+	<field name="category_name" class="java.lang.String"/>
+	<field name="sub_category_code" class="java.lang.String"/>
+	<field name="sub_category_name" class="java.lang.String"/>
+	<field name="stock_uom_name" class="java.lang.String"/>
+	<field name="stock_uom_abbreviation" class="java.lang.String"/>
+	<field name="material_status" class="java.lang.String"/>
+	<field name="primary_size" class="java.lang.String"/>
+	<field name="secondary_size" class="java.lang.String"/>
+	<field name="alternate_size" class="java.lang.String"/>
+	<field name="thickness_or_gauge" class="java.lang.String"/>
+	<field name="width" class="java.lang.String"/>
+	<field name="length" class="java.lang.String"/>
+	<field name="schedule" class="java.lang.String"/>
+	<field name="pressure_or_load_rating" class="java.lang.String"/>
+	<field name="standard" class="java.lang.String"/>
+	<field name="pack_size" class="java.lang.String"/>
+	<field name="additional_specification" class="java.lang.String"/>
+	<field name="brands" class="java.lang.String"/>
+	<field name="fulfillment_options" class="java.lang.String"/>
+	<field name="notes" class="java.lang.String"/>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<pageHeader>
+		<band height="25" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="0" width="555" height="25" uuid="474845ca-2b29-4d9a-a32a-123beae225a0"/>
+				<textElement>
+					<font size="20" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Product List]]></text>
+			</staticText>
+		</band>
+	</pageHeader>
+	<columnHeader>
+		<band height="20" splitType="Stretch">
+			<staticText>
+				<reportElement x="0" y="0" width="100" height="20" uuid="11f23b80-fc22-4beb-9d25-e8665895c80a"/>
+				<text><![CDATA[Product Code]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="100" y="0" width="260" height="20" uuid="27af3937-71da-4ac3-a986-0fb8d02e5b1d"/>
+				<text><![CDATA[Size]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="20" splitType="Stretch">
+			<textField>
+				<reportElement x="0" y="0" width="100" height="20" uuid="ded1786f-4e04-4136-950e-5432df8cc2d9"/>
+				<textFieldExpression><![CDATA[$F{product_code}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="100" y="0" width="260" height="20" uuid="a735fa35-bfd5-42cb-b50a-1b3a4fe10548"/>
+				<textFieldExpression><![CDATA[$F{source_description}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="20" splitType="Stretch">
+			<textField>
+				<reportElement x="435" y="0" width="80" height="20" uuid="9669ecbf-8165-4459-a91a-bc93c0b65c74"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA["Page "+$V{PAGE_NUMBER}+" of"]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="515" y="0" width="40" height="20" uuid="7457f078-3ced-403e-b7dd-7793a5d233f6"/>
+				<textFieldExpression><![CDATA[" " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+</jasperReport>

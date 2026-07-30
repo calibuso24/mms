@@ -6,6 +6,11 @@ interface RequestOptions {
   body?: any;
 }
 
+interface BlobResponse {
+  blob: Blob;
+  headers: Headers;
+}
+
 export class ApiClient {
   private static getAuthToken(): string | null {
     return localStorage.getItem('authToken');
@@ -61,6 +66,32 @@ export class ApiClient {
 
   static delete(endpoint: string): Promise<any> {
     return this.request(endpoint, { method: 'DELETE' });
+  }
+
+  static async requestBlob(endpoint: string, options: RequestOptions = {}): Promise<BlobResponse> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const requestOptions: RequestInit = {
+      method: options.method || 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    };
+
+    if (options.body) {
+      requestOptions.body = JSON.stringify(options.body);
+    }
+
+    const response = await fetch(url, requestOptions);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Network error' }));
+      const errorMessage = error.error?.message || error.message || 'An error occurred';
+      throw new Error(errorMessage);
+    }
+
+    return {
+      blob: await response.blob(),
+      headers: response.headers,
+    };
   }
 }
 
@@ -259,4 +290,12 @@ export const navigationApi = {
   getReports: () => ApiClient.get('/navigation/reports'),
   getByContext: (context: string) => ApiClient.get(`/navigation/context/${context}`),
   getReportCatalogSidebar: () => ApiClient.get('/navigation/report-catalog-sidebar'),
+};
+
+// Report API
+export const reportApi = {
+  list: () => ApiClient.get('/reports'),
+  getParameters: (reportCode: string) => ApiClient.get(`/reports/${reportCode}/parameters`),
+  generate: (reportCode: string, payload: { parameters: Record<string, unknown>; format: string }) =>
+    ApiClient.requestBlob(`/reports/${reportCode}/generate`, { method: 'POST', body: payload }),
 };
