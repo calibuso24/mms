@@ -196,7 +196,6 @@ export class ContactRepository {
     city: string | null = null,
     province: string | null = null,
     region: string | null = null,
-    countryCode: string | null = null,
     postalCode: string | null = null,
     isPrimary: boolean = false,
     createdByAccountId: number | null = null,
@@ -229,7 +228,7 @@ export class ContactRepository {
         log_created_by_account_id,
         log_module_created
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), $13, 'manage_users')
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL, $11, now(), $12, 'manage_users')
        RETURNING *`,
       [
         contactId,
@@ -242,7 +241,6 @@ export class ContactRepository {
         city,
         province,
         region,
-        countryCode,
         postalCode,
         createdByAccountId,
       ]
@@ -252,7 +250,7 @@ export class ContactRepository {
 
   async updateAddress(
     addressId: number,
-    updates: Partial<Pick<Address, 'address_label' | 'is_primary' | 'address_type_id' | 'house_no' | 'street' | 'barangay' | 'city' | 'province' | 'region' | 'country_code' | 'postal_code'>>,
+    updates: Partial<Pick<Address, 'address_label' | 'is_primary' | 'address_type_id' | 'house_no' | 'street' | 'barangay' | 'city' | 'province' | 'region' | 'postal_code'>>,
     updatedByAccountId: number | null = null,
     client?: PoolClient
   ): Promise<Address> {
@@ -312,10 +310,6 @@ export class ContactRepository {
     if (updates.region !== undefined) {
       fields.push(`region = $${paramCount++}`);
       values.push(updates.region);
-    }
-    if (updates.country_code !== undefined) {
-      fields.push(`country_code = $${paramCount++}`);
-      values.push(updates.country_code);
     }
     if (updates.postal_code !== undefined) {
       fields.push(`postal_code = $${paramCount++}`);

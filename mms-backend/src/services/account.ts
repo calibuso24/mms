@@ -354,7 +354,6 @@ export class AccountService {
       address.city ?? null,
       address.province ?? null,
       address.region ?? null,
-      address.country_code ?? null,
       address.postal_code ?? null,
       address.is_primary ?? false
     );
@@ -377,7 +376,6 @@ export class AccountService {
         city: updates.city ?? null,
         province: updates.province ?? null,
         region: updates.region ?? null,
-        country_code: updates.country_code ?? null,
         postal_code: updates.postal_code ?? null,
         is_primary: updates.is_primary ?? false,
       },
@@ -609,7 +607,6 @@ export class AccountService {
             city: address.city ?? null,
             province: address.province ?? null,
             region: address.region ?? null,
-            country_code: address.country_code ?? null,
             postal_code: address.postal_code ?? null,
           },
           actorAccountId,
@@ -627,7 +624,6 @@ export class AccountService {
           address.city ?? null,
           address.province ?? null,
           address.region ?? null,
-          address.country_code ?? null,
           address.postal_code ?? null,
           address.is_primary ?? false,
           actorAccountId,
@@ -942,9 +938,7 @@ export class AccountService {
       .map((part) => (part ?? '').trim())
       .filter((part) => part.length > 0)
       .join(' ');
-    const line4 = (address.country_code ?? '').trim();
-
-    return [line1, line2, line3, line4 ? `(${line4})` : '']
+    return [line1, line2, line3]
       .filter((part) => part.length > 0)
       .join(', ');
   }

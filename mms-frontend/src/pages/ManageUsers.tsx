@@ -78,7 +78,6 @@ interface AddressInput {
   city?: string | null;
   province?: string | null;
   region?: string | null;
-  country_code?: string | null;
   postal_code?: string | null;
   is_primary?: boolean;
 }
@@ -141,7 +140,6 @@ const emptyAddress = (): AddressInput => ({
   city: '',
   province: '',
   region: '',
-  country_code: '',
   postal_code: '',
   is_primary: false,
 });
@@ -282,7 +280,6 @@ export default function ManageUsersPage() {
           city: item.city ?? '',
           province: item.province ?? '',
           region: item.region ?? '',
-          country_code: item.country_code ?? '',
           postal_code: item.postal_code ?? '',
           is_primary: item.is_primary,
         })),
@@ -319,7 +316,6 @@ export default function ManageUsersPage() {
             city: item.city ?? '',
             province: item.province ?? '',
             region: item.region ?? '',
-            country_code: item.country_code ?? '',
             postal_code: item.postal_code ?? '',
             is_primary: item.is_primary,
           })),
@@ -371,9 +367,8 @@ export default function ManageUsersPage() {
     const line1 = [address.house_no, address.street].filter(Boolean).join(' ').trim();
     const line2 = [address.barangay, address.city, address.province].filter(Boolean).join(', ').trim();
     const line3 = [address.region, address.postal_code].filter(Boolean).join(' ').trim();
-    const country = (address.country_code || '').trim();
 
-    return [line1, line2, line3, country ? `(${country})` : ''].filter(Boolean).join(', ');
+    return [line1, line2, line3].filter(Boolean).join(', ');
   };
 
   const submit = async () => {
@@ -406,7 +401,6 @@ export default function ManageUsersPage() {
         city: item.city ?? null,
         province: item.province ?? null,
         region: item.region ?? null,
-        country_code: item.country_code ?? null,
         postal_code: item.postal_code ?? null,
         is_primary: item.is_primary ?? false,
       })),
@@ -439,7 +433,6 @@ export default function ManageUsersPage() {
           city: item.city ?? null,
           province: item.province ?? null,
           region: item.region ?? null,
-          country_code: item.country_code ?? null,
           postal_code: item.postal_code ?? null,
           is_primary: item.is_primary ?? false,
         })),
@@ -798,16 +791,6 @@ export default function ManageUsersPage() {
                         size="small"
                       />
                       <TextField
-                        label="Country Code"
-                        value={address.country_code || ''}
-                        onChange={(e) => {
-                          const next = [...form.addresses];
-                          next[index] = { ...next[index], country_code: e.target.value };
-                          setForm((prev) => ({ ...prev, addresses: next }));
-                        }}
-                        size="small"
-                      />
-                      <TextField
                         label="Postal Code"
                         value={address.postal_code || ''}
                         onChange={(e) => {
@@ -1119,18 +1102,6 @@ export default function ManageUsersPage() {
                               const next = [...form.contacts];
                               const addresses = [...next[contactIndex].addresses];
                               addresses[addressIndex] = { ...addresses[addressIndex], region: e.target.value };
-                              next[contactIndex] = { ...next[contactIndex], addresses };
-                              setForm((prev) => ({ ...prev, contacts: next }));
-                            }}
-                          />
-                          <TextField
-                            size="small"
-                            label="Country Code"
-                            value={address.country_code || ''}
-                            onChange={(e) => {
-                              const next = [...form.contacts];
-                              const addresses = [...next[contactIndex].addresses];
-                              addresses[addressIndex] = { ...addresses[addressIndex], country_code: e.target.value };
                               next[contactIndex] = { ...next[contactIndex], addresses };
                               setForm((prev) => ({ ...prev, contacts: next }));
                             }}
