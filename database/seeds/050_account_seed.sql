@@ -9,12 +9,7 @@ VALUES
   ('superuser', crypt('superuser', gen_salt('bf')), 'SuperUser', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
   --('admin', crypt('admin', gen_salt('bf')), 'Admin', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now()),
   ('auditor', crypt('auditor', gen_salt('bf')), 'Auditor', '{"notes": "initial seed - set password on first login"}'::jsonb, TRUE, now())
-;
-
-INSERT INTO look_up (look_up_type, code, name, description, display_order)
-VALUES ('contact_entity_type', 'person', 'Person', 'Individual contact entity.', 1)
---ON CONFLICT (look_up_type, name) DO NOTHING
-;
+ON CONFLICT DO NOTHING;
 
 INSERT INTO contact (entity_type_id, contact_name)
 SELECT
@@ -22,8 +17,8 @@ SELECT
     u.full_name
 FROM account u
 JOIN look_up entity_lookup
-    ON entity_lookup.look_up_type = 'contact_entity_type'
-   AND entity_lookup.name = 'Person'
+    ON entity_lookup.look_up_type = 'ENTITY_TYPE'
+   AND entity_lookup.name = 'PERSON'
 WHERE u.contact_id IS NULL
   AND NOT EXISTS (
       SELECT 1
@@ -40,13 +35,19 @@ WHERE u.contact_id IS NULL
   AND c.entity_type_id = (
       SELECT look_up_id
       FROM look_up
-      WHERE look_up_type = 'contact_entity_type'
-        AND name = 'Person'
+      WHERE look_up_type = 'ENTITY_TYPE'
+        AND name = 'PERSON'
   );
 
-INSERT INTO address (contact_id, address_label, address, is_primary)
-SELECT u.contact_id, 'Primary', '', TRUE
+INSERT INTO address (contact_id, address_type_id, is_primary)
+SELECT
+    u.contact_id,
+    address_type_lookup.look_up_id,
+    TRUE
 FROM account u
+JOIN look_up address_type_lookup
+    ON address_type_lookup.look_up_type = 'address_type'
+   AND address_type_lookup.name = 'HOME'
 WHERE u.contact_id IS NOT NULL
   AND NOT EXISTS (
       SELECT 1
@@ -54,9 +55,16 @@ WHERE u.contact_id IS NOT NULL
       WHERE a.contact_id = u.contact_id
   );
 
-INSERT INTO phone (contact_id, phone_label, phone_number, is_primary)
-SELECT u.contact_id, 'Primary', '', TRUE
+INSERT INTO phone (contact_id, phone_type_id, phone_number, is_primary)
+SELECT
+    u.contact_id,
+    phone_type_lookup.look_up_id,
+    '',
+    TRUE
 FROM account u
+JOIN look_up phone_type_lookup
+    ON phone_type_lookup.look_up_type = 'PHONE_TYPE'
+   AND phone_type_lookup.name = 'MOBILE'
 WHERE u.contact_id IS NOT NULL
   AND NOT EXISTS (
       SELECT 1
@@ -64,9 +72,16 @@ WHERE u.contact_id IS NOT NULL
       WHERE p.contact_id = u.contact_id
   );
 
-INSERT INTO email (contact_id, email_label, email_address, is_primary)
-SELECT u.contact_id, 'Primary', '', TRUE
+INSERT INTO email (contact_id, email_type_id, email_address, is_primary)
+SELECT
+    u.contact_id,
+    email_type_lookup.look_up_id,
+    '',
+    TRUE
 FROM account u
+JOIN look_up email_type_lookup
+    ON email_type_lookup.look_up_type = 'EMAIL_TYPE'
+   AND email_type_lookup.name = 'PERSONAL'
 WHERE u.contact_id IS NOT NULL
   AND NOT EXISTS (
       SELECT 1

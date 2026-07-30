@@ -11,6 +11,7 @@ import { KPICard } from './shared/components/KPICard.js';
 import { muiTheme } from './shared/theme/muiTheme.js';
 import LoginPage from './pages/Login.js';
 import MaterialsPage from './pages/Materials.js';
+import ManageUsersPage from './pages/ManageUsers.js';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -64,6 +65,10 @@ function DynamicPage({ route }: { route: string | null }) {
 
   if (route?.includes('product-management')) {
     return <MaterialsPage />;
+  }
+
+  if (route?.includes('manage-users')) {
+    return <ManageUsersPage />;
   }
 
   return (

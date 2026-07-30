@@ -76,12 +76,15 @@ export const authApi = {
 export const accountApi = {
   getMe: () => ApiClient.get('/accounts/me'),
   getAccount: (id: number) => ApiClient.get(`/accounts/${id}`),
-  listAccounts: (limit?: number, offset?: number) => {
+  listAccounts: (limit?: number, offset?: number, search?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
     return ApiClient.get(`/accounts?${params.toString()}`);
   },
+  listRoles: () => ApiClient.get('/accounts/meta/roles'),
+  getPermissions: (id: number) => ApiClient.get(`/accounts/${id}/permissions`),
   createAccount: (data: any) => ApiClient.post('/accounts', data),
   updateAccount: (id: number, data: any) => ApiClient.put(`/accounts/${id}`, data),
   deleteAccount: (id: number) => ApiClient.delete(`/accounts/${id}`),
