@@ -5,7 +5,7 @@ import { NotFoundError, ValidationError, ConflictError } from '../utils/errors.j
 import { pool } from '../config/database.js';
 
 export interface CreateAccountRequest {
-  accountName: string;
+  userName: string;
   fullName: string;
   password?: string;
   addresses?: Array<{ label?: string; address: string; isPrimary?: boolean }>;
@@ -39,7 +39,7 @@ export class AccountService {
 
     return {
       account_id: account.account_id,
-      account_name: account.account_name,
+      user_name: account.user_name,
       full_name: account.full_name,
       is_active: account.is_active,
       contact_id: account.contact_id,
@@ -64,7 +64,7 @@ export class AccountService {
         const withRoles = await this.accountRepository.findByIdWithRoles(acc.account_id);
         return {
           account_id: acc.account_id,
-          account_name: acc.account_name,
+          user_name: acc.user_name,
           full_name: acc.full_name,
           is_active: acc.is_active,
           roles: withRoles?.roles || [],
@@ -80,12 +80,12 @@ export class AccountService {
     createdByAccountId?: number
   ): Promise<any> {
     // Validate input
-    if (!req.accountName || !req.fullName) {
+    if (!req.userName || !req.fullName) {
       throw new ValidationError('Account name and full name are required');
     }
 
     // Check for duplicate account name
-    const existing = await this.accountRepository.findByAccountName(req.accountName);
+    const existing = await this.accountRepository.findByUserName(req.userName);
     if (existing) {
       throw new ConflictError('Account name already exists');
     }
@@ -132,7 +132,7 @@ export class AccountService {
 
     // Create account
     const account = await this.accountRepository.create(
-      req.accountName,
+      req.userName,
       req.fullName,
       req.password ? await this.hashPassword(req.password) : null,
       contact.contact_id,

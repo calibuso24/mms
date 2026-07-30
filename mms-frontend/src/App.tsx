@@ -141,7 +141,7 @@ function AppShell() {
       <TopBar
         onMenuClick={() => setSidebarOpen(true)}
         pageTitle={pageTitle}
-        userName={account?.full_name || account?.account_name || 'User'}
+        userName={account?.full_name || account?.user_name || 'User'}
         onLogout={handleLogout}
       />
 

@@ -10,13 +10,13 @@ export class AuthService {
   private contactRepository = new ContactRepository();
   private roleRepository = new RoleRepository();
 
-  async login(accountName: string, password: string): Promise<{ token: string; account: any }> {
-    if (!accountName || !password) {
+  async login(userName: string, password: string): Promise<{ token: string; account: any }> {
+    if (!userName || !password) {
       throw new ValidationError('Account name and password are required');
     }
 
     const account = await this.accountRepository.findByIdWithRoles(
-      await this.getAccountIdByName(accountName)
+      await this.getAccountIdByUserName(userName)
     );
 
     if (!account) {
@@ -27,18 +27,18 @@ export class AuthService {
       throw new UnauthorizedError('Account is inactive');
     }
 
-    if (!account.password_hash) {
+    if (!account.password) {
       throw new UnauthorizedError('Account does not have a password set');
     }
 
-    const isPasswordValid = await verifyPassword(password, account.password_hash);
+    const isPasswordValid = await verifyPassword(password, account.password);
     if (!isPasswordValid) {
       throw new UnauthorizedError('Invalid account name or password');
     }
 
     const token = generateToken({
       accountId: account.account_id,
-      accountName: account.account_name,
+      userName: account.user_name,
       fullName: account.full_name,
       roles: account.roles || [],
     });
@@ -47,7 +47,7 @@ export class AuthService {
       token,
       account: {
         account_id: account.account_id,
-        account_name: account.account_name,
+        user_name: account.user_name,
         full_name: account.full_name,
         is_active: account.is_active,
         roles: account.roles || [],
@@ -55,8 +55,8 @@ export class AuthService {
     };
   }
 
-  private async getAccountIdByName(accountName: string): Promise<number> {
-    const account = await this.accountRepository.findByAccountName(accountName);
+  private async getAccountIdByUserName(userName: string): Promise<number> {
+    const account = await this.accountRepository.findByUserName(userName);
     if (!account) {
       throw new UnauthorizedError('Invalid account name or password');
     }
@@ -73,14 +73,14 @@ export class AuthService {
       throw new NotFoundError('Account not found');
     }
 
-    if (currentPassword && account.password_hash) {
-      const isValid = await verifyPassword(currentPassword, account.password_hash);
+    if (currentPassword && account.password) {
+      const isValid = await verifyPassword(currentPassword, account.password);
       if (!isValid) {
         throw new UnauthorizedError('Current password is incorrect');
       }
     }
 
     const hashedPassword = await hashPassword(newPassword);
-    await this.accountRepository.update(accountId, { password_hash: hashedPassword }, accountId);
+    await this.accountRepository.update(accountId, { password: hashedPassword }, accountId);
   }
 }

@@ -7,13 +7,13 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const { account_name, password } = req.body;
+      const { user_name, password } = req.body;
 
-      if (!account_name || !password) {
+      if (!user_name || !password) {
         throw new ValidationError('Account name and password are required');
       }
 
-      const result = await this.authService.login(account_name, password);
+      const result = await this.authService.login(user_name, password);
       res.json(result);
     } catch (error) {
       next(error);
