@@ -32,6 +32,12 @@ import {
 } from '../shared/api/client.js';
 
 type Mode = 'project' | 'supplier';
+type ScheduleTemplateCode =
+  | 'custom'
+  | 'standard_office_hours'
+  | 'monday_saturday'
+  | 'retail_hours'
+  | 'always_open';
 
 const WEEK_DAYS = [
   { value: 1, label: 'Monday' },
@@ -41,6 +47,14 @@ const WEEK_DAYS = [
   { value: 5, label: 'Friday' },
   { value: 6, label: 'Saturday' },
   { value: 7, label: 'Sunday' },
+];
+
+const SCHEDULE_TEMPLATES: Array<{ code: ScheduleTemplateCode; label: string }> = [
+  { code: 'standard_office_hours', label: 'Standard Office Hours' },
+  { code: 'monday_saturday', label: 'Monday-Saturday' },
+  { code: 'retail_hours', label: 'Retail Hours' },
+  { code: 'always_open', label: '24/7' },
+  { code: 'custom', label: 'Custom' },
 ];
 
 interface LookupItem {
@@ -204,6 +218,111 @@ function summarizeBusinessHours(schedule?: BusinessHourInput[]): string {
   return openDays === 0 ? 'Closed all week' : `${openDays} open day${openDays > 1 ? 's' : ''}`;
 }
 
+function getTemplateSchedule(templateCode: ScheduleTemplateCode): BusinessHourInput[] {
+  if (templateCode === 'standard_office_hours') {
+    return WEEK_DAYS.map((day) => ({
+      day_of_week: day.value,
+      is_closed: day.value >= 6,
+      opening_time: day.value <= 5 ? '09:00' : null,
+      closing_time: day.value <= 5 ? '17:00' : null,
+    }));
+  }
+
+  if (templateCode === 'monday_saturday') {
+    return WEEK_DAYS.map((day) => {
+      if (day.value <= 5) {
+        return {
+          day_of_week: day.value,
+          is_closed: false,
+          opening_time: '08:00',
+          closing_time: '17:00',
+        };
+      }
+      if (day.value === 6) {
+        return {
+          day_of_week: day.value,
+          is_closed: false,
+          opening_time: '08:00',
+          closing_time: '12:00',
+        };
+      }
+      return {
+        day_of_week: day.value,
+        is_closed: true,
+        opening_time: null,
+        closing_time: null,
+      };
+    });
+  }
+
+  if (templateCode === 'retail_hours') {
+    return WEEK_DAYS.map((day) => ({
+      day_of_week: day.value,
+      is_closed: false,
+      opening_time: '10:00',
+      closing_time: day.value === 7 ? '18:00' : '20:00',
+    }));
+  }
+
+  if (templateCode === 'always_open') {
+    return WEEK_DAYS.map((day) => ({
+      day_of_week: day.value,
+      is_closed: false,
+      opening_time: '00:00',
+      closing_time: '23:59',
+    }));
+  }
+
+  return defaultBusinessHoursSchedule();
+}
+
+function areSchedulesEqual(a: BusinessHourInput[], b: BusinessHourInput[]): boolean {
+  const normalize = (items: BusinessHourInput[]) => items
+    .slice()
+    .sort((left, right) => left.day_of_week - right.day_of_week)
+    .map((item) => ({
+      day_of_week: item.day_of_week,
+      is_closed: item.is_closed,
+      opening_time: item.is_closed ? null : normalizeTimeForInput(item.opening_time),
+      closing_time: item.is_closed ? null : normalizeTimeForInput(item.closing_time),
+    }));
+
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+}
+
+function detectScheduleTemplate(schedule: BusinessHourInput[]): ScheduleTemplateCode {
+  const templateCodes: ScheduleTemplateCode[] = [
+    'standard_office_hours',
+    'monday_saturday',
+    'retail_hours',
+    'always_open',
+  ];
+
+  for (const templateCode of templateCodes) {
+    if (areSchedulesEqual(schedule, getTemplateSchedule(templateCode))) {
+      return templateCode;
+    }
+  }
+
+  return 'custom';
+}
+
+function getScheduleTemplatePreview(templateCode: ScheduleTemplateCode): string {
+  if (templateCode === 'standard_office_hours') {
+    return 'Mon-Fri 9:00 AM-5:00 PM, Sat/Sun Closed';
+  }
+  if (templateCode === 'monday_saturday') {
+    return 'Mon-Fri 8:00 AM-5:00 PM, Sat 8:00 AM-12:00 PM, Sun Closed';
+  }
+  if (templateCode === 'retail_hours') {
+    return 'Mon-Sat 10:00 AM-8:00 PM, Sun 10:00 AM-6:00 PM';
+  }
+  if (templateCode === 'always_open') {
+    return 'Daily 12:00 AM-11:59 PM';
+  }
+  return 'No auto-population. Keep or edit the current day-by-day schedule manually.';
+}
+
 const initialFormState = (): PartyFormState => ({
   status_id: '',
   description: '',
@@ -287,6 +406,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPartyId, setEditingPartyId] = useState<number | null>(null);
   const [form, setForm] = useState<PartyFormState>(initialFormState);
+  const [selectedScheduleTemplate, setSelectedScheduleTemplate] = useState<ScheduleTemplateCode>('custom');
 
   const [statusOptions, setStatusOptions] = useState<LookupItem[]>([]);
   const [projectTypeOptions, setProjectTypeOptions] = useState<LookupItem[]>([]);
@@ -337,6 +457,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
 
   const openCreate = () => {
     setForm(initialFormState());
+    setSelectedScheduleTemplate('custom');
     setEditingPartyId(null);
     setDialogOpen(true);
   };
@@ -364,6 +485,11 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
         contacts: detail.contacts || [],
         deleted_contact_ids: [],
       });
+      setSelectedScheduleTemplate(
+        mode === 'supplier'
+          ? detectScheduleTemplate(normalizeScheduleFromApi(detail.business_hours_schedule))
+          : 'custom'
+      );
       setDialogOpen(true);
     } catch (err: any) {
       setError(err.message || `Failed to load ${title.toLowerCase()} details`);
@@ -428,6 +554,22 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
     } catch (err: any) {
       setError(err.message || `Failed to save ${title.toLowerCase()}`);
     }
+  };
+
+  const applyScheduleToForm = (schedule: BusinessHourInput[]) => {
+    setForm((prev) => ({
+      ...prev,
+      business_hours_schedule: schedule,
+    }));
+    setSelectedScheduleTemplate(detectScheduleTemplate(schedule));
+  };
+
+  const handleTemplateChange = (templateCode: ScheduleTemplateCode) => {
+    setSelectedScheduleTemplate(templateCode);
+    if (templateCode === 'custom') {
+      return;
+    }
+    applyScheduleToForm(getTemplateSchedule(templateCode));
   };
 
   const handleDelete = async (partyId: number) => {
@@ -591,6 +733,19 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                       <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
                     ))}
                   </TextField>
+                  <TextField
+                    label="Business Schedule Template"
+                    select
+                    value={selectedScheduleTemplate}
+                    onChange={(e) => handleTemplateChange(e.target.value as ScheduleTemplateCode)}
+                  >
+                    {SCHEDULE_TEMPLATES.map((template) => (
+                      <MenuItem key={template.code} value={template.code}>{template.label}</MenuItem>
+                    ))}
+                  </TextField>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
+                    {getScheduleTemplatePreview(selectedScheduleTemplate)}
+                  </Typography>
                 </>
               )}
 
@@ -646,7 +801,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                                     opening_time: e.target.checked ? null : next[index].opening_time,
                                     closing_time: e.target.checked ? null : next[index].closing_time,
                                   };
-                                  setForm((prev) => ({ ...prev, business_hours_schedule: next }));
+                                  applyScheduleToForm(next);
                                 }}
                               />
                             </TableCell>
@@ -659,7 +814,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                                 onChange={(e) => {
                                   const next = [...form.business_hours_schedule];
                                   next[index] = { ...next[index], opening_time: e.target.value || null };
-                                  setForm((prev) => ({ ...prev, business_hours_schedule: next }));
+                                  applyScheduleToForm(next);
                                 }}
                                 inputProps={{ step: 60 }}
                               />
@@ -673,7 +828,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                                 onChange={(e) => {
                                   const next = [...form.business_hours_schedule];
                                   next[index] = { ...next[index], closing_time: e.target.value || null };
-                                  setForm((prev) => ({ ...prev, business_hours_schedule: next }));
+                                  applyScheduleToForm(next);
                                 }}
                                 inputProps={{ step: 60 }}
                               />
