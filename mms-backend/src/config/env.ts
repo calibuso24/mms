@@ -19,4 +19,9 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },
+  reporting: {
+    serviceBaseUrl: process.env.REPORT_SERVICE_BASE_URL || 'http://localhost:8085',
+    renderPath: process.env.REPORT_SERVICE_RENDER_PATH || '/reports/render',
+    timeoutMs: parseInt(process.env.REPORT_SERVICE_TIMEOUT_MS || '120000', 10),
+  },
 };
