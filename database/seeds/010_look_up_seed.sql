@@ -58,5 +58,20 @@ VALUES
     ('EMAIL_TYPE', 'work', 'WORK', 'Work Email', 2, NULL, NULL),
     ('EMAIL_TYPE', 'billing', 'BILLING', 'Billing Email', 3, NULL, NULL),
     ('EMAIL_TYPE', 'support', 'SUPPORT', 'Support Email', 4, NULL, NULL),
-    ('EMAIL_TYPE', 'notification', 'NOTIFICATION', 'Notification Email', 5, NULL, NULL)
+    ('EMAIL_TYPE', 'notification', 'NOTIFICATION', 'Notification Email', 5, NULL, NULL),
+    ('party_type', 'project', 'Project', 'Project party used for project-level transactions.', 1, NULL, NULL),
+    ('party_type', 'warehouse', 'Warehouse', 'Warehouse party used for stock holding and transfers.', 2, NULL, NULL),
+    ('party_type', 'services', 'Services', 'Service provider party used for job order or service transactions.', 3, NULL, NULL),
+    ('party_type', 'external', 'External', 'External party used for non-standard third-party transactions.', 4, NULL, NULL),
+    ('party_type', 'supplier', 'Supplier', 'Supplier party used for purchasing and supplier delivery transactions.', 5, NULL, NULL),
+    ('party_status', 'active', 'Active', 'Party is active and available for transactions.', 1, NULL, NULL),
+    ('party_status', 'inactive', 'Inactive', 'Party is inactive and cannot be selected for new transactions.', 2, NULL, NULL),
+    ('project_type', 'residential', 'Residential', 'Residential construction project.', 1, NULL, NULL),
+    ('project_type', 'commercial', 'Commercial', 'Commercial or office project.', 2, NULL, NULL),
+    ('project_type', 'industrial', 'Industrial', 'Industrial plant or facility project.', 3, NULL, NULL),
+    ('project_type', 'infrastructure', 'Infrastructure', 'Infrastructure and public works project.', 4, NULL, NULL),
+    ('payment_terms', 'cod', 'Cash on Delivery', 'Payment due upon delivery.', 1, NULL, NULL),
+    ('payment_terms', 'net15', 'Net 15', 'Payment due 15 days after invoice date.', 2, NULL, NULL),
+    ('payment_terms', 'net30', 'Net 30', 'Payment due 30 days after invoice date.', 3, NULL, NULL),
+    ('payment_terms', 'net60', 'Net 60', 'Payment due 60 days after invoice date.', 4, NULL, NULL)
 ON CONFLICT (look_up_type, name) DO NOTHING;

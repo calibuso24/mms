@@ -9,6 +9,7 @@ import accountRoutes from './routes/account.js';
 import productRoutes from './routes/product.js';
 import navigationRoutes from './routes/navigation.js';
 import roleRoutes from './routes/roles.js';
+import partyRoutes from './routes/party.js';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/accounts', authMiddleware, accountRoutes);
 app.use('/api/roles', authMiddleware, roleRoutes);
 app.use('/api/navigation', authMiddleware, navigationRoutes);
 app.use('/api', authMiddleware, productRoutes);
+app.use('/api', authMiddleware, partyRoutes);
 
 // Error handling
 app.use(notFoundHandler);
