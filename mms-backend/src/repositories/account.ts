@@ -238,7 +238,9 @@ export class AccountRepository {
       await this.getExecutor(client).query(
         `INSERT INTO account_role (account_id, role_id, is_active, log_date_created, log_created_by_account_id, log_module_created)
          VALUES ($1, $2, true, now(), $3, 'auth')
-         ON CONFLICT (account_id, role_id) DO UPDATE SET is_active = true`,
+         ON CONFLICT (account_id, role_id) DO UPDATE SET
+           is_active = true,
+           is_deleted = false`,
         [accountId, roleId, createdByAccountId]
       );
     } catch (error: any) {

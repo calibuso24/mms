@@ -167,6 +167,12 @@ export class AccountService {
     try {
       await client.query('BEGIN');
 
+      const existingRoles = await this.roleRepository.getRolesForAccount(accountId);
+      const nextRoleCodes =
+        Array.isArray(req.role_codes) && req.role_codes.length > 0
+          ? req.role_codes
+          : existingRoles.map((role) => role.role_code);
+
       if (req.user_name && req.user_name !== existingAccount.user_name) {
         const duplicate = await this.accountRepository.findByUserName(req.user_name, client);
         if (duplicate && duplicate.account_id !== accountId) {
@@ -174,7 +180,7 @@ export class AccountService {
         }
       }
 
-      await this.assertRoleCodesExist(req.role_codes || [], client);
+      await this.assertRoleCodesExist(nextRoleCodes, client);
       await this.assertEmailsUnique(this.collectEmails(req), existingAccount.contact_id, client);
 
       const accountUpdates: Record<string, unknown> = {};
@@ -204,9 +210,7 @@ export class AccountService {
         );
       }
 
-      if (req.role_codes) {
-        await this.syncRoles(accountId, req.role_codes, updatedByAccountId ?? null, client);
-      }
+      await this.syncRoles(accountId, nextRoleCodes, updatedByAccountId ?? null, client);
 
       await this.syncAddresses(existingAccount.contact_id, req.addresses, updatedByAccountId ?? null, client);
       await this.syncPhones(existingAccount.contact_id, req.phones, updatedByAccountId ?? null, client);
