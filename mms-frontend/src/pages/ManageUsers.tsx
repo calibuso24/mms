@@ -457,27 +457,14 @@ export default function ManageUsersPage() {
     }
 
     try {
-      let savedAccount: UserDetailShape;
       if (editingAccountId) {
-        savedAccount = await accountApi.updateAccount(editingAccountId, payload);
+        await accountApi.updateAccount(editingAccountId, payload);
       } else {
-        savedAccount = await accountApi.createAccount(payload);
+        await accountApi.createAccount(payload);
       }
 
-      setItems((prev) => {
-        const nextItem = toListItem(savedAccount);
-        const existingIndex = prev.findIndex((item) => item.account_id === nextItem.account_id);
-
-        if (existingIndex >= 0) {
-          const next = [...prev];
-          next[existingIndex] = nextItem;
-          return next;
-        }
-
-        return [nextItem, ...prev];
-      });
-
       closeDialog();
+      await loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to save user');
     }
