@@ -271,14 +271,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   };
 
   const openCreate = () => {
-    const next = initialFormState();
-    if (statusOptions.length > 0) {
-      const active = statusOptions.find((item) => item.code?.toLowerCase() === 'active');
-      if (active) {
-        next.status_id = String(active.look_up_id);
-      }
-    }
-    setForm(next);
+    setForm(initialFormState());
     setEditingPartyId(null);
     setDialogOpen(true);
   };
@@ -536,16 +529,18 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                 </>
               )}
 
-              <TextField
-                label="Status"
-                select
-                value={form.status_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, status_id: e.target.value }))}
-              >
-                {statusOptions.map((item) => (
-                  <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                ))}
-              </TextField>
+              {editingPartyId ? (
+                <TextField
+                  label="Status"
+                  select
+                  value={form.status_id}
+                  onChange={(e) => setForm((prev) => ({ ...prev, status_id: e.target.value }))}
+                >
+                  {statusOptions.map((item) => (
+                    <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                  ))}
+                </TextField>
+              ) : null}
 
               <TextField
                 label="Description"
