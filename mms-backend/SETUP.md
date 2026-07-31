@@ -1,96 +1,134 @@
-# Backend Setup
+# MMS Backend Setup
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Install and Run](#install-and-run)
+3. [Environment Variables](#environment-variables)
+4. [Mounted Route Groups](#mounted-route-groups)
+5. [Permission Modules in Use](#permission-modules-in-use)
+6. [Reporting Integration Settings](#reporting-integration-settings)
+7. [Seeded Test Accounts](#seeded-test-accounts)
+8. [Revision History](#revision-history)
 
 ## Prerequisites
-- Node.js 16+ and npm
+
+- Node.js 16+
+- npm
 - PostgreSQL 12+
 
-## Installation Steps
+## Install and Run
 
-1. **Copy environment configuration:**
-   ```bash
-   cp .env.example .env
-   ```
+1. Copy environment file:
 
-2. **Configure database connection in `.env`:**
-   ```
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_USER=postgres
-   DB_PASSWORD=postgres
-   DB_NAME=mms
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-4. **Set up database (from project root):**
-   ```bash
-   cd ../database
-   ./deploy.sh  # On Linux/Mac
-   # or
-   deploy.bat  # On Windows
-   ```
-
-5. **Start development server:**
-   ```bash
-   npm run dev
-   ```
-
-   Server will start on `http://localhost:3001`
-
-6. **Test API:**
-   ```bash
-   curl http://localhost:3001/health
-   ```
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/login` - Login with account_name and password
-- `POST /api/auth/set-password` - Set or change password
-
-### Accounts
-- `GET /api/accounts/me` - Get current account (requires auth)
-- `GET /api/accounts` - List all accounts (requires auth)
-- `GET /api/accounts/:id` - Get specific account (requires auth)
-- `POST /api/accounts` - Create new account (requires auth)
-- `PUT /api/accounts/:id` - Update account (requires auth)
-- `DELETE /api/accounts/:id` - Delete account (requires auth)
-
-### Account Relationships
-- `POST /api/accounts/:id/addresses` - Create address
-- `PUT /api/accounts/:id/addresses/:addressId` - Update address
-- `DELETE /api/accounts/:id/addresses/:addressId` - Delete address
-- `POST /api/accounts/:id/phones` - Create phone
-- `PUT /api/accounts/:id/phones/:phoneId` - Update phone
-- `DELETE /api/accounts/:id/phones/:phoneId` - Delete phone
-- `POST /api/accounts/:id/emails` - Create email
-- `PUT /api/accounts/:id/emails/:emailId` - Update email
-- `DELETE /api/accounts/:id/emails/:emailId` - Delete email
-
-### Roles
-- `POST /api/accounts/:id/roles` - Assign role to account
-- `DELETE /api/accounts/:id/roles/:roleCode` - Remove role from account
-
-## Test Credentials
-
-Two accounts are seeded in the database:
-- Account: `superuser` (password not set)
-- Account: `admin` (password not set)
-
-Before first login, set password using:
 ```bash
-curl -X POST http://localhost:3001/api/auth/set-password \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"password":"your_new_password"}'
+cp .env.example .env
 ```
 
-Or directly update the `password_hash` in the database:
-```sql
-UPDATE account SET password_hash = crypt('admin', gen_salt('bf')) WHERE account_name = 'admin';
+2. Install dependencies:
+
+```bash
+npm install
 ```
 
-(Note: This requires the pgcrypto extension - see database setup)
+3. Deploy database from repository root:
+
+```bash
+cd ../database
+./deploy.sh
+# or on Windows
+deploy.bat
+```
+
+4. Start backend in watch mode:
+
+```bash
+cd ../mms-backend
+npm run dev
+```
+
+Backend default URL: http://localhost:3001
+
+Health check:
+
+```bash
+curl http://localhost:3001/health
+```
+
+## Environment Variables
+
+Variables from .env.example:
+
+- PORT
+- NODE_ENV
+- DB_HOST
+- DB_PORT
+- DB_USER
+- DB_PASSWORD
+- DB_NAME
+- JWT_SECRET
+- SESSION_SECRET
+- JWT_EXPIRES_IN
+- CORS_ORIGIN
+
+Additional backend variables supported by config/env.ts:
+
+- REPORT_SERVICE_URL
+- REPORT_SERVICE_BASE_URL
+- REPORT_SERVICE_RENDER_PATH
+- REPORT_SERVICE_TIMEOUT_MS
+
+## Mounted Route Groups
+
+Routes mounted in src/index.ts:
+
+- /api/auth
+- /api/accounts
+- /api/roles
+- /api/navigation
+- /api/reports
+- /api/system-settings
+- /api (product routes)
+- /api (party routes)
+
+## Permission Modules in Use
+
+Current requirePermission checks rely on these module names:
+
+- User Management
+- Manage Roles
+- Project Management
+- Supplier
+- System Settings
+- Report Catalog (REPORT_<code>)
+
+These names must match permission.module_name values in the database.
+
+## Reporting Integration Settings
+
+Backend report service builds render endpoint in this order:
+
+1. report_catalog.report_service_endpoint
+2. REPORT_SERVICE_URL
+3. REPORT_SERVICE_BASE_URL + REPORT_SERVICE_RENDER_PATH
+
+Default computed endpoint if none overridden: http://localhost:8085/reports/render
+
+## Seeded Test Accounts
+
+Seed file 050_account_seed.sql inserts:
+
+- superuser
+- auditor
+
+To ensure passwords are set for login testing:
+
+```bash
+npm run setup-test-accounts
+```
+
+## Revision History
+
+| Date | Author | Summary |
+|---|---|---|
+| 2026-08-01 | Copilot | Corrected route inventory, permission modules, report integration config, and seeded test account details. |

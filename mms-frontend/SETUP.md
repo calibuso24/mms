@@ -1,78 +1,107 @@
-# Frontend Setup
+# MMS Frontend Setup
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Install and Run](#install-and-run)
+3. [Environment](#environment)
+4. [Implemented Pages](#implemented-pages)
+5. [Routing and Navigation Behavior](#routing-and-navigation-behavior)
+6. [State and API Layers](#state-and-api-layers)
+7. [Seeded Accounts for Testing](#seeded-accounts-for-testing)
+8. [Revision History](#revision-history)
 
 ## Prerequisites
-- Node.js 16+ and npm
 
-## Installation Steps
+- Node.js 16+
+- npm
+- Backend API running
 
-1. **Copy environment configuration:**
-   ```bash
-   cp .env.example .env
-   ```
+## Install and Run
 
-2. **Configure API endpoint in `.env`:**
-   ```
-   VITE_API_BASE_URL=http://localhost:3001/api
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-4. **Start development server:**
-   ```bash
-   npm run dev
-   ```
-
-   Application will run on `http://localhost:5173`
-
-5. **Build for production:**
-   ```bash
-   npm run build
-   ```
-
-   Output: `dist/` folder
-
-## Development
-
-- The application uses React Router for navigation
-- Authentication is handled via JWT tokens stored in localStorage
-- API calls are made through the `ApiClient` utility
-- Auth context provides `useAuth()` hook for accessing login state and methods
-
-## Test Credentials
-
-Use the accounts seeded in the database:
-- Account: `superuser`
-- Account: `admin`
-
-**Note:** These accounts don't have passwords by default. You'll need to set a password through the API first.
-
-## Architecture
-
-```
-src/
-├── pages/           # Page components
-│   └── Login.tsx    # Login page
-├── shared/
-│   ├── api/         # API client and endpoints
-│   ├── components/  # Shared components
-│   ├── contexts/    # React contexts (auth)
-│   └── styles/      # Global styles
-├── App.tsx          # Main app component with routing
-└── main.tsx         # Entry point
+```bash
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-## Debugging
+Default URL: http://localhost:5173
 
-To debug API calls:
-1. Open browser DevTools (F12)
-2. Go to Network tab
-3. Perform actions in the app
-4. Inspect requests/responses
+Production build:
 
-To check localStorage:
-1. Open browser DevTools (F12)
-2. Go to Application tab
-3. Look for `authToken` in localStorage
+```bash
+npm run build
+npm run preview
+```
+
+## Environment
+
+Required variable:
+
+- VITE_API_BASE_URL=http://localhost:3001/api
+
+## Implemented Pages
+
+Current pages under src/pages:
+
+- Login
+- Materials
+- ManageUsers
+- ManageRoles
+- PartyManagement (Project + Supplier modes)
+- SystemSettings
+- Profile
+- ReportRunner
+
+## Routing and Navigation Behavior
+
+Core route behavior is centralized in App.tsx:
+
+- Public route: /login
+- Protected shell: /app/*
+- /app/profile -> Profile page
+- /app routes containing:
+  - product-management -> Materials
+  - manage-users -> ManageUsers
+  - manage-roles -> ManageRoles
+  - project-management -> ProjectManagement
+  - supplier-management -> SupplierManagement
+  - system-settings -> SystemSettings
+  - /reports/<code> -> ReportRunner
+
+If a navigation route is present but not mapped to a dedicated page component, frontend shows "This page is under development."
+
+## State and API Layers
+
+Key frontend layers:
+
+- shared/api/client.ts
+  - ApiClient (GET/POST/PUT/DELETE)
+  - domain APIs for auth, account, product, party, roles, navigation, reports, system settings
+- shared/contexts/auth.tsx
+  - token persistence in localStorage
+  - account restore through /accounts/me
+- shared/contexts/navigation.tsx
+  - loads MAIN navigation tree
+  - loads report groups from report catalog sidebar endpoint
+  - tracks current context and expanded group state
+
+## Seeded Accounts for Testing
+
+Database seed includes:
+
+- superuser
+- auditor
+
+If login fails due to password state, run backend helper:
+
+```bash
+cd ../mms-backend
+npm run setup-test-accounts
+```
+
+## Revision History
+
+| Date | Author | Summary |
+|---|---|---|
+| 2026-08-01 | Copilot | Updated frontend setup, route behavior, implemented page list, and account testing notes to match current code. |

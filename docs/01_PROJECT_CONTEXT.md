@@ -1,152 +1,252 @@
-# MMS — Project Overview
+# MMS - Project Context
 
-## Purpose
+## Table of Contents
 
-**MMS (Materials Management System)** is a full-stack web application for managing material requests, purchasing, inventory movement, job orders, site purchases, and inventory audits for construction or project-based organizations.
+1. [Purpose and Scope](#purpose-and-scope)
+2. [Current System Architecture](#current-system-architecture)
+3. [Technology Stack](#technology-stack)
+4. [Repository Structure](#repository-structure)
+5. [Implemented Functional Scope](#implemented-functional-scope)
+6. [Runtime Endpoints](#runtime-endpoints)
+7. [Build and Run Scripts](#build-and-run-scripts)
+8. [Environment Configuration](#environment-configuration)
+9. [Naming and Design Conventions](#naming-and-design-conventions)
+10. [Related Documents](#related-documents)
+11. [Revision History](#revision-history)
 
----
+## Purpose and Scope
+
+MMS (Materials Management System) is a multi-service application for enterprise operations. The current implementation prioritizes:
+
+- Product master data management
+- Party management for projects and suppliers
+- User and role administration with RBAC
+- Database-driven navigation
+- Report catalog and report file generation
+- Database-driven system settings management
+
+Operational menu entries for procurement and inventory workflows are seeded in navigation, but several are still frontend placeholders.
+
+## Current System Architecture
+
+MMS runs as three cooperating services:
+
+1. mms-frontend
+2. mms-backend
+3. reporting-service
+
+Data flow:
+
+1. Frontend authenticates with backend and stores JWT.
+2. Backend enforces auth and permission checks on protected routes.
+3. Backend persists business data in PostgreSQL.
+4. Report requests from backend are proxied to reporting-service for Jasper rendering.
 
 ## Technology Stack
 
 ### Backend
+
 | Item | Detail |
 |---|---|
 | Runtime | Node.js 16+ |
-| Framework | Express.js 4.x |
-| Language | TypeScript (ESM, `"type": "module"`) |
-| Database client | `pg` (node-postgres) 8.x |
-| Authentication | JWT (`jsonwebtoken` 9.x) + bcrypt (`bcryptjs` 2.x) |
-| Validation | `joi` 17.x |
-| Dev server | `tsx watch` |
-| Build | `tsc` → `dist/` |
+| Framework | Express 4 |
+| Language | TypeScript (ESM) |
+| Database | pg (node-postgres) |
+| Auth | JWT + bcryptjs |
+| Validation | joi |
+| Dev runner | tsx watch |
 
 ### Frontend
+
 | Item | Detail |
 |---|---|
 | Framework | React 18 + TypeScript |
 | Build tool | Vite 5 |
-| UI library | Material-UI (MUI) v5 + MUI X DataGrid v6 |
-| Routing | React Router v6 |
-| HTTP client | Custom `ApiClient` wrapper |
+| UI | Material UI v5 + MUI X Data Grid |
+| Router | React Router v6 |
+| API layer | Custom ApiClient |
+
+### Reporting Service
+
+| Item | Detail |
+|---|---|
+| Runtime | Java 17 |
+| HTTP Framework | Javalin |
+| Reporting engine | JasperReports |
+| DB driver | PostgreSQL JDBC |
+| Build/run | Maven |
 
 ### Database
+
 | Item | Detail |
 |---|---|
 | Engine | PostgreSQL |
-| Name | `mms` |
-| Default user | `postgres` / `postgres` |
-| Schema | 50+ tables across 8 functional modules |
+| Default database | mms |
+| Migration model | Ordered SQL files in database/migrations |
 
----
+## Repository Structure
 
-## Ports
-
-| Service | URL |
-|---|---|
-| Frontend | `http://localhost:5173` |
-| Backend | `http://localhost:3001` |
-| Database | `localhost:5432` |
-| Health check | `http://localhost:3001/health` |
-
----
-
-## Project Folder Structure
-
-```
+```text
 mms/
-├── database/
-│   ├── migrations/        # 50+ ordered SQL migration files (000_ to 999_)
-│   ├── seeds/             # Seed data files (010_ to 051_)
-│   ├── views/             # SQL view definitions
-│   ├── functions/         # PostgreSQL stored functions
-│   ├── rollback/          # Rollback scripts for specific migrations
-│   ├── import/            # One-time import scripts
-│   ├── deploy.sh          # Linux deployment script (creates DB, runs migrations + seeds)
-│   └── deploy.bat         # Windows deployment script
-│
-├── mms-backend/
-│   ├── src/
-│   │   ├── index.ts              # Express app entry point
-│   │   ├── config/               # env.ts, database.ts
-│   │   ├── controllers/          # HTTP request handlers
-│   │   ├── services/             # Business logic
-│   │   ├── repositories/         # All direct DB queries (pg pool)
-│   │   ├── routes/               # Express router definitions
-│   │   ├── middleware/           # auth.ts, errorHandler.ts
-│   │   ├── utils/                # auth.ts (JWT/bcrypt), errors.ts
-│   │   ├── shared/               # Shared types/interfaces
-│   │   └── modules/
-│   │       ├── manage_users/     # DTOs, ViewModels, Entities, Repository interfaces
-│   │       └── product_management/
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── mms-frontend/
-│   ├── src/
-│   │   ├── main.tsx              # React entry point
-│   │   ├── App.tsx               # Root component + routing
-│   │   ├── pages/
-│   │   │   ├── Login.tsx         # Login page
-│   │   │   ├── Materials.tsx     # Material management page
-│   │   │   └── ManageUsers.tsx   # User management page
-│   │   └── shared/
-│   │       ├── contexts/         # auth.tsx, navigation.tsx
-│   │       └── api/              # client.ts (ApiClient + domain API objects)
-│   ├── package.json
-│   └── vite.config.ts
-│
-└── docs/                  # This folder — project documentation
+|- database/
+|  |- migrations/
+|  |- seeds/
+|  |- views/
+|  |- functions/
+|  |- import/
+|  |- rollback/
+|  |- deploy.bat
+|  |- deploy.sh
+|  \- drop_db.bat
+|- docs/
+|- mms-backend/
+|  \- src/
+|     |- config/
+|     |- controllers/
+|     |- middleware/
+|     |- modules/
+|     |- repositories/
+|     |- routes/
+|     |- services/
+|     |- shared/
+|     \- utils/
+|- mms-frontend/
+|  \- src/
+|     |- modules/
+|     |- pages/
+|     \- shared/
+|- reporting-service/
+|  |- reports/
+|  \- src/main/java/
+\- tests/
 ```
 
----
+## Implemented Functional Scope
 
-## NPM Scripts
+### Backend route groups currently mounted
 
-### Backend (`mms-backend/`)
-| Script | Command | Purpose |
-|---|---|---|
-| `dev` | `tsx watch src/index.ts` | Hot-reload dev server |
-| `build` | `tsc` | Compile TS → `dist/` |
-| `start` | `node dist/index.js` | Production start |
-| `lint` | `eslint src --ext .ts` | Lint source |
-| `setup-test-accounts` | `npm run build && node setup-test-accounts.js` | Hash & insert test account passwords |
+- /api/auth
+- /api/accounts
+- /api/roles
+- /api/navigation
+- /api/reports
+- /api/system-settings
+- /api/categories, /api/brands, /api/uom, /api/subcategories, /api/lookups, /api/materials
+- /api/projects, /api/suppliers
 
-### Frontend (`mms-frontend/`)
-| Script | Command | Purpose |
-|---|---|---|
-| `dev` | `vite` | Hot-reload dev server |
-| `build` | `vite build` | Production build |
-| `preview` | `vite preview` | Preview production build |
+### Frontend pages currently implemented
 
----
+- Login
+- Dashboard (KPI placeholders)
+- Product Management
+- Manage Users
+- Manage Roles
+- Project Management
+- Supplier Management
+- System Settings
+- My Profile
+- Report Runner
 
-## Environment Variables
+### Reporting integration
 
-### Backend (`.env` in `mms-backend/`)
-```env
-PORT=3001
-NODE_ENV=development
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=mms
-JWT_SECRET=your_jwt_secret_key_change_this
-JWT_EXPIRES_IN=24h
-CORS_ORIGIN=http://localhost:5173
-```
+- Backend reads report metadata and parameters from report_catalog and report_parameter.
+- Backend calls reporting-service endpoint (default /reports/render).
+- reporting-service supports pdf, xlsx, and docx rendering.
 
----
+## Runtime Endpoints
 
-## Naming Conventions
+| Service | Default URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:3001 |
+| Backend health | http://localhost:3001/health |
+| Reporting service | http://localhost:8085 |
+| Reporting health | http://localhost:8085/health |
+
+## Build and Run Scripts
+
+### Root scripts
+
+| Script | Purpose |
+|---|---|
+| npm run dev | Starts backend, frontend, and reporting-service concurrently |
+| npm run reporting | Runs reporting-service using Maven |
+| npm run rebuild | Reinstalls Node dependencies and builds reporting-service |
+| npm run build | Reinstalls backend/frontend dependencies |
+
+### Backend scripts
+
+| Script | Purpose |
+|---|---|
+| npm run dev | Start backend in watch mode |
+| npm run build | Compile to dist |
+| npm start | Run compiled backend |
+| npm run setup-test-accounts | Build backend and set seed account passwords |
+
+### Frontend scripts
+
+| Script | Purpose |
+|---|---|
+| npm run dev | Start Vite dev server |
+| npm run build | Build production assets |
+| npm run preview | Preview production build |
+
+## Environment Configuration
+
+### Backend core variables
+
+- PORT
+- NODE_ENV
+- DB_HOST
+- DB_PORT
+- DB_USER
+- DB_PASSWORD
+- DB_NAME
+- JWT_SECRET
+- JWT_EXPIRES_IN
+- CORS_ORIGIN
+
+### Backend reporting variables (optional)
+
+- REPORT_SERVICE_URL
+- REPORT_SERVICE_BASE_URL (default http://localhost:8085)
+- REPORT_SERVICE_RENDER_PATH (default /reports/render)
+- REPORT_SERVICE_TIMEOUT_MS (default 120000)
+
+### Frontend
+
+- VITE_API_BASE_URL
+
+### Reporting-service variables
+
+- REPORT_SERVICE_PORT (default 8085)
+- REPORTS_BASE_DIR (default current directory)
+- REPORT_DB_URL or DB_URL
+- REPORT_DB_HOST / REPORT_DB_PORT / REPORT_DB_NAME
+- REPORT_DB_USER / REPORT_DB_PASSWORD
+
+## Naming and Design Conventions
 
 | Context | Convention |
 |---|---|
-| Database tables & columns | `snake_case` |
-| TypeScript files | `camelCase.ts` |
-| Migration files | `NNN_table_name.sql` (zero-padded number prefix) |
-| Seed files | `NNN_description_seed.sql` |
-| All tables | Have audit fields: `log_date_created`, `log_date_updated`, `log_created_by_account_id`, `log_updated_by_account_id` |
-| Soft deletes | `is_deleted BOOLEAN DEFAULT FALSE` column where applicable |
-| Status/type enums | Stored in `look_up` table, referenced by `look_up_id` FK |
-| Permission module names | Match navigation `permission_code` labels exactly |
+| SQL object names | snake_case |
+| TypeScript files | camelCase.ts |
+| Migration files | NNN_description.sql |
+| Seed files | NNN_description.sql |
+| Soft delete | is_deleted flag where applicable |
+| Lookup FKs | look_up_id naming pattern |
+| Permission checks | module_name + permission_code pair |
+
+## Related Documents
+
+- [README.md](../README.md)
+- [docs/02_DATABASE_GUIDE.md](02_DATABASE_GUIDE.md)
+- [docs/03_BUSINESS_FLOW.md](03_BUSINESS_FLOW.md)
+- [docs/04_DEVELOPMENT_GUIDE.md](04_DEVELOPMENT_GUIDE.md)
+- [docs/SETUP.md](SETUP.md)
+
+## Revision History
+
+| Date | Author | Summary |
+|---|---|---|
+| 2026-08-01 | Copilot | Updated architecture, module scope, scripts, environment settings, and frontend/backend implementation coverage to match current codebase. |

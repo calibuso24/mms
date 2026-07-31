@@ -1,294 +1,148 @@
-# MMS — Business Workflow
+# MMS - Business Flow and Navigation
 
-## Overview
+## Table of Contents
 
-MMS covers five major operational flows:
+1. [Current Workflow Coverage](#current-workflow-coverage)
+2. [Implemented End-to-End Flows](#implemented-end-to-end-flows)
+3. [Seeded Data Flows Not Yet Fully Exposed in UI/API](#seeded-data-flows-not-yet-fully-exposed-in-uiapi)
+4. [Navigation System](#navigation-system)
+5. [Report Navigation and Report Catalog](#report-navigation-and-report-catalog)
+6. [Data Integrity Rules](#data-integrity-rules)
+7. [Cross References](#cross-references)
+8. [Revision History](#revision-history)
 
-1. **Material Request** — Site/project raises a request for materials
-2. **Purchasing** — Office creates a PO when materials are not in stock
-3. **Inventory Movement** — Physical movement is logged in stock transfer and stock movement receipts
-4. **Job Order** — Materials sent to a service shop for fabrication or work
-5. **Audit & Adjustment** — Quarterly physical count and stock correction
+## Current Workflow Coverage
 
----
+The repository contains broad procurement and inventory schema support, but current frontend/backend implementation focuses on these active operational areas:
 
-## 1. Material Request Flow
+- Product Management
+- Project Management
+- Supplier Management
+- Manage Users
+- Manage Roles
+- System Settings
+- Report generation through Report Runner
 
-### 1.1 Request Creation
-- A project/site raises a `material_request` record.
-- Line items are added in `material_request_item` with `requested_quantity`, `approved_quantity`, and `estimated_quantity`.
-- The request is linked to a `project_id` (party).
+## Implemented End-to-End Flows
 
-### 1.2 Decision Path
+### 1. Authentication and session flow
 
-**If material is available in warehouse:**
-- No PO is created.
-- Issue from warehouse → create `delivery_receipt` (with `purchase_order_id = NULL`).
-- Log movement → create `stock_transfer` record.
-- Update `stock_balance` and `stock_layer` via `stock_movement_consume()`.
+1. User submits credentials to /api/auth/login.
+2. Backend validates account and returns JWT + current account details.
+3. Frontend stores authToken in localStorage.
+4. AuthProvider restores account state using /api/accounts/me on refresh.
 
-**If material is NOT available:**
-- Create a `purchase_order` linked to the `material_request_id`.
-- Supplier issues one or more `delivery_advice` documents.
-- Warehouse creates `supplier_delivery` linked to the approved purchase order and delivery advice references.
-- Posting `supplier_delivery` updates stock and purchase order received quantities.
+### 2. User and role administration flow
 
----
+1. Admin opens Manage Users or Manage Roles.
+2. Backend enforces permission checks:
+  - User Management (VIEW/CREATE/UPDATE/DELETE)
+  - Manage Roles (VIEW/CREATE/UPDATE/DELETE)
+3. CRUD operations update account, role, role_permission, and related contact tables.
 
-## 2. Purchasing & Supplier Logistics Flow
+### 3. Product management flow
 
-### 2.1 Purchase Order Creation
-- `purchase_order` records the PO header (po_number, supplier, project, status, total_amount).
-- `purchase_order_item` records line items (material, quantity, unit_price).
-- `order_type_id` distinguishes: regular purchase, site purchase, or other PO types.
-- `purchase_order_adj` and `purchase_order_item_adj` record discounts/surcharges.
+1. User manages categories, brands, UOM, sub-categories, and materials.
+2. Material form supports:
+  - base material fields
+  - optional material specification payload
+  - optional material option payload
+3. List filtering uses search + lookup-based filters.
 
-### 2.2 Supplier Delivery Advice
-- Supplier issues a delivery advice → recorded in `delivery_advice` + `delivery_advice_item`.
-- Supports partial deliveries over multiple advice documents.
+### 4. Project and supplier management flow
 
-### 2.3 Goods Receipt
-- Supplier receipt is recorded in `supplier_delivery` + `supplier_delivery_item`.
-- One supplier delivery can include multiple `delivery_advice` references via `supplier_delivery_advice`.
-- Supplier delivery must reference an approved purchase order.
-- Stock is increased only when supplier delivery is posted.
+1. Project and Supplier pages use party records keyed by party_type lookup.
+2. Shared contact information is handled through nested addresses, phones, emails, and related contacts.
+3. Supplier flow includes normalized weekly business hours in supplier_business_hours.
 
-### 2.4 Delivery Receipt (Project/Warehouse Issue)
-- Physical issue/receipt to project remains recorded in `delivery_receipt` + `delivery_receipt_item`.
-- If internal warehouse issue: `purchase_order_id` is NULL.
-- This document is separate from supplier-to-warehouse receiving.
+### 5. System settings flow
 
-### 2.5 Site Purchase
-- `site_purchase` handles direct purchasing at site level without a formal PO.
+1. Settings categories are loaded from system_setting_category.
+2. Category settings are lazy-loaded from system_setting.
+3. Permission split:
+  - VIEW: read categories/settings
+  - EDIT: create/delete definitions
+  - SAVE: persist value updates
+  - RESET: reset category to defaults
 
----
+### 6. Report generation flow
 
-## 3. Inventory Movement & Stock Transfer
+1. Sidebar and report pages read report definitions and parameters.
+2. User chooses an enabled format and enters required parameters.
+3. Backend validates required parameters and format support.
+4. Backend calls reporting-service for rendering.
+5. Generated file is downloaded and report_history is updated (RUNNING to SUCCESS/FAILED).
 
-### 3.1 Stock Transfer Types
-`stock_transfer` records all physical inventory movements with a `transfer_type_id`:
-- **Warehouse Transfer** — movement between warehouses
-- **RTS Warehouse** — return to warehouse
-- **RTS Supplier** — return to supplier
-- **Job Order Delivery** — materials sent to service shop
-- **Site Receipt** — materials received at site
+## Seeded Data Flows Not Yet Fully Exposed in UI/API
 
-### 3.2 Inventory State Tables
-| Table | Purpose |
-|---|---|
-| `stock_movement` | Detailed movement record per transaction |
-| `stock_balance` | Current on-hand quantity per party + material |
-| `stock_layer` | FIFO/LIFO costing layers per party + material |
+Navigation and schema include additional business areas that currently route to the generic "under development" page in frontend:
 
-### 3.3 `stock_movement_consume()` Function
-All inventory consumption goes through this PostgreSQL function:
-- Atomically deducts from `stock_layer` (FIFO or LIFO)
-- Writes a `stock_movement` record
-- Maintains data integrity via database-level transaction
+- Coordinating transactions (material request/control variants)
+- Purchasing transactions (requisition, PO, delivery advice/receipt, RTS)
+- Inventory transactions (supplier delivery, stock transfer, job order delivery, physical count, material adjustment)
+- Audit Logs page route
 
----
+These are treated as planned/seeded flows in this revision, not as completed interactive modules.
 
-## 4. Job Order & Service Workflow
+## Navigation System
 
-### 4.1 Job Order Document
-- `job_order` represents an internal or external service job (fabrication, installation, etc.).
-- `job_order_item` lists the materials needed for the job.
+Navigation is database-driven through table navigation and loaded by backend endpoints:
 
-### 4.2 Job Order Delivery
-- Materials sent to the service shop are logged in `stock_transfer` with `transfer_type_id = 'Job Order Delivery'`.
-- `stock_transfer.job_order_id` links the inventory movement to the job order.
-- The service document (`job_order`) stays separate from the inventory flow.
-- `stock_transfer_job_order` is the junction table for many-to-many relationships.
+- GET /api/navigation/main
+- GET /api/navigation/reports
+- GET /api/navigation/context/:context
+- GET /api/navigation/report-catalog-sidebar
 
----
+Key characteristics:
 
-## 5. Inventory Audit & Correction
+- Contexts: MAIN and REPORTS
+- Tree hierarchy through parent_navigation_id
+- SQL-level permission filtering by permission_code
+- Visibility filtering through is_visible and is_deleted
 
-### 5.1 Physical Count
-- `physical_count` is the quarterly site inventory audit document.
-- `physical_count_item` records per-material: **expected quantity**, **counted quantity**, **variance**.
-- This is an **audit document only** — it does NOT automatically adjust stock.
+Frontend behavior:
 
-### 5.2 Material Adjustment
-- After reviewing physical count variance, an authorized user creates a `material_adjustment`.
-- `material_adjustment_item` records the approved adjustment quantity per material.
-- This triggers the actual stock balance correction.
+- MAIN sidebar uses navigation tree from /navigation/main
+- REPORTS sidebar uses grouped report catalog from /navigation/report-catalog-sidebar
+- Expanded menu state is persisted in localStorage
 
----
+## Report Navigation and Report Catalog
 
-## 6. Material Control & Coordination
+There are two report navigation sources:
 
-### 6.1 Material Control
-- `material_control` tracks how much of each material is allocated to a project.
-- Stores `control_quantity`, `issued_quantity`, and `balance_quantity` per project/material pair.
-- Updated whenever stock is issued to a project.
+1. REPORTS rows seeded in navigation table (legacy slug routes)
+2. Report catalog grouping endpoint that builds /reports/<report_code> routes from report_catalog
 
-### 6.2 Additional Control
-- `additional_control` provides supplementary control entries linked to `material_control`.
-- Used for tracking extra allocations or adjustments outside the main control record.
+Current report runner behavior in App:
 
----
+- Any route starting with /reports/ is treated as report code route.
+- The segment after /reports/ is passed to backend report endpoints.
+
+Practical implication:
+
+- report-catalog-driven routes such as /reports/inv001 align with backend report code lookups.
 
 ## Data Integrity Rules
 
-| Rule | Enforcement |
+| Rule | Current enforcement |
 |---|---|
-| All stock consumption uses `stock_movement_consume()` | Database function |
-| Soft deletes only — records are never physically removed | `is_deleted` column |
-| All changes require audit trail | Audit fields on every table |
-| Status and type values come from `look_up` | FK to `look_up_id` |
-| Username must be unique among non-deleted accounts | Partial unique index |
-| Physical count does not auto-adjust stock | Application logic |
-| Supplier delivery posts inventory only on post action | `post_supplier_delivery()` database function |
+| Auth required on business routes | authMiddleware |
+| Permission checks by module/code | requirePermission middleware |
+| Lookup-backed status/type values | FK to look_up |
+| Soft deletes for mutable records | is_deleted flags |
+| Supplier schedule day/time validation | supplier_business_hours constraints |
+| Report access by per-report permission | Report Catalog + REPORT_<code> |
+| Report execution state tracking | report_history + REPORT_STATUS lookups |
 
+## Cross References
 
-# MMS — Navigation System
+- [docs/01_PROJECT_CONTEXT.md](01_PROJECT_CONTEXT.md)
+- [docs/02_DATABASE_GUIDE.md](02_DATABASE_GUIDE.md)
+- [docs/04_DEVELOPMENT_GUIDE.md](04_DEVELOPMENT_GUIDE.md)
+- [database/seeds/049_navigation_seed.sql](../database/seeds/049_navigation_seed.sql)
 
-## Overview
+## Revision History
 
-MMS uses a **fully database-driven navigation system**. All menu items are stored in the `navigation` table. No menu structure is hardcoded.
-
-**Features:**
-- Hierarchical menus (unlimited parent-child nesting)
-- Two contexts: `MAIN` (operations) and `REPORTS` (analytics)
-- Permission-aware: SQL-level filtering — users only see items they have access to
-- Soft delete with audit trail
-- Icon support (SVG)
-- Expand/collapse state persisted in `localStorage` on the frontend
-
----
-
-## `navigation` Table Schema
-
-```sql
-navigation_id            BIGINT PRIMARY KEY
-parent_navigation_id     BIGINT → navigation(navigation_id)  -- self-referencing
-context                  VARCHAR(50)   -- 'MAIN' or 'REPORTS'
-navigation_type          VARCHAR(50)   -- GROUP, MENU, REPORT, HEADER
-title                    VARCHAR(255)
-route                    VARCHAR(255)  -- frontend route path (nullable for GROUPs)
-icon                     VARCHAR(100)  -- icon identifier
-permission_code          VARCHAR(100)  -- NULL = visible to all authenticated users
-display_order            INTEGER
-is_visible               BOOLEAN
-is_deleted               BOOLEAN
-reference_type           VARCHAR(50)   -- 'NONE' or 'REPORT'
-reference_id             BIGINT        -- FK to report_catalog when reference_type = 'REPORT'
-log_created_by_account_id BIGINT
-log_date_created         TIMESTAMPTZ
-log_updated_by_account_id BIGINT
-log_date_updated         TIMESTAMPTZ
-```
-
----
-
-## Key Column Values
-
-### `context`
-| Value | Meaning |
-|---|---|
-| `MAIN` | Operations menus (materials, purchasing, inventory, etc.) |
-| `REPORTS` | Analytics and reporting menus |
-
-### `navigation_type`
-| Value | Meaning |
-|---|---|
-| `GROUP` | A collapsible section header — has children, no direct route |
-| `MENU` | A clickable menu item with a route |
-| `REPORT` | A report link — links to a `report_catalog` entry |
-| `HEADER` | A static non-clickable section label |
-
-### `permission_code`
-- If `NULL` → visible to all authenticated users
-- If set → must match a `permission_code` value in the `permission` table
-- The SQL query filters navigation items where the user has the required permission
-
-### `reference_type` + `reference_id`
-- `reference_type = 'REPORT'` + `reference_id = <report_catalog_id>` → links the nav item to a specific report
-
----
-
-## Database Indexes (8 total)
-
-| Index | Purpose |
-|---|---|
-| `idx_navigation_parent_navigation_id` | Parent lookups |
-| `idx_navigation_context` | Context-based queries |
-| `idx_navigation_context_parent` | Combined context + parent queries |
-| `idx_navigation_route` | Route-based lookups |
-| `idx_navigation_permission_code` | Permission filtering |
-| `idx_navigation_is_visible` | Visibility filtering |
-| `idx_navigation_is_deleted` | Soft delete filtering |
-| `idx_navigation_reference_type_id` | Reference lookups |
-
----
-
-## Backend
-
-### Routes (`src/routes/navigation.ts`)
-```
-GET /api/navigation/main                   → getMainNavigation()
-GET /api/navigation/reports                → getReportsNavigation()
-GET /api/navigation/context/:context       → getNavigationByContext()
-GET /api/navigation/report-catalog-sidebar → getReportCatalogSidebar()
-```
-All require `authMiddleware`.
-
-### NavigationService (`src/services/navigation.ts`)
-```typescript
-getMainNavigation(accountId?)
-getReportsNavigation(accountId?)
-getNavigationByContext(context, accountId?)
-getReportCatalogSidebar(accountId?)
-```
-
-### NavigationRepository (`src/repositories/navigation.ts`)
-```typescript
-findByContext(context, accountId?)               // Flat list, permission-filtered
-findByContextAndParent(context, parentId?, accountId?)
-findChildren(navigationId, context, accountId?)
-getReportCatalogByCategory(accountId?)
-buildHierarchy(rows)                             // Converts flat list → tree
-```
-
-The repository filters items at the SQL level:
-- `WHERE is_deleted = FALSE AND is_visible = TRUE`
-- `AND (permission_code IS NULL OR permission_code IN (SELECT ... FROM account permissions))`
-
-`buildHierarchy()` takes the flat SQL result and assembles the tree structure using `parent_navigation_id`.
-
----
-
-## Frontend Navigation Context (`src/shared/contexts/navigation.tsx`)
-
-```typescript
-interface NavigationContextType {
-  mainNavigation: NavigationItem[]     // MAIN context tree
-  reportsNavigation: NavigationItem[]  // REPORTS context tree
-  reportGroups: ReportGroup[]          // Reports grouped by category (for sidebar)
-  currentContext: 'MAIN' | 'REPORTS'   // Active context
-  expandedItems: Set<number>           // IDs of expanded GROUP items
-  loading: boolean
-  error: string | null
-  setCurrentContext(context): void
-  toggleExpandedItem(id): void
-  setExpandedItems(ids): void
-  refreshNavigation(): Promise<void>
-  pageTitle: string
-  setPageTitle(title): void
-}
-```
-
-- Expand/collapse state stored in `localStorage`
-- Context switches between MAIN and REPORTS sidebar views
-- `pageTitle` allows pages to set the header title dynamically
-
----
-
-## Adding New Navigation Items
-
-1. Insert a row into the `navigation` table with the correct `context`, `navigation_type`, `parent_navigation_id`, and `display_order`.
-2. Set `permission_code` if the item should be restricted to users with a specific permission.
-3. Set `is_visible = TRUE`, `is_deleted = FALSE`.
-4. For report links: set `reference_type = 'REPORT'` and `reference_id = <report_catalog_id>`.
-5. No code changes are needed — the frontend reads navigation from the API automatically.
+| Date | Author | Summary |
+|---|---|---|
+| 2026-08-01 | Copilot | Reworked workflow documentation to distinguish implemented modules from seeded placeholders, and aligned navigation/report flow details with actual frontend and backend behavior. |

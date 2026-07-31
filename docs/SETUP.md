@@ -1,126 +1,169 @@
-# MMS — Setup Guide
+# MMS - Setup Guide
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Database Deployment](#database-deployment)
+3. [Backend Setup](#backend-setup)
+4. [Frontend Setup](#frontend-setup)
+5. [Reporting Service Setup](#reporting-service-setup)
+6. [Run All Services Together](#run-all-services-together)
+7. [Environment Variables](#environment-variables)
+8. [Verification Checklist](#verification-checklist)
+9. [Troubleshooting](#troubleshooting)
+10. [Revision History](#revision-history)
 
 ## Prerequisites
 
 - Node.js 16+
-- PostgreSQL (running locally)
 - npm
+- PostgreSQL server and psql client
+- Java 17+
+- Maven 3.9+
 
----
+## Database Deployment
 
-## 1. Database Setup
+From repository root:
 
 ```bash
 cd database
 
-# Linux/Mac
+# Linux/macOS
 ./deploy.sh
 
 # Windows
 deploy.bat
 ```
 
-`deploy.sh` will:
-1. Create the `mms` database
-2. Run all migration files in order (`000_` → `999_`)
-3. Run all seed files
+What deployment scripts do:
 
-**Default connection:** `localhost:5432`, user `postgres`, password `postgres`
+1. Validate PostgreSQL connectivity.
+2. Create database if missing.
+3. Apply migrations in sorted order.
+4. Apply seeds in sorted order.
+5. Apply views and functions.
 
----
+Default DB values used by backend and scripts:
 
-## 2. Backend Setup
+- host: localhost
+- port: 5432
+- database: mms
+- user: postgres
+
+## Backend Setup
 
 ```bash
 cd mms-backend
-
-# Copy environment template
 cp .env.example .env
-
-# Edit .env if your DB credentials differ from defaults
-
-# Install dependencies
 npm install
+```
 
-# (Optional) Hash and insert test account passwords
+Optional helper for test account passwords:
+
+```bash
 npm run setup-test-accounts
+```
 
-# Start development server (hot reload)
+Run backend:
+
+```bash
 npm run dev
 ```
 
-Backend runs on `http://localhost:3001`.
+Backend default URL: http://localhost:3001
 
-### Backend `.env` defaults
-```env
-PORT=3001
-NODE_ENV=development
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=mms
-JWT_SECRET=your_jwt_secret_key_change_this
-JWT_EXPIRES_IN=24h
-CORS_ORIGIN=http://localhost:5173
-```
-
-> **Production:** Change `JWT_SECRET` to a strong random string.
-
----
-
-## 3. Frontend Setup
+## Frontend Setup
 
 ```bash
 cd mms-frontend
-
-# Copy environment template
 cp .env.example .env
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173`.
+Frontend default URL: http://localhost:5173
 
----
+## Reporting Service Setup
 
-## 4. Test Credentials
-
-| Username | Password |
-|---|---|
-| `superuser` | `superuser123` |
-| `auditor` | *(run `npm run setup-test-accounts` to set)* |
-
----
-
-## 5. Build for Production
-
-### Backend
 ```bash
-cd mms-backend
-npm run build       # Compiles TypeScript → dist/
-npm start           # Runs dist/index.js
+cd reporting-service
+mvn clean package
+mvn exec:java
 ```
 
-### Frontend
+Reporting service default URL: http://localhost:8085
+
+Important directories:
+
+- JRXML templates root: reporting-service/reports
+- Current committed template path: reporting-service/reports/ProductList/ProductList.jrxml
+
+## Run All Services Together
+
+From repository root:
+
 ```bash
-cd mms-frontend
-npm run build       # Outputs to dist/
-npm run preview     # Preview the production build
+npm install
+npm run dev
 ```
 
----
+This runs:
+
+- backend dev server
+- frontend dev server
+- reporting-service
+
+## Environment Variables
+
+### Backend (.env)
+
+- PORT
+- NODE_ENV
+- DB_HOST
+- DB_PORT
+- DB_USER
+- DB_PASSWORD
+- DB_NAME
+- JWT_SECRET
+- JWT_EXPIRES_IN
+- CORS_ORIGIN
+- REPORT_SERVICE_URL (optional)
+- REPORT_SERVICE_BASE_URL (optional)
+- REPORT_SERVICE_RENDER_PATH (optional)
+- REPORT_SERVICE_TIMEOUT_MS (optional)
+
+### Frontend (.env)
+
+- VITE_API_BASE_URL
+
+### Reporting-service (environment)
+
+- REPORT_SERVICE_PORT
+- REPORTS_BASE_DIR
+- REPORT_DB_URL or DB_URL
+- REPORT_DB_HOST / REPORT_DB_PORT / REPORT_DB_NAME
+- REPORT_DB_USER / REPORT_DB_PASSWORD
+
+## Verification Checklist
+
+1. GET http://localhost:3001/health returns status ok.
+2. GET http://localhost:8085/health returns status ok.
+3. Login page loads in frontend.
+4. Login works with seeded account after setting passwords.
+5. Sidebar loads MAIN navigation and report groups.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `ECONNREFUSED` on backend start | PostgreSQL is not running — start it first |
-| Login returns 401 | Run `npm run setup-test-accounts` to set test passwords |
-| CORS error in browser | Check `CORS_ORIGIN` in backend `.env` matches frontend URL |
-| `relation "xxx" does not exist` | Re-run `deploy.sh` — migrations may not have run fully |
-| Frontend shows blank page | Check browser console; ensure backend is running on port 3001 |
+| Backend cannot connect to DB | Verify DB credentials in mms-backend/.env and ensure PostgreSQL service is running |
+| Reporting endpoint errors during report generation | Ensure reporting-service is running and backend REPORT_SERVICE_* values point to it |
+| Report generation says template not configured/not found | Verify report_catalog jrxml_file values and presence of JRXML files under reporting-service/reports |
+| Permission denied on pages | Confirm role assignments and required permissions in role_permission |
+| Empty navigation for user | Confirm account has roles and corresponding VIEW permissions |
+
+## Revision History
+
+| Date | Author | Summary |
+|---|---|---|
+| 2026-08-01 | Copilot | Updated setup to include reporting-service requirements, root dev workflow, current environment variables, and implementation-specific troubleshooting. |
