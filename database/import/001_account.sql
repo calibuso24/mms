@@ -1,4 +1,6 @@
 
+BEGIN;
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 ALTER TABLE source.tbluser ADD COLUMN IF NOT EXISTS account_id BIGINT;
@@ -69,3 +71,5 @@ FROM source.tbluser a, role r
 WHERE a.logtype = 5
 AND r.role_code = 'SITE_STAFF'
 ;
+
+COMMIT;
