@@ -7,7 +7,12 @@ export interface ReportCatalogRow {
   description: string | null;
   report_url: string | null;
   report_file: string | null;
-  jrxml_report_path: string | null;
+  jrxml_file: string | null;
+  jrxml_file_xls: string | null;
+  pdf: boolean;
+  xlsx: boolean;
+  csv: boolean;
+  docx: boolean;
   paper_size: string | null;
   page_orientation: string | null;
   default_export_format: string | null;
@@ -43,7 +48,12 @@ export class ReportRepository {
         rc.description,
         rc.report_url,
         rc.report_file,
-        rc.jrxml_report_path,
+        rc.jrxml_file,
+        rc.jrxml_file_xls,
+        rc.pdf,
+        rc.xlsx,
+        rc.csv,
+        rc.docx,
         rc.paper_size,
         rc.page_orientation,
         rc.default_export_format,
@@ -87,7 +97,12 @@ export class ReportRepository {
         rc.description,
         rc.report_url,
         rc.report_file,
-        rc.jrxml_report_path,
+        rc.jrxml_file,
+        rc.jrxml_file_xls,
+        rc.pdf,
+        rc.xlsx,
+        rc.csv,
+        rc.docx,
         rc.paper_size,
         rc.page_orientation,
         rc.default_export_format,

@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { reportApi } from '../shared/api/client.js';
 
-type ExportFormat = 'pdf' | 'xlsx' | 'docx';
+type ExportFormat = 'pdf' | 'xlsx' | 'csv' | 'docx';
 
 interface ReportParameter {
   report_parameter_id: number;
@@ -41,6 +41,10 @@ interface ReportDefinition {
     default_export_format: string | null;
     paper_size: string | null;
     page_orientation: string | null;
+    pdf: boolean;
+    xlsx: boolean;
+    csv: boolean;
+    docx: boolean;
   };
   parameters: ReportParameter[];
 }
@@ -51,16 +55,18 @@ interface ReportRunnerPageProps {
 
 function guessFormat(value: string | null | undefined): ExportFormat {
   const normalized = (value || 'pdf').toLowerCase();
-  if (normalized === 'xlsx' || normalized === 'excel') {
-    return 'xlsx';
-  }
-
-  if (normalized === 'docx' || normalized === 'doc') {
-    return 'docx';
-  }
-
+  if (normalized === 'xlsx' || normalized === 'excel') return 'xlsx';
+  if (normalized === 'docx' || normalized === 'doc') return 'docx';
+  if (normalized === 'csv') return 'csv';
   return 'pdf';
 }
+
+const FORMAT_OPTIONS: { value: ExportFormat; label: string }[] = [
+  { value: 'pdf',  label: 'PDF' },
+  { value: 'xlsx', label: 'Excel (XLSX)' },
+  { value: 'csv',  label: 'CSV' },
+  { value: 'docx', label: 'Word (DOCX)' },
+];
 
 function extractFileName(headers: Headers, fallback: string): string {
   const disposition = headers.get('content-disposition');
@@ -114,7 +120,9 @@ export default function ReportRunnerPage({ reportCode }: ReportRunnerPageProps) 
 
         setDefinition(payload);
         setValues(defaultValues);
-        setFormat(guessFormat(payload.report.default_export_format));
+        const guessed = guessFormat(payload.report.default_export_format);
+        const enabledFormats = FORMAT_OPTIONS.map((o) => o.value).filter((f) => payload.report[f]);
+        setFormat(enabledFormats.includes(guessed) ? guessed : (enabledFormats[0] ?? 'pdf'));
       } catch (fetchError) {
         setError(fetchError instanceof Error ? fetchError.message : 'Failed to load report definition');
       } finally {
@@ -251,9 +259,9 @@ export default function ReportRunnerPage({ reportCode }: ReportRunnerPageProps) 
             label="Format"
             onChange={(event: SelectChangeEvent) => setFormat(event.target.value as ExportFormat)}
           >
-            <MenuItem value="pdf">PDF</MenuItem>
-            <MenuItem value="xlsx">Excel (XLSX)</MenuItem>
-            <MenuItem value="docx">Word (DOCX)</MenuItem>
+            {FORMAT_OPTIONS.filter((option) => definition.report[option.value]).map((option) => (
+              <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+            ))}
           </Select>
         </FormControl>
 

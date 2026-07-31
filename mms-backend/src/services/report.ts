@@ -6,7 +6,7 @@ import { ReportRepository, ReportCatalogRow, ReportParameterRow } from '../repos
 import { RoleRepository } from '../repositories/role.js';
 import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 
-type ReportFormat = 'pdf' | 'xlsx' | 'docx';
+type ReportFormat = 'pdf' | 'xlsx' | 'docx' | 'csv';
 
 export interface ReportParameterDefinition {
   report_parameter_id: number;
@@ -32,6 +32,10 @@ export interface ReportDefinitionViewModel {
     default_export_format: string | null;
     paper_size: string | null;
     page_orientation: string | null;
+    pdf: boolean;
+    xlsx: boolean;
+    csv: boolean;
+    docx: boolean;
   };
   parameters: ReportParameterDefinition[];
 }
@@ -78,6 +82,10 @@ export class ReportService {
         default_export_format: report.default_export_format,
         paper_size: report.paper_size,
         page_orientation: report.page_orientation,
+        pdf: report.pdf,
+        xlsx: report.xlsx,
+        csv: report.csv,
+        docx: report.docx,
       },
       parameters: parameters.map((parameter) => this.toParameterDefinition(parameter)),
     };
@@ -97,11 +105,9 @@ export class ReportService {
     const normalizedFormat = this.normalizeFormat(input.format, report.default_export_format);
     const extension = this.extensionByFormat(normalizedFormat);
     const generatedFileName = `${report.report_code.toLowerCase()}_${Date.now()}.${extension}`;
-    const reportPath = report.jrxml_report_path || report.report_file;
 
-    if (!reportPath) {
-      throw new ValidationError('Report is not configured with a JRXML path');
-    }
+    this.validateFormatEnabled(report, normalizedFormat);
+    const reportPath = this.resolveReportTemplate(report, normalizedFormat);
 
     const runningStatusLookupId = await this.reportRepository.findReportStatusLookupId('RUNNING');
     const reportHistoryId = await this.reportRepository.createHistoryEntry(
@@ -212,31 +218,38 @@ export class ReportService {
 
   private normalizeFormat(format?: string, fallback?: string | null): ReportFormat {
     const candidate = (format || fallback || 'pdf').toLowerCase();
-    if (candidate === 'pdf') {
-      return 'pdf';
-    }
-
-    if (candidate === 'xlsx' || candidate === 'excel') {
-      return 'xlsx';
-    }
-
-    if (candidate === 'docx' || candidate === 'doc') {
-      return 'docx';
-    }
-
-    throw new ValidationError('Unsupported export format. Allowed formats are pdf, xlsx, docx');
+    if (candidate === 'pdf') return 'pdf';
+    if (candidate === 'xlsx' || candidate === 'excel') return 'xlsx';
+    if (candidate === 'docx' || candidate === 'doc') return 'docx';
+    if (candidate === 'csv') return 'csv';
+    throw new ValidationError('Unsupported export format. Allowed formats are pdf, xlsx, docx, csv');
   }
 
   private extensionByFormat(format: ReportFormat): string {
-    if (format === 'pdf') {
-      return 'pdf';
-    }
-
-    if (format === 'xlsx') {
-      return 'xlsx';
-    }
-
+    if (format === 'pdf') return 'pdf';
+    if (format === 'xlsx') return 'xlsx';
+    if (format === 'csv') return 'csv';
     return 'docx';
+  }
+
+  private validateFormatEnabled(report: ReportCatalogRow, format: ReportFormat): void {
+    if (!report[format]) {
+      throw new ValidationError(`Report does not support ${format.toUpperCase()} export`);
+    }
+  }
+
+  private resolveReportTemplate(report: ReportCatalogRow, format: ReportFormat): string {
+    // xlsx and csv use the dedicated XLS template, falling back to the primary template
+    const usesXlsTemplate = format === 'xlsx' || format === 'csv';
+    const template = usesXlsTemplate
+      ? (report.jrxml_file_xls || report.jrxml_file || report.report_file)
+      : (report.jrxml_file || report.report_file);
+
+    if (!template) {
+      throw new ValidationError(`Report is not configured with a JRXML template for ${format.toUpperCase()}`);
+    }
+
+    return template;
   }
 
   private resolveRenderEndpoint(reportSpecificEndpoint: string | null): string {
