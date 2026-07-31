@@ -107,6 +107,13 @@ Important convention:
 - material, material_specification, material_brand, material_option, material_option_detail
 - material_type exists in schema and is linked from material.material_type_id
 
+### Coordinating transactions
+
+- material_request stores project-level request headers with generated MR numbers and line items in material_request_item
+- material_request_status seeds Draft, Submitted, Approved, Rejected, Cancelled, Completed, and Closed
+- material_control stores project-level control codes, budgets, estimated costs, and status history
+- material_control_status seeds Draft, Submitted, Approved, Rejected, Cancelled, and Closed
+
 ### Contacts, parties, and security
 
 - contact, address, phone, email
@@ -122,6 +129,7 @@ Important convention:
 - material_control, additional_control
 - material_request and material_request_item
 - purchase_order, purchase_order_item, purchase_order_adj, purchase_order_item_adj
+- purchase_order_status lookup drives PO workflow states (Draft, Approved, Partially Delivered, Delivered, Cancelled)
 - delivery_advice and delivery_advice_item
 - delivery_receipt and delivery_receipt_item
 - supplier_delivery, supplier_delivery_item, supplier_delivery_advice

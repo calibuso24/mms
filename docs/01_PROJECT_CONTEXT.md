@@ -132,6 +132,9 @@ mms/
 - /api/reports
 - /api/system-settings
 - /api/categories, /api/brands, /api/uom, /api/subcategories, /api/lookups, /api/materials
+- /api/material-controls
+- /api/material-requests
+- /api/purchase-orders
 - /api/projects, /api/suppliers
 
 ### Frontend pages currently implemented
@@ -146,6 +149,9 @@ mms/
 - System Settings
 - My Profile
 - Report Runner
+- Material Control
+- Material Request
+- Purchase Order
 
 ### Reporting integration
 

@@ -11,6 +11,9 @@ import { KPICard } from './shared/components/KPICard.js';
 import { muiTheme } from './shared/theme/muiTheme.js';
 import LoginPage from './pages/Login.js';
 import MaterialsPage from './pages/Materials.js';
+import MaterialControlPage from './pages/MaterialControl.js';
+import MaterialRequestPage from './pages/MaterialRequest.js';
+import PurchaseOrderPage from './pages/PurchaseOrder.js';
 import ManageUsersPage from './pages/ManageUsers.js';
 import ManageRolesPage from './pages/ManageRoles.js';
 import SystemSettingsPage from './pages/SystemSettings.js';
@@ -70,6 +73,18 @@ function DynamicPage({ route }: { route: string | null }) {
 
   if (route?.includes('product-management')) {
     return <MaterialsPage />;
+  }
+
+  if (route?.includes('material-control')) {
+    return <MaterialControlPage />;
+  }
+
+  if (route?.includes('material-request')) {
+    return <MaterialRequestPage />;
+  }
+
+  if (route?.includes('purchase-order')) {
+    return <PurchaseOrderPage />;
   }
 
   if (route?.includes('manage-users')) {

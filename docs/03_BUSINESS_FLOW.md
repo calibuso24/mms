@@ -22,6 +22,9 @@ The repository contains broad procurement and inventory schema support, but curr
 - Manage Roles
 - System Settings
 - Report generation through Report Runner
+- Material Control
+- Material Request
+- Purchase Order
 
 ## Implemented End-to-End Flows
 
@@ -55,7 +58,28 @@ The repository contains broad procurement and inventory schema support, but curr
 2. Shared contact information is handled through nested addresses, phones, emails, and related contacts.
 3. Supplier flow includes normalized weekly business hours in supplier_business_hours.
 
-### 5. System settings flow
+### 5. Material control flow
+
+1. Material Control records are created per project with a control code, budget, estimated cost, and workflow status.
+2. Status transitions use lookup-driven values from material_control_status.
+3. Review metadata is recorded when the record reaches a terminal status.
+
+### 6. Material request flow
+
+1. Material requests are created per project and include one or more material_request_item rows.
+2. Request numbers are generated automatically in MR-YYYY-000001 format.
+3. Status transitions use lookup-driven values from material_request_status.
+4. Approval metadata is recorded when the request reaches a terminal status.
+
+### 7. Purchase order flow
+
+1. Purchase orders are created per project and supplier with one or more purchase_order_item rows.
+2. PO numbers are generated automatically in PO-YYYY-000001 format.
+3. Orders can optionally be linked back to a material request for procurement traceability.
+4. Status transitions use lookup-driven values from purchase_order_status.
+5. Approval and cancellation are tracked as workflow actions on the order header.
+
+### 8. System settings flow
 
 1. Settings categories are loaded from system_setting_category.
 2. Category settings are lazy-loaded from system_setting.
@@ -65,7 +89,7 @@ The repository contains broad procurement and inventory schema support, but curr
   - SAVE: persist value updates
   - RESET: reset category to defaults
 
-### 6. Report generation flow
+### 9. Report generation flow
 
 1. Sidebar and report pages read report definitions and parameters.
 2. User chooses an enabled format and enters required parameters.
@@ -78,6 +102,9 @@ The repository contains broad procurement and inventory schema support, but curr
 Navigation and schema include additional business areas that currently route to the generic "under development" page in frontend:
 
 - Coordinating transactions (material request/control variants)
+- Material Control
+- Material Request
+- Purchase Order
 - Purchasing transactions (requisition, PO, delivery advice/receipt, RTS)
 - Inventory transactions (supplier delivery, stock transfer, job order delivery, physical count, material adjustment)
 - Audit Logs page route
@@ -146,3 +173,4 @@ Practical implication:
 | Date | Author | Summary |
 |---|---|---|
 | 2026-08-01 | Copilot | Reworked workflow documentation to distinguish implemented modules from seeded placeholders, and aligned navigation/report flow details with actual frontend and backend behavior. |
+| 2026-08-01 | Copilot | Added purchase order as an implemented workflow and documented its procurement lifecycle. |

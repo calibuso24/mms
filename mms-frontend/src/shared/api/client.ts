@@ -227,6 +227,72 @@ export const materialApi = {
   delete: (id: number) => ApiClient.delete(`/materials/${id}`),
 };
 
+// Material Control API
+export const materialControlApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; project_id?: number; status_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.project_id) params.append('project_id', filters.project_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/material-controls?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/material-controls/${id}`),
+  create: (data: any) => ApiClient.post('/material-controls', data),
+  update: (id: number, data: any) => ApiClient.put(`/material-controls/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/material-controls/${id}`),
+};
+
+// Material Request API
+export const materialRequestApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; project_id?: number; status_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.project_id) params.append('project_id', filters.project_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/material-requests?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/material-requests/${id}`),
+  create: (data: any) => ApiClient.post('/material-requests', data),
+  update: (id: number, data: any) => ApiClient.put(`/material-requests/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/material-requests/${id}`),
+  submit: (id: number) => ApiClient.post(`/material-requests/${id}/submit`, {}),
+  approve: (id: number) => ApiClient.post(`/material-requests/${id}/approve`, {}),
+  reject: (id: number) => ApiClient.post(`/material-requests/${id}/reject`, {}),
+  cancel: (id: number) => ApiClient.post(`/material-requests/${id}/cancel`, {}),
+  close: (id: number) => ApiClient.post(`/material-requests/${id}/close`, {}),
+};
+
+// Purchase Order API
+export const purchaseOrderApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; project_id?: number; supplier_party_id?: number; status_id?: number; order_type_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.project_id) params.append('project_id', filters.project_id.toString());
+    if (filters?.supplier_party_id) params.append('supplier_party_id', filters.supplier_party_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.order_type_id) params.append('order_type_id', filters.order_type_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/purchase-orders?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/purchase-orders/${id}`),
+  create: (data: any) => ApiClient.post('/purchase-orders', data),
+  update: (id: number, data: any) => ApiClient.put(`/purchase-orders/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/purchase-orders/${id}`),
+  approve: (id: number) => ApiClient.post(`/purchase-orders/${id}/approve`, {}),
+  cancel: (id: number) => ApiClient.post(`/purchase-orders/${id}/cancel`, {}),
+};
+
 // Project Management API
 export const projectApi = {
   list: (limit?: number, offset?: number, search?: string, sortBy?: string, sortDir?: 'asc' | 'desc') => {

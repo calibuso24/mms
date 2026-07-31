@@ -80,6 +80,43 @@ Security model:
 | GET | /api/lookups/:type/:id |
 | GET/POST/PUT/DELETE | /api/materials and /api/materials/:id |
 
+### Material Control routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/material-controls | Material Control VIEW |
+| GET | /api/material-controls/:id | Material Control VIEW |
+| POST | /api/material-controls | Material Control CREATE |
+| PUT | /api/material-controls/:id | Material Control UPDATE |
+| DELETE | /api/material-controls/:id | Material Control DELETE |
+
+### Material Request routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/material-requests | Material Request VIEW |
+| GET | /api/material-requests/:id | Material Request VIEW |
+| POST | /api/material-requests | Material Request CREATE |
+| PUT | /api/material-requests/:id | Material Request UPDATE |
+| DELETE | /api/material-requests/:id | Material Request DELETE |
+| POST | /api/material-requests/:id/submit | Material Request UPDATE |
+| POST | /api/material-requests/:id/approve | Material Request APPROVE |
+| POST | /api/material-requests/:id/reject | Material Request APPROVE |
+| POST | /api/material-requests/:id/cancel | Material Request UPDATE |
+| POST | /api/material-requests/:id/close | Material Request UPDATE |
+
+### Purchase Order routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/purchase-orders | Purchase Order VIEW |
+| GET | /api/purchase-orders/:id | Purchase Order VIEW |
+| POST | /api/purchase-orders | Purchase Order CREATE |
+| PUT | /api/purchase-orders/:id | Purchase Order UPDATE |
+| DELETE | /api/purchase-orders/:id | Purchase Order DELETE |
+| POST | /api/purchase-orders/:id/approve | Purchase Order APPROVE |
+| POST | /api/purchase-orders/:id/cancel | Purchase Order APPROVE |
+
 Material list filters:
 
 - search

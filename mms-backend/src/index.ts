@@ -10,6 +10,9 @@ import productRoutes from './routes/product.js';
 import navigationRoutes from './routes/navigation.js';
 import roleRoutes from './routes/roles.js';
 import partyRoutes from './routes/party.js';
+import materialControlRoutes from './routes/materialControl.js';
+import materialRequestRoutes from './routes/materialRequest.js';
+import purchaseOrderRoutes from './routes/purchaseOrder.js';
 import reportRoutes from './routes/report.js';
 import systemSettingsRoutes from './routes/systemSettings.js';
 
@@ -37,6 +40,9 @@ app.use('/api/roles', authMiddleware, roleRoutes);
 app.use('/api/navigation', authMiddleware, navigationRoutes);
 app.use('/api/reports', authMiddleware, reportRoutes);
 app.use('/api/system-settings', authMiddleware, systemSettingsRoutes);
+app.use('/api/material-controls', authMiddleware, materialControlRoutes);
+app.use('/api/material-requests', authMiddleware, materialRequestRoutes);
+app.use('/api/purchase-orders', authMiddleware, purchaseOrderRoutes);
 app.use('/api', authMiddleware, productRoutes);
 app.use('/api', authMiddleware, partyRoutes);
 
