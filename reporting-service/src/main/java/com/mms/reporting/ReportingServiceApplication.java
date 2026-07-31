@@ -117,7 +117,7 @@ public final class ReportingServiceApplication {
         return parameters;
     }
 
-    private static JRDataSource buildDataSource(List<Map<String, Object>> data) {
+    private static JRDataSource buildDataSource(List<Map<String, ?>> data) {
         if (data == null || data.isEmpty()) {
             return new JREmptyDataSource();
         }
@@ -185,7 +185,7 @@ public final class ReportingServiceApplication {
     private static final class RenderRequest {
         public String reportPath;
         public Map<String, Object> parameters = Collections.emptyMap();
-        public List<Map<String, Object>> data = Collections.emptyList();
+        public List<Map<String, ?>> data = Collections.emptyList();
         public String format = "pdf";
         public String paperSize;
         public String pageOrientation;

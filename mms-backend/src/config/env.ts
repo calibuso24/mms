@@ -20,6 +20,7 @@ export const config = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },
   reporting: {
+    serviceUrl: process.env.REPORT_SERVICE_URL || null,
     serviceBaseUrl: process.env.REPORT_SERVICE_BASE_URL || 'http://localhost:8085',
     renderPath: process.env.REPORT_SERVICE_RENDER_PATH || '/reports/render',
     timeoutMs: parseInt(process.env.REPORT_SERVICE_TIMEOUT_MS || '120000', 10),

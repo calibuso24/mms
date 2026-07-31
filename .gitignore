@@ -34,3 +34,21 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.cache
+
+# Maven build output
+target/
+
+# Java compiled classes
+*.class
+
+# Packaged artifacts
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*

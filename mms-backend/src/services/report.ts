@@ -244,6 +244,10 @@ export class ReportService {
       return reportSpecificEndpoint;
     }
 
+    if (config.reporting.serviceUrl) {
+      return config.reporting.serviceUrl;
+    }
+
     const base = config.reporting.serviceBaseUrl.replace(/\/$/, '');
     const path = config.reporting.renderPath.startsWith('/')
       ? config.reporting.renderPath
