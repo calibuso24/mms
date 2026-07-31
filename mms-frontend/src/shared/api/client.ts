@@ -229,11 +229,13 @@ export const materialApi = {
 
 // Project Management API
 export const projectApi = {
-  list: (limit?: number, offset?: number, search?: string) => {
+  list: (limit?: number, offset?: number, search?: string, sortBy?: string, sortDir?: 'asc' | 'desc') => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset !== undefined) params.append('offset', offset.toString());
     if (search) params.append('search', search);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortDir) params.append('sort_dir', sortDir);
     return ApiClient.get(`/projects?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/projects/${id}`),
@@ -244,11 +246,13 @@ export const projectApi = {
 
 // Supplier Management API
 export const supplierApi = {
-  list: (limit?: number, offset?: number, search?: string) => {
+  list: (limit?: number, offset?: number, search?: string, sortBy?: string, sortDir?: 'asc' | 'desc') => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset !== undefined) params.append('offset', offset.toString());
     if (search) params.append('search', search);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortDir) params.append('sort_dir', sortDir);
     return ApiClient.get(`/suppliers?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/suppliers/${id}`),

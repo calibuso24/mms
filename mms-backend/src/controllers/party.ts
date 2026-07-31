@@ -16,8 +16,10 @@ export class PartyController {
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
       const offset = parseInt(req.query.offset as string, 10) || 0;
       const search = (req.query.search as string) || undefined;
+      const sortBy = (req.query.sort_by as string) || undefined;
+      const sortDir = (req.query.sort_dir as string) === 'desc' ? 'desc' : 'asc';
 
-      const result = await this.partyService.listProjects(limit, offset, search);
+      const result = await this.partyService.listProjects(limit, offset, search, sortBy, sortDir);
       res.json(result);
     } catch (error) {
       next(error);
@@ -82,8 +84,10 @@ export class PartyController {
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
       const offset = parseInt(req.query.offset as string, 10) || 0;
       const search = (req.query.search as string) || undefined;
+      const sortBy = (req.query.sort_by as string) || undefined;
+      const sortDir = (req.query.sort_dir as string) === 'desc' ? 'desc' : 'asc';
 
-      const result = await this.partyService.listSuppliers(limit, offset, search);
+      const result = await this.partyService.listSuppliers(limit, offset, search, sortBy, sortDir);
       res.json(result);
     } catch (error) {
       next(error);

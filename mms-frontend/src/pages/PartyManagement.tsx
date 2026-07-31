@@ -1,25 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
+  FormControlLabel,
+  Grid,
   IconButton,
+  InputAdornment,
   MenuItem,
   Paper,
+  Snackbar,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
+  TableSortLabel,
   TextField,
   Typography,
+  Tooltip,
+  LinearProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -32,6 +44,8 @@ import {
 } from '../shared/api/client.js';
 
 type Mode = 'project' | 'supplier';
+type SortField = 'party_code' | 'party_name' | 'project_type_name' | 'payment_terms_name' | 'status_name' | 'created_at';
+type SortDir = 'asc' | 'desc';
 type ScheduleTemplateCode =
   | 'custom'
   | 'standard_office_hours'
@@ -399,14 +413,25 @@ function normalizeContacts(items: ContactInput[]): ContactInput[] {
 function PartyManagementPage({ mode }: { mode: Mode }) {
   const [items, setItems] = useState<PartyListItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [sortBy, setSortBy] = useState<SortField>('party_name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [loading, setLoading] = useState(false);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPartyId, setEditingPartyId] = useState<number | null>(null);
   const [form, setForm] = useState<PartyFormState>(initialFormState);
   const [selectedScheduleTemplate, setSelectedScheduleTemplate] = useState<ScheduleTemplateCode>('custom');
+  const [formErrors, setFormErrors] = useState<Partial<Record<'project_code' | 'project_name' | 'supplier_code' | 'supplier_name', string>>>({});
+  const [deleteTarget, setDeleteTarget] = useState<PartyListItem | null>(null);
 
   const [statusOptions, setStatusOptions] = useState<LookupItem[]>([]);
   const [projectTypeOptions, setProjectTypeOptions] = useState<LookupItem[]>([]);
@@ -422,32 +447,53 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   const listApi = mode === 'project' ? projectApi : supplierApi;
 
   useEffect(() => {
-    void loadData();
+    setPage(0);
+    setSearch('');
+    setSearchInput('');
+    setSortBy('party_name');
+    setSortDir('asc');
+    void loadLookups();
   }, [mode]);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [listResult, statuses, projectTypes, paymentTerms, addressTypes, phoneTypes, emailTypes] =
-        await Promise.all([
-          listApi.list(100, 0, search || undefined) as Promise<PartyListResponse>,
-          lookupApi.listByType('party_status', 100),
-          lookupApi.listByType('project_type', 100).catch(() => []),
-          lookupApi.listByType('payment_terms', 100).catch(() => []),
-          lookupApi.listByType('address_type', 100).catch(() => []),
-          lookupApi.listByType('PHONE_TYPE', 100).catch(() => []),
-          lookupApi.listByType('EMAIL_TYPE', 100).catch(() => []),
-        ]);
+  useEffect(() => {
+    void loadData();
+  }, [mode, page, rowsPerPage, search, sortBy, sortDir]);
 
-      setItems(Array.isArray(listResult?.items) ? listResult.items : []);
-      setTotal(listResult?.total || 0);
+  const loadLookups = async () => {
+    try {
+      const [statuses, projectTypes, paymentTerms, addressTypes, phoneTypes, emailTypes] = await Promise.all([
+        lookupApi.listByType('party_status', 100),
+        lookupApi.listByType('project_type', 100).catch(() => []),
+        lookupApi.listByType('payment_terms', 100).catch(() => []),
+        lookupApi.listByType('address_type', 100).catch(() => []),
+        lookupApi.listByType('PHONE_TYPE', 100).catch(() => []),
+        lookupApi.listByType('EMAIL_TYPE', 100).catch(() => []),
+      ]);
+
       setStatusOptions(Array.isArray(statuses) ? statuses : []);
       setProjectTypeOptions(Array.isArray(projectTypes) ? projectTypes : []);
       setPaymentTermsOptions(Array.isArray(paymentTerms) ? paymentTerms : []);
       setAddressTypeOptions(Array.isArray(addressTypes) ? addressTypes : []);
       setPhoneTypeOptions(Array.isArray(phoneTypes) ? phoneTypes : []);
       setEmailTypeOptions(Array.isArray(emailTypes) ? emailTypes : []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load lookup values');
+    }
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const listResult = await listApi.list(
+        rowsPerPage,
+        page * rowsPerPage,
+        search || undefined,
+        sortBy,
+        sortDir,
+      ) as PartyListResponse;
+      setItems(Array.isArray(listResult?.items) ? listResult.items : []);
+      setTotal(listResult?.total || 0);
     } catch (err: any) {
       setError(err.message || `Failed to load ${title.toLowerCase()}`);
     } finally {
@@ -459,16 +505,19 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
     setForm(initialFormState());
     setSelectedScheduleTemplate('custom');
     setEditingPartyId(null);
+    setFormErrors({});
     setDialogOpen(true);
   };
 
   const openEdit = async (partyId: number) => {
-    setLoading(true);
+    setDialogOpen(true);
+    setDialogLoading(true);
     setError('');
 
     try {
       const detail = await listApi.get(partyId);
       setEditingPartyId(partyId);
+      setFormErrors({});
       setForm({
         status_id: detail.status_id ? String(detail.status_id) : '',
         description: detail.description || '',
@@ -490,17 +539,46 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
           ? detectScheduleTemplate(normalizeScheduleFromApi(detail.business_hours_schedule))
           : 'custom'
       );
-      setDialogOpen(true);
     } catch (err: any) {
       setError(err.message || `Failed to load ${title.toLowerCase()} details`);
+      setDialogOpen(false);
     } finally {
-      setLoading(false);
+      setDialogLoading(false);
     }
+  };
+
+  const validateForm = () => {
+    const nextErrors: Partial<Record<'project_code' | 'project_name' | 'supplier_code' | 'supplier_name', string>> = {};
+
+    if (mode === 'project') {
+      if (!form.project_code.trim()) {
+        nextErrors.project_code = 'Project code is required';
+      }
+      if (!form.project_name.trim()) {
+        nextErrors.project_name = 'Project name is required';
+      }
+    } else {
+      if (!form.supplier_code.trim()) {
+        nextErrors.supplier_code = 'Supplier code is required';
+      }
+      if (!form.supplier_name.trim()) {
+        nextErrors.supplier_name = 'Supplier name is required';
+      }
+    }
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setSaving(true);
 
     const basePayload = {
       status_id: form.status_id ? parseInt(form.status_id, 10) : undefined,
@@ -550,9 +628,12 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
       setDialogOpen(false);
       setEditingPartyId(null);
       setForm(initialFormState());
+      setSuccessMessage(`${mode === 'project' ? 'Project' : 'Supplier'} saved successfully`);
       await loadData();
     } catch (err: any) {
       setError(err.message || `Failed to save ${title.toLowerCase()}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -573,107 +654,216 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   };
 
   const handleDelete = async (partyId: number) => {
-    const confirmed = window.confirm(`Delete this ${mode}?`);
-    if (!confirmed) {
+    setDeleteTarget(items.find((item) => item.party_id === partyId) || null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) {
       return;
     }
 
+    setDeleting(true);
     setError('');
     try {
       if (mode === 'project') {
-        await projectApi.delete(partyId);
+        await projectApi.delete(deleteTarget.party_id);
       } else {
-        await supplierApi.delete(partyId);
+        await supplierApi.delete(deleteTarget.party_id);
       }
+      setSuccessMessage(`${mode === 'project' ? 'Project' : 'Supplier'} deleted successfully`);
+      setDeleteTarget(null);
       await loadData();
     } catch (err: any) {
       setError(err.message || `Failed to delete ${mode}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const filteredItems = useMemo(() => {
-    if (!search.trim()) {
-      return items;
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setPage(0);
+    setSearch(searchInput.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearch('');
+    setPage(0);
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortDir('asc');
     }
-    const needle = search.toLowerCase();
-    return items.filter((item) => {
-      const code = mode === 'project' ? item.project_code || '' : item.supplier_code || '';
-      const name = mode === 'project' ? item.project_name || '' : item.supplier_name || '';
-      return code.toLowerCase().includes(needle) || name.toLowerCase().includes(needle);
-    });
-  }, [items, mode, search]);
+    setPage(0);
+  };
+
+  const totalPages = total === 0 ? 0 : Math.ceil(total / rowsPerPage);
+  const currentPageLabel = total === 0 ? 'Page 0 of 0' : `Page ${page + 1} of ${totalPages}`;
+
+  const handleScheduleFieldChange = (index: number, field: keyof BusinessHourInput, value: string | boolean | null) => {
+    const next = [...form.business_hours_schedule];
+    next[index] = {
+      ...next[index],
+      [field]: value,
+    };
+    if (field === 'is_closed' && value === true) {
+      next[index] = { ...next[index], opening_time: null, closing_time: null };
+    }
+    applyScheduleToForm(next);
+  };
 
   return (
     <Box>
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField
-            size="small"
-            label={`Search ${mode}s`}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} /> }}
-          />
-          <Button variant="outlined" onClick={() => void loadData()}>Refresh</Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-            Add {mode === 'project' ? 'Project' : 'Supplier'}
-          </Button>
-          <Typography variant="body2" color="text.secondary">Total: {total}</Typography>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={2}>
+          <Box>
+            <Typography variant="h5" fontWeight={700}>
+              {title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {currentPageLabel} · {total.toLocaleString()} total records
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Button variant="outlined" onClick={() => void loadData()}>
+              Refresh
+            </Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+              Add {mode === 'project' ? 'Project' : 'Supplier'}
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box component="form" onSubmit={handleSearchSubmit}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ md: 'center' }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder={`Search ${mode}s`}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button type="submit" variant="outlined">
+              Search
+            </Button>
+            <Button variant="text" onClick={handleClearSearch} disabled={!search && !searchInput}>
+              Clear
+            </Button>
+          </Stack>
         </Box>
       </Paper>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <TableContainer component={Paper}>
+      <Paper>
+        {loading && <LinearProgress />}
+        <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>{codeLabel}</TableCell>
-                <TableCell>{nameLabel}</TableCell>
-                {mode === 'project' ? <TableCell>Project Type</TableCell> : <TableCell>Payment Terms</TableCell>}
+                <TableCell sortDirection={sortBy === 'party_code' ? sortDir : false}>
+                  <TableSortLabel active={sortBy === 'party_code'} direction={sortBy === 'party_code' ? sortDir : 'asc'} onClick={() => handleSort('party_code')}>
+                    {codeLabel}
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sortDirection={sortBy === 'party_name' ? sortDir : false}>
+                  <TableSortLabel active={sortBy === 'party_name'} direction={sortBy === 'party_name' ? sortDir : 'asc'} onClick={() => handleSort('party_name')}>
+                    {nameLabel}
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sortDirection={sortBy === (mode === 'project' ? 'project_type_name' : 'payment_terms_name') ? sortDir : false}>
+                  <TableSortLabel
+                    active={sortBy === (mode === 'project' ? 'project_type_name' : 'payment_terms_name')}
+                    direction={sortBy === (mode === 'project' ? 'project_type_name' : 'payment_terms_name') ? sortDir : 'asc'}
+                    onClick={() => handleSort(mode === 'project' ? 'project_type_name' : 'payment_terms_name')}
+                  >
+                    {mode === 'project' ? 'Project Type' : 'Payment Terms'}
+                  </TableSortLabel>
+                </TableCell>
                 {mode === 'supplier' ? <TableCell>Business Schedule</TableCell> : null}
-                <TableCell>Status</TableCell>
+                <TableCell sortDirection={sortBy === 'status_name' ? sortDir : false}>
+                  <TableSortLabel active={sortBy === 'status_name'} direction={sortBy === 'status_name' ? sortDir : 'asc'} onClick={() => handleSort('status_name')}>
+                    Status
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredItems.map((item) => (
-                <TableRow key={item.party_id} hover>
-                  <TableCell>{mode === 'project' ? item.project_code : item.supplier_code}</TableCell>
-                  <TableCell>{mode === 'project' ? item.project_name : item.supplier_name}</TableCell>
-                  {mode === 'project' ? (
-                    <TableCell>{item.project_type_name || '-'}</TableCell>
-                  ) : (
-                    <TableCell>{item.payment_terms_name || '-'}</TableCell>
-                  )}
-                  {mode === 'supplier' ? <TableCell>{summarizeBusinessHours(item.business_hours_schedule)}</TableCell> : null}
-                  <TableCell>{item.status_name}</TableCell>
-                  <TableCell align="right">
-                    <IconButton color="primary" onClick={() => void openEdit(item.party_id)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton color="error" onClick={() => void handleDelete(item.party_id)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+              {loading && items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={mode === 'supplier' ? 6 : 5} align="center" sx={{ py: 4 }}>
+                    <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
-              ))}
-              {filteredItems.length === 0 && (
+              ) : items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={mode === 'supplier' ? 6 : 5} align="center">
+                  <TableCell colSpan={mode === 'supplier' ? 6 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     No records found.
                   </TableCell>
                 </TableRow>
+              ) : (
+                items.map((item: PartyListItem) => (
+                  <TableRow key={item.party_id} hover>
+                    <TableCell>{mode === 'project' ? item.project_code : item.supplier_code}</TableCell>
+                    <TableCell>{mode === 'project' ? item.project_name : item.supplier_name}</TableCell>
+                    {mode === 'project' ? <TableCell>{item.project_type_name || '-'}</TableCell> : <TableCell>{item.payment_terms_name || '-'}</TableCell>}
+                    {mode === 'supplier' ? <TableCell>{summarizeBusinessHours(item.business_hours_schedule)}</TableCell> : null}
+                    <TableCell>{item.status_name}</TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Edit">
+                        <IconButton color="primary" onClick={() => void openEdit(item.party_id)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton color="error" onClick={() => handleDelete(item.party_id)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </TableContainer>
-      )}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, px: 2, pb: 1, flexWrap: 'wrap' }}>
+          <Typography variant="body2" color="text.secondary">
+            {currentPageLabel} · {total.toLocaleString()} total records
+          </Typography>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+          />
+        </Box>
+      </Paper>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="lg">
         <form onSubmit={handleSave}>
@@ -681,556 +871,626 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
             {editingPartyId ? `Edit ${mode === 'project' ? 'Project' : 'Supplier'}` : `Create ${mode === 'project' ? 'Project' : 'Supplier'}`}
           </DialogTitle>
           <DialogContent dividers>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2, mb: 2 }}>
-              {mode === 'project' ? (
-                <>
-                  <TextField
-                    required
-                    label="Project Code"
-                    value={form.project_code}
-                    onChange={(e) => setForm((prev) => ({ ...prev, project_code: e.target.value }))}
-                  />
-                  <TextField
-                    required
-                    label="Project Name"
-                    value={form.project_name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, project_name: e.target.value }))}
-                  />
-                  <TextField
-                    label="Project Type"
-                    select
-                    value={form.project_type_id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, project_type_id: e.target.value }))}
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {projectTypeOptions.map((item) => (
-                      <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                    ))}
-                  </TextField>
-                </>
-              ) : (
-                <>
-                  <TextField
-                    required
-                    label="Supplier Code"
-                    value={form.supplier_code}
-                    onChange={(e) => setForm((prev) => ({ ...prev, supplier_code: e.target.value }))}
-                  />
-                  <TextField
-                    required
-                    label="Supplier Name"
-                    value={form.supplier_name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, supplier_name: e.target.value }))}
-                  />
-                  <TextField
-                    label="Payment Terms"
-                    select
-                    value={form.payment_terms_id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, payment_terms_id: e.target.value }))}
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {paymentTermsOptions.map((item) => (
-                      <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    label="Business Schedule Template"
-                    select
-                    value={selectedScheduleTemplate}
-                    onChange={(e) => handleTemplateChange(e.target.value as ScheduleTemplateCode)}
-                  >
-                    {SCHEDULE_TEMPLATES.map((template) => (
-                      <MenuItem key={template.code} value={template.code}>{template.label}</MenuItem>
-                    ))}
-                  </TextField>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-                    {getScheduleTemplatePreview(selectedScheduleTemplate)}
-                  </Typography>
-                </>
-              )}
-
-              {editingPartyId ? (
-                <TextField
-                  label="Status"
-                  select
-                  value={form.status_id}
-                  onChange={(e) => setForm((prev) => ({ ...prev, status_id: e.target.value }))}
-                >
-                  {statusOptions.map((item) => (
-                    <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                  ))}
-                </TextField>
-              ) : null}
-
-              <TextField
-                label="Description"
-                value={form.description}
-                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                multiline
-                minRows={2}
-              />
-            </Box>
-
-            {mode === 'supplier' ? (
-              <>
-                <Typography variant="subtitle1" sx={{ mb: 1 }}>Business Schedule</Typography>
-                <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Day</TableCell>
-                        <TableCell>Closed</TableCell>
-                        <TableCell>Opening Time</TableCell>
-                        <TableCell>Closing Time</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {form.business_hours_schedule.map((row, index) => {
-                        const day = WEEK_DAYS.find((item) => item.value === row.day_of_week);
-                        return (
-                          <TableRow key={`business-hour-${row.day_of_week}`}>
-                            <TableCell>{day?.label || row.day_of_week}</TableCell>
-                            <TableCell>
-                              <Checkbox
-                                checked={row.is_closed}
-                                onChange={(e) => {
-                                  const next = [...form.business_hours_schedule];
-                                  next[index] = {
-                                    ...next[index],
-                                    is_closed: e.target.checked,
-                                    opening_time: e.target.checked ? null : next[index].opening_time,
-                                    closing_time: e.target.checked ? null : next[index].closing_time,
-                                  };
-                                  applyScheduleToForm(next);
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <TextField
-                                type="time"
-                                size="small"
-                                value={row.opening_time || ''}
-                                disabled={row.is_closed}
-                                onChange={(e) => {
-                                  const next = [...form.business_hours_schedule];
-                                  next[index] = { ...next[index], opening_time: e.target.value || null };
-                                  applyScheduleToForm(next);
-                                }}
-                                inputProps={{ step: 60 }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <TextField
-                                type="time"
-                                size="small"
-                                value={row.closing_time || ''}
-                                disabled={row.is_closed}
-                                onChange={(e) => {
-                                  const next = [...form.business_hours_schedule];
-                                  next[index] = { ...next[index], closing_time: e.target.value || null };
-                                  applyScheduleToForm(next);
-                                }}
-                                inputProps={{ step: 60 }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </>
-            ) : null}
-
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Addresses</Typography>
-            {(form.addresses || []).map((address, index) => (
-              <Box key={`address-${index}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1, mb: 1 }}>
-                <TextField
-                  label="Address Type"
-                  select
-                  value={address.address_type_id ? String(address.address_type_id) : ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], address_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {addressTypeOptions.map((item) => (
-                    <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  label="House No"
-                  value={address.house_no || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], house_no: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <TextField
-                  label="Street"
-                  value={address.street || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], street: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <TextField
-                  label="Barangay"
-                  value={address.barangay || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], barangay: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <TextField
-                  label="City"
-                  value={address.city || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], city: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <TextField
-                  label="Province"
-                  value={address.province || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], province: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <TextField
-                  label="Region"
-                  value={address.region || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], region: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <TextField
-                  label="Postal Code"
-                  value={address.postal_code || ''}
-                  onChange={(e) => {
-                    const next = [...form.addresses];
-                    next[index] = { ...next[index], postal_code: e.target.value };
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}
-                />
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Checkbox
-                      checked={!!address.is_primary}
-                      onChange={() => setForm((prev) => ({ ...prev, addresses: setPrimary(prev.addresses, index) }))}
-                    />
-                    <Typography variant="body2">Primary</Typography>
-                  </Box>
-                  <IconButton color="error" onClick={() => {
-                    const next = form.addresses.filter((_, idx) => idx !== index);
-                    setForm((prev) => ({ ...prev, addresses: next }));
-                  }}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+            {dialogLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                <CircularProgress />
               </Box>
-            ))}
-            <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, addresses: [...prev.addresses, emptyAddress()] }))}>
-              Add Address
-            </Button>
+            ) : (
+              <Stack spacing={2}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                      Basic Information
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          required
+                          fullWidth
+                          label={codeLabel}
+                          value={mode === 'project' ? form.project_code : form.supplier_code}
+                          error={Boolean(mode === 'project' ? formErrors.project_code : formErrors.supplier_code)}
+                          helperText={mode === 'project' ? formErrors.project_code : formErrors.supplier_code}
+                          onChange={(e) => setForm((prev) => mode === 'project'
+                            ? { ...prev, project_code: e.target.value }
+                            : { ...prev, supplier_code: e.target.value })}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          required
+                          fullWidth
+                          label={nameLabel}
+                          value={mode === 'project' ? form.project_name : form.supplier_name}
+                          error={Boolean(mode === 'project' ? formErrors.project_name : formErrors.supplier_name)}
+                          helperText={mode === 'project' ? formErrors.project_name : formErrors.supplier_name}
+                          onChange={(e) => setForm((prev) => mode === 'project'
+                            ? { ...prev, project_name: e.target.value }
+                            : { ...prev, supplier_name: e.target.value })}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Status"
+                          select
+                          value={form.status_id}
+                          onChange={(e) => setForm((prev) => ({ ...prev, status_id: e.target.value }))}
+                        >
+                          <MenuItem value="">Active</MenuItem>
+                          {statusOptions.map((item: LookupItem) => (
+                            <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        {mode === 'project' ? (
+                          <TextField
+                            fullWidth
+                            label="Project Type"
+                            select
+                            value={form.project_type_id}
+                            onChange={(e) => setForm((prev) => ({ ...prev, project_type_id: e.target.value }))}
+                          >
+                            <MenuItem value="">None</MenuItem>
+                            {projectTypeOptions.map((item: LookupItem) => (
+                              <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        ) : (
+                          <TextField
+                            fullWidth
+                            label="Payment Terms"
+                            select
+                            value={form.payment_terms_id}
+                            onChange={(e) => setForm((prev) => ({ ...prev, payment_terms_id: e.target.value }))}
+                          >
+                            <MenuItem value="">None</MenuItem>
+                            {paymentTermsOptions.map((item: LookupItem) => (
+                              <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        )}
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Description"
+                          value={form.description}
+                          onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                          multiline
+                          minRows={2}
+                        />
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
 
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Phone Numbers</Typography>
-            {(form.phones || []).map((phone, index) => (
-              <Box key={`phone-${index}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 2fr 1fr auto' }, gap: 1, mb: 1 }}>
-                <TextField
-                  label="Phone Type"
-                  select
-                  value={phone.phone_type_id ? String(phone.phone_type_id) : ''}
-                  onChange={(e) => {
-                    const next = [...form.phones];
-                    next[index] = { ...next[index], phone_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
-                    setForm((prev) => ({ ...prev, phones: next }));
-                  }}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {phoneTypeOptions.map((item) => (
-                    <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  required
-                  label="Phone Number"
-                  value={phone.phone_number}
-                  onChange={(e) => {
-                    const next = [...form.phones];
-                    next[index] = { ...next[index], phone_number: e.target.value };
-                    setForm((prev) => ({ ...prev, phones: next }));
-                  }}
-                />
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Checkbox checked={!!phone.is_primary} onChange={() => setForm((prev) => ({ ...prev, phones: setPrimary(prev.phones, index) }))} />
-                  <Typography variant="body2">Primary</Typography>
-                </Box>
-                <IconButton color="error" onClick={() => setForm((prev) => ({ ...prev, phones: prev.phones.filter((_, idx) => idx !== index) }))}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            ))}
-            <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, phones: [...prev.phones, emptyPhone()] }))}>
-              Add Phone
-            </Button>
+                {mode === 'supplier' ? (
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Stack spacing={1.5} sx={{ mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          Business Schedule
+                        </Typography>
+                        <TextField
+                          fullWidth
+                          label="Schedule Template"
+                          select
+                          value={selectedScheduleTemplate}
+                          onChange={(e) => handleTemplateChange(e.target.value as ScheduleTemplateCode)}
+                        >
+                          {SCHEDULE_TEMPLATES.map((template) => (
+                            <MenuItem key={template.code} value={template.code}>{template.label}</MenuItem>
+                          ))}
+                        </TextField>
+                        <Typography variant="body2" color="text.secondary">
+                          {getScheduleTemplatePreview(selectedScheduleTemplate)}
+                        </Typography>
+                      </Stack>
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Day</TableCell>
+                              <TableCell>Closed</TableCell>
+                              <TableCell>Opening Time</TableCell>
+                              <TableCell>Closing Time</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {form.business_hours_schedule.map((row, index) => {
+                              const day = WEEK_DAYS.find((item) => item.value === row.day_of_week);
+                              return (
+                                <TableRow key={`business-hour-${row.day_of_week}`}>
+                                  <TableCell>{day?.label || row.day_of_week}</TableCell>
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={row.is_closed}
+                                      onChange={(e) => handleScheduleFieldChange(index, 'is_closed', e.target.checked)}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <TextField
+                                      type="time"
+                                      size="small"
+                                      value={row.opening_time || ''}
+                                      disabled={row.is_closed}
+                                      onChange={(e) => handleScheduleFieldChange(index, 'opening_time', e.target.value || null)}
+                                      inputProps={{ step: 60 }}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <TextField
+                                      type="time"
+                                      size="small"
+                                      value={row.closing_time || ''}
+                                      disabled={row.is_closed}
+                                      onChange={(e) => handleScheduleFieldChange(index, 'closing_time', e.target.value || null)}
+                                      inputProps={{ step: 60 }}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Email Addresses</Typography>
-            {(form.emails || []).map((email, index) => (
-              <Box key={`email-${index}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 2fr 1fr auto' }, gap: 1, mb: 1 }}>
-                <TextField
-                  label="Email Type"
-                  select
-                  value={email.email_type_id ? String(email.email_type_id) : ''}
-                  onChange={(e) => {
-                    const next = [...form.emails];
-                    next[index] = { ...next[index], email_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
-                    setForm((prev) => ({ ...prev, emails: next }));
-                  }}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {emailTypeOptions.map((item) => (
-                    <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  required
-                  label="Email Address"
-                  value={email.email_address}
-                  onChange={(e) => {
-                    const next = [...form.emails];
-                    next[index] = { ...next[index], email_address: e.target.value };
-                    setForm((prev) => ({ ...prev, emails: next }));
-                  }}
-                />
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Checkbox checked={!!email.is_primary} onChange={() => setForm((prev) => ({ ...prev, emails: setPrimary(prev.emails, index) }))} />
-                  <Typography variant="body2">Primary</Typography>
-                </Box>
-                <IconButton color="error" onClick={() => setForm((prev) => ({ ...prev, emails: prev.emails.filter((_, idx) => idx !== index) }))}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            ))}
-            <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, emails: [...prev.emails, emptyEmail()] }))}>
-              Add Email
-            </Button>
-
-            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Contact Persons</Typography>
-            {(form.contacts || []).map((contact, contactIndex) => (
-              <Paper key={`contact-${contactIndex}`} variant="outlined" sx={{ p: 2, mb: 1 }}>
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-                  <TextField
-                    fullWidth
-                    required
-                    label="Contact Name"
-                    value={contact.contact_name}
-                    onChange={(e) => {
-                      const next = [...form.contacts];
-                      next[contactIndex] = { ...next[contactIndex], contact_name: e.target.value };
-                      setForm((prev) => ({ ...prev, contacts: next }));
-                    }}
-                  />
-                  <IconButton
-                    color="error"
-                    onClick={() => {
-                      const removed = form.contacts[contactIndex];
-                      setForm((prev) => ({
-                        ...prev,
-                        contacts: prev.contacts.filter((_, idx) => idx !== contactIndex),
-                        deleted_contact_ids: removed.contact_id
-                          ? [...prev.deleted_contact_ids, removed.contact_id]
-                          : prev.deleted_contact_ids,
-                      }));
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                  <Button size="small" onClick={() => {
-                    const next = [...form.contacts];
-                    next[contactIndex] = { ...next[contactIndex], phones: [...next[contactIndex].phones, emptyPhone()] };
-                    setForm((prev) => ({ ...prev, contacts: next }));
-                  }}>
-                    Add Contact Phone
-                  </Button>
-                  <Button size="small" onClick={() => {
-                    const next = [...form.contacts];
-                    next[contactIndex] = { ...next[contactIndex], emails: [...next[contactIndex].emails, emptyEmail()] };
-                    setForm((prev) => ({ ...prev, contacts: next }));
-                  }}>
-                    Add Contact Email
-                  </Button>
-                  <Button size="small" onClick={() => {
-                    const next = [...form.contacts];
-                    next[contactIndex] = { ...next[contactIndex], addresses: [...next[contactIndex].addresses, emptyAddress()] };
-                    setForm((prev) => ({ ...prev, contacts: next }));
-                  }}>
-                    Add Contact Address
-                  </Button>
-                </Box>
-
-                {(contact.phones || []).map((phone, phoneIndex) => (
-                  <Box key={`cp-${contactIndex}-ph-${phoneIndex}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 2fr auto' }, gap: 1, mb: 1 }}>
-                    <TextField
-                      label="Phone Type"
-                      select
-                      value={phone.phone_type_id ? String(phone.phone_type_id) : ''}
-                      onChange={(e) => {
-                        const next = [...form.contacts];
-                        const phones = [...next[contactIndex].phones];
-                        phones[phoneIndex] = { ...phones[phoneIndex], phone_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
-                        next[contactIndex] = { ...next[contactIndex], phones };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {phoneTypeOptions.map((item) => (
-                        <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                      Addresses
+                    </Typography>
+                    <Stack spacing={2}>
+                      {(form.addresses || []).map((address, index) => (
+                        <Card key={`address-${index}`} variant="outlined" sx={{ bgcolor: 'background.default' }}>
+                          <CardContent>
+                            <Grid container spacing={2} alignItems="center">
+                              <Grid item xs={12} md={3}>
+                                <TextField
+                                  fullWidth
+                                  label="Address Type"
+                                  select
+                                  value={address.address_type_id ? String(address.address_type_id) : ''}
+                                  onChange={(e) => {
+                                    const next = [...form.addresses];
+                                    next[index] = { ...next[index], address_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
+                                    setForm((prev) => ({ ...prev, addresses: next }));
+                                  }}
+                                >
+                                  <MenuItem value="">None</MenuItem>
+                                  {addressTypeOptions.map((item: LookupItem) => (
+                                    <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                                  ))}
+                                </TextField>
+                              </Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="House No" value={address.house_no || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], house_no: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="Street" value={address.street || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], street: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <FormControlLabel
+                                    control={<Checkbox checked={!!address.is_primary} onChange={() => setForm((prev) => ({ ...prev, addresses: setPrimary(prev.addresses, index) }))} />}
+                                    label="Primary"
+                                  />
+                                  <IconButton color="error" onClick={() => setForm((prev) => ({ ...prev, addresses: prev.addresses.filter((_, idx) => idx !== index) }))}>
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+                              </Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="Barangay" value={address.barangay || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], barangay: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="City" value={address.city || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], city: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="Province" value={address.province || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], province: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="Region" value={address.region || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], region: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="Postal Code" value={address.postal_code || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], postal_code: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                            </Grid>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </TextField>
-                    <TextField
-                      label="Phone"
-                      value={phone.phone_number}
-                      onChange={(e) => {
-                        const next = [...form.contacts];
-                        const phones = [...next[contactIndex].phones];
-                        phones[phoneIndex] = { ...phones[phoneIndex], phone_number: e.target.value };
-                        next[contactIndex] = { ...next[contactIndex], phones };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}
-                    />
-                    <IconButton color="error" onClick={() => {
-                      const next = [...form.contacts];
-                      const phones = next[contactIndex].phones.filter((_, idx) => idx !== phoneIndex);
-                      next[contactIndex] = { ...next[contactIndex], phones };
-                      setForm((prev) => ({ ...prev, contacts: next }));
-                    }}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
+                      <Box>
+                        <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, addresses: [...prev.addresses, emptyAddress()] }))}>
+                          Add Address
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
 
-                {(contact.emails || []).map((email, emailIndex) => (
-                  <Box key={`cp-${contactIndex}-em-${emailIndex}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 2fr auto' }, gap: 1, mb: 1 }}>
-                    <TextField
-                      label="Email Type"
-                      select
-                      value={email.email_type_id ? String(email.email_type_id) : ''}
-                      onChange={(e) => {
-                        const next = [...form.contacts];
-                        const emails = [...next[contactIndex].emails];
-                        emails[emailIndex] = { ...emails[emailIndex], email_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
-                        next[contactIndex] = { ...next[contactIndex], emails };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {emailTypeOptions.map((item) => (
-                        <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                      Phone Numbers
+                    </Typography>
+                    <Stack spacing={2}>
+                      {(form.phones || []).map((phone, index) => (
+                        <Grid key={`phone-${index}`} container spacing={2} alignItems="center">
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Phone Type"
+                              select
+                              value={phone.phone_type_id ? String(phone.phone_type_id) : ''}
+                              onChange={(e) => {
+                                const next = [...form.phones];
+                                next[index] = { ...next[index], phone_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
+                                setForm((prev) => ({ ...prev, phones: next }));
+                              }}
+                            >
+                              <MenuItem value="">None</MenuItem>
+                              {phoneTypeOptions.map((item: LookupItem) => (
+                                <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={12} md={5}>
+                            <TextField
+                              fullWidth
+                              required
+                              label="Phone Number"
+                              value={phone.phone_number}
+                              onChange={(e) => {
+                                const next = [...form.phones];
+                                next[index] = { ...next[index], phone_number: e.target.value };
+                                setForm((prev) => ({ ...prev, phones: next }));
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <FormControlLabel control={<Checkbox checked={!!phone.is_primary} onChange={() => setForm((prev) => ({ ...prev, phones: setPrimary(prev.phones, index) }))} />} label="Primary" />
+                              <IconButton color="error" onClick={() => setForm((prev) => ({ ...prev, phones: prev.phones.filter((_, idx) => idx !== index) }))}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                          </Grid>
+                        </Grid>
                       ))}
-                    </TextField>
-                    <TextField
-                      label="Email"
-                      value={email.email_address}
-                      onChange={(e) => {
-                        const next = [...form.contacts];
-                        const emails = [...next[contactIndex].emails];
-                        emails[emailIndex] = { ...emails[emailIndex], email_address: e.target.value };
-                        next[contactIndex] = { ...next[contactIndex], emails };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}
-                    />
-                    <IconButton color="error" onClick={() => {
-                      const next = [...form.contacts];
-                      const emails = next[contactIndex].emails.filter((_, idx) => idx !== emailIndex);
-                      next[contactIndex] = { ...next[contactIndex], emails };
-                      setForm((prev) => ({ ...prev, contacts: next }));
-                    }}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
+                      <Box>
+                        <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, phones: [...prev.phones, emptyPhone()] }))}>
+                          Add Phone
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
 
-                {(contact.addresses || []).map((address, addressIndex) => (
-                  <Box key={`cp-${contactIndex}-ad-${addressIndex}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1, mb: 1 }}>
-                    <TextField
-                      label="Address Type"
-                      select
-                      value={address.address_type_id ? String(address.address_type_id) : ''}
-                      onChange={(e) => {
-                        const next = [...form.contacts];
-                        const addresses = [...next[contactIndex].addresses];
-                        addresses[addressIndex] = { ...addresses[addressIndex], address_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
-                        next[contactIndex] = { ...next[contactIndex], addresses };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {addressTypeOptions.map((item) => (
-                        <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                      Email Addresses
+                    </Typography>
+                    <Stack spacing={2}>
+                      {(form.emails || []).map((email, index) => (
+                        <Grid key={`email-${index}`} container spacing={2} alignItems="center">
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              fullWidth
+                              label="Email Type"
+                              select
+                              value={email.email_type_id ? String(email.email_type_id) : ''}
+                              onChange={(e) => {
+                                const next = [...form.emails];
+                                next[index] = { ...next[index], email_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
+                                setForm((prev) => ({ ...prev, emails: next }));
+                              }}
+                            >
+                              <MenuItem value="">None</MenuItem>
+                              {emailTypeOptions.map((item: LookupItem) => (
+                                <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={12} md={5}>
+                            <TextField
+                              fullWidth
+                              required
+                              label="Email Address"
+                              value={email.email_address}
+                              onChange={(e) => {
+                                const next = [...form.emails];
+                                next[index] = { ...next[index], email_address: e.target.value };
+                                setForm((prev) => ({ ...prev, emails: next }));
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <FormControlLabel control={<Checkbox checked={!!email.is_primary} onChange={() => setForm((prev) => ({ ...prev, emails: setPrimary(prev.emails, index) }))} />} label="Primary" />
+                              <IconButton color="error" onClick={() => setForm((prev) => ({ ...prev, emails: prev.emails.filter((_, idx) => idx !== index) }))}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                          </Grid>
+                        </Grid>
                       ))}
-                    </TextField>
-                    <TextField
-                      label="Street"
-                      value={address.street || ''}
-                      onChange={(e) => {
-                        const next = [...form.contacts];
-                        const addresses = [...next[contactIndex].addresses];
-                        addresses[addressIndex] = { ...addresses[addressIndex], street: e.target.value };
-                        next[contactIndex] = { ...next[contactIndex], addresses };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}
-                    />
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Checkbox
-                        checked={!!address.is_primary}
-                        onChange={() => {
-                          const next = [...form.contacts];
-                          next[contactIndex] = {
-                            ...next[contactIndex],
-                            addresses: setPrimary(next[contactIndex].addresses, addressIndex),
-                          };
-                          setForm((prev) => ({ ...prev, contacts: next }));
-                        }}
-                      />
-                      <IconButton color="error" onClick={() => {
-                        const next = [...form.contacts];
-                        next[contactIndex] = {
-                          ...next[contactIndex],
-                          addresses: next[contactIndex].addresses.filter((_, idx) => idx !== addressIndex),
-                        };
-                        setForm((prev) => ({ ...prev, contacts: next }));
-                      }}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                ))}
-              </Paper>
-            ))}
+                      <Box>
+                        <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, emails: [...prev.emails, emptyEmail()] }))}>
+                          Add Email
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
 
-            <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, contacts: [...prev.contacts, emptyContact()] }))}>
-              Add Contact Person
-            </Button>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
+                      Contact Persons
+                    </Typography>
+                    <Stack spacing={2}>
+                      {(form.contacts || []).map((contact, contactIndex) => (
+                        <Card key={`contact-${contactIndex}`} variant="outlined">
+                          <CardContent>
+                            <Grid container spacing={2} alignItems="center">
+                              <Grid item xs={12} md={10}>
+                                <TextField
+                                  fullWidth
+                                  required
+                                  label="Contact Name"
+                                  value={contact.contact_name}
+                                  onChange={(e) => {
+                                    const next = [...form.contacts];
+                                    next[contactIndex] = { ...next[contactIndex], contact_name: e.target.value };
+                                    setForm((prev) => ({ ...prev, contacts: next }));
+                                  }}
+                                />
+                              </Grid>
+                              <Grid item xs={12} md={2} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                                <IconButton
+                                  color="error"
+                                  onClick={() => {
+                                    const removed = form.contacts[contactIndex];
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      contacts: prev.contacts.filter((_, idx) => idx !== contactIndex),
+                                      deleted_contact_ids: removed.contact_id
+                                        ? [...prev.deleted_contact_ids, removed.contact_id]
+                                        : prev.deleted_contact_ids,
+                                    }));
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Grid>
+                            </Grid>
+                            <Divider sx={{ my: 2 }} />
+                            <Stack spacing={1.5}>
+                              <Stack direction="row" spacing={1} flexWrap="wrap">
+                                <Button size="small" onClick={() => {
+                                  const next = [...form.contacts];
+                                  next[contactIndex] = { ...next[contactIndex], phones: [...next[contactIndex].phones, emptyPhone()] };
+                                  setForm((prev) => ({ ...prev, contacts: next }));
+                                }}>
+                                  Add Contact Phone
+                                </Button>
+                                <Button size="small" onClick={() => {
+                                  const next = [...form.contacts];
+                                  next[contactIndex] = { ...next[contactIndex], emails: [...next[contactIndex].emails, emptyEmail()] };
+                                  setForm((prev) => ({ ...prev, contacts: next }));
+                                }}>
+                                  Add Contact Email
+                                </Button>
+                                <Button size="small" onClick={() => {
+                                  const next = [...form.contacts];
+                                  next[contactIndex] = { ...next[contactIndex], addresses: [...next[contactIndex].addresses, emptyAddress()] };
+                                  setForm((prev) => ({ ...prev, contacts: next }));
+                                }}>
+                                  Add Contact Address
+                                </Button>
+                              </Stack>
+
+                              {(contact.phones || []).map((phone, phoneIndex) => (
+                                <Grid key={`cp-${contactIndex}-ph-${phoneIndex}`} container spacing={2} alignItems="center">
+                                  <Grid item xs={12} md={5}>
+                                    <TextField
+                                      fullWidth
+                                      label="Phone Type"
+                                      select
+                                      value={phone.phone_type_id ? String(phone.phone_type_id) : ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const phones = [...next[contactIndex].phones];
+                                        phones[phoneIndex] = { ...phones[phoneIndex], phone_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
+                                        next[contactIndex] = { ...next[contactIndex], phones };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    >
+                                      <MenuItem value="">None</MenuItem>
+                                      {phoneTypeOptions.map((item: LookupItem) => (
+                                        <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                                      ))}
+                                    </TextField>
+                                  </Grid>
+                                  <Grid item xs={12} md={5}>
+                                    <TextField
+                                      fullWidth
+                                      label="Phone"
+                                      value={phone.phone_number}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const phones = [...next[contactIndex].phones];
+                                        phones[phoneIndex] = { ...phones[phoneIndex], phone_number: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], phones };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <IconButton color="error" onClick={() => {
+                                      const next = [...form.contacts];
+                                      const phones = next[contactIndex].phones.filter((_, idx) => idx !== phoneIndex);
+                                      next[contactIndex] = { ...next[contactIndex], phones };
+                                      setForm((prev) => ({ ...prev, contacts: next }));
+                                    }}>
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Grid>
+                                </Grid>
+                              ))}
+
+                              {(contact.emails || []).map((email, emailIndex) => (
+                                <Grid key={`cp-${contactIndex}-em-${emailIndex}`} container spacing={2} alignItems="center">
+                                  <Grid item xs={12} md={5}>
+                                    <TextField
+                                      fullWidth
+                                      label="Email Type"
+                                      select
+                                      value={email.email_type_id ? String(email.email_type_id) : ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const emails = [...next[contactIndex].emails];
+                                        emails[emailIndex] = { ...emails[emailIndex], email_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
+                                        next[contactIndex] = { ...next[contactIndex], emails };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    >
+                                      <MenuItem value="">None</MenuItem>
+                                      {emailTypeOptions.map((item: LookupItem) => (
+                                        <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                                      ))}
+                                    </TextField>
+                                  </Grid>
+                                  <Grid item xs={12} md={5}>
+                                    <TextField
+                                      fullWidth
+                                      label="Email"
+                                      value={email.email_address}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const emails = [...next[contactIndex].emails];
+                                        emails[emailIndex] = { ...emails[emailIndex], email_address: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], emails };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <IconButton color="error" onClick={() => {
+                                      const next = [...form.contacts];
+                                      const emails = next[contactIndex].emails.filter((_, idx) => idx !== emailIndex);
+                                      next[contactIndex] = { ...next[contactIndex], emails };
+                                      setForm((prev) => ({ ...prev, contacts: next }));
+                                    }}>
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Grid>
+                                </Grid>
+                              ))}
+
+                              {(contact.addresses || []).map((address, addressIndex) => (
+                                <Grid key={`cp-${contactIndex}-ad-${addressIndex}`} container spacing={2} alignItems="center">
+                                  <Grid item xs={12} md={4}>
+                                    <TextField
+                                      fullWidth
+                                      label="Address Type"
+                                      select
+                                      value={address.address_type_id ? String(address.address_type_id) : ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], address_type_id: e.target.value ? parseInt(e.target.value, 10) : null };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    >
+                                      <MenuItem value="">None</MenuItem>
+                                      {addressTypeOptions.map((item: LookupItem) => (
+                                        <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
+                                      ))}
+                                    </TextField>
+                                  </Grid>
+                                  <Grid item xs={12} md={5}>
+                                    <TextField
+                                      fullWidth
+                                      label="Street"
+                                      value={address.street || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], street: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                      <FormControlLabel
+                                        control={<Checkbox checked={!!address.is_primary} onChange={() => {
+                                          const next = [...form.contacts];
+                                          next[contactIndex] = {
+                                            ...next[contactIndex],
+                                            addresses: setPrimary(next[contactIndex].addresses, addressIndex),
+                                          };
+                                          setForm((prev) => ({ ...prev, contacts: next }));
+                                        }} />}
+                                        label="Primary"
+                                      />
+                                      <IconButton color="error" onClick={() => {
+                                        const next = [...form.contacts];
+                                        next[contactIndex] = {
+                                          ...next[contactIndex],
+                                          addresses: next[contactIndex].addresses.filter((_, idx) => idx !== addressIndex),
+                                        };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}>
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </Stack>
+                                  </Grid>
+                                </Grid>
+                              ))}
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      <Box>
+                        <Button startIcon={<AddIcon />} onClick={() => setForm((prev) => ({ ...prev, contacts: [...prev.contacts, emptyContact()] }))}>
+                          Add Contact Person
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Stack>
+            )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button variant="contained" type="submit">Save</Button>
+            <Button onClick={() => setDialogOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="contained" type="submit" disabled={saving}>
+              {saving ? <CircularProgress size={20} /> : 'Save'}
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
+
+      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete {mode === 'project' ? 'Project' : 'Supplier'}</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            Are you sure you want to delete <strong>{deleteTarget?.party_name || deleteTarget?.project_name || deleteTarget?.supplier_name}</strong>?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button variant="contained" color="error" onClick={() => void confirmDelete()} disabled={deleting}>
+            {deleting ? <CircularProgress size={20} /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={Boolean(successMessage)} autoHideDuration={2500} onClose={() => setSuccessMessage('')}>
+        <Alert severity="success" variant="filled" onClose={() => setSuccessMessage('')}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -53,10 +53,19 @@ export class PartyService {
   async listProjects(
     limit: number = 50,
     offset: number = 0,
-    search?: string
+    search?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
   ): Promise<PartyListViewModel<ProjectListItemViewModel>> {
     const projectTypeId = await this.requireLookupIdByCode(PARTY_TYPE_LOOKUP, 'project');
-    const { rows, total } = await this.partyRepository.findAllByType(projectTypeId, limit, offset, search);
+    const { rows, total } = await this.partyRepository.findAllByType(
+      projectTypeId,
+      limit,
+      offset,
+      search,
+      sortBy,
+      sortDir
+    );
 
     return {
       items: rows.map((row) => this.mapProjectListRow(row)),
@@ -305,10 +314,19 @@ export class PartyService {
   async listSuppliers(
     limit: number = 50,
     offset: number = 0,
-    search?: string
+    search?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
   ): Promise<PartyListViewModel<SupplierListItemViewModel>> {
     const supplierTypeId = await this.requireLookupIdByCode(PARTY_TYPE_LOOKUP, 'supplier');
-    const { rows, total } = await this.partyRepository.findAllByType(supplierTypeId, limit, offset, search);
+    const { rows, total } = await this.partyRepository.findAllByType(
+      supplierTypeId,
+      limit,
+      offset,
+      search,
+      sortBy,
+      sortDir
+    );
     const schedules = await this.partyRepository.listBusinessHoursBySupplierIds(rows.map((row) => row.party_id));
 
     const scheduleBySupplierId = new Map<number, SupplierBusinessHourViewModel[]>();

@@ -77,6 +77,8 @@ export class PartyRepository {
     limit: number,
     offset: number,
     search?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc',
     client?: PoolClient
   ): Promise<{ rows: PartyListRow[]; total: number }> {
     const executor = this.getExecutor(client);
@@ -100,6 +102,17 @@ export class PartyRepository {
 
     const countResult = await executor.query(countQuery, params);
 
+    const allowedSortFields: Record<string, string> = {
+      party_code: 'p.party_code',
+      party_name: 'p.party_name',
+      status_name: 's.name',
+      project_type_name: 'pt.name',
+      payment_terms_name: 'terms.name',
+      created_at: 'p.log_date_created',
+    };
+    const orderBy = allowedSortFields[sortBy ?? ''] ?? 'p.party_name';
+    const orderDirection = sortDir === 'desc' ? 'DESC' : 'ASC';
+
     params.push(limit);
     params.push(offset);
 
@@ -114,7 +127,7 @@ export class PartyRepository {
       LEFT JOIN look_up pt ON pt.look_up_id = p.project_type_id AND pt.is_deleted = false
       LEFT JOIN look_up terms ON terms.look_up_id = p.payment_terms_id AND terms.is_deleted = false
       WHERE ${where.join(' AND ')}
-      ORDER BY p.party_name ASC
+      ORDER BY ${orderBy} ${orderDirection}, p.party_name ASC
       LIMIT $${params.length - 1}
       OFFSET $${params.length}
     `;
