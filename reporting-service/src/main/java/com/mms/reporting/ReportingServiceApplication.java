@@ -23,6 +23,9 @@ import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +59,10 @@ public final class ReportingServiceApplication {
             ctx.status(500).json(Map.of("error", "Failed to render report", "details", error.getMessage()));
         });
 
+        app.exception(SQLException.class, (error, ctx) -> {
+            ctx.status(500).json(Map.of("error", "Failed to connect to reporting database", "details", error.getMessage()));
+        });
+
         app.exception(Exception.class, (error, ctx) -> {
             ctx.status(500).json(Map.of("error", "Unexpected reporting service error", "details", error.getMessage()));
         });
@@ -72,8 +79,15 @@ public final class ReportingServiceApplication {
         JasperReport compiledReport = JasperCompileManager.compileReport(reportPath.toString());
 
         Map<String, Object> parameters = buildParameters(request.parameters, reportPath.getParent());
-        JRDataSource dataSource = buildDataSource(request.data);
-        JasperPrint jasperPrint = JasperFillManager.fillReport(compiledReport, parameters, dataSource);
+        JasperPrint jasperPrint;
+        if (hasInlineData(request.data)) {
+            JRDataSource dataSource = buildDataSource(request.data);
+            jasperPrint = JasperFillManager.fillReport(compiledReport, parameters, dataSource);
+        } else {
+            try (Connection connection = openDatabaseConnection()) {
+                jasperPrint = JasperFillManager.fillReport(compiledReport, parameters, connection);
+            }
+        }
 
         String normalizedFormat = normalizeFormat(request.format);
         byte[] output = export(jasperPrint, normalizedFormat);
@@ -123,6 +137,59 @@ public final class ReportingServiceApplication {
         }
 
         return new JRMapCollectionDataSource(data);
+    }
+
+    private static boolean hasInlineData(List<Map<String, ?>> data) {
+        return data != null && !data.isEmpty();
+    }
+
+    private static Connection openDatabaseConnection() throws SQLException {
+        String jdbcUrl = resolveJdbcUrl();
+        String user = firstNonBlank(
+            System.getenv("REPORT_DB_USER"),
+            System.getenv("DB_USER"),
+            "postgres"
+        );
+        String password = firstNonBlank(
+            System.getenv("REPORT_DB_PASSWORD"),
+            System.getenv("DB_PASSWORD"),
+            "postgres"
+        );
+        return DriverManager.getConnection(jdbcUrl, user, password);
+    }
+
+    private static String resolveJdbcUrl() {
+        String explicitUrl = firstNonBlank(System.getenv("REPORT_DB_URL"), System.getenv("DB_URL"));
+        if (explicitUrl != null) {
+            return explicitUrl;
+        }
+
+        String host = firstNonBlank(
+            System.getenv("REPORT_DB_HOST"),
+            System.getenv("DB_HOST"),
+            "localhost"
+        );
+        String port = firstNonBlank(
+            System.getenv("REPORT_DB_PORT"),
+            System.getenv("DB_PORT"),
+            "5432"
+        );
+        String database = firstNonBlank(
+            System.getenv("REPORT_DB_NAME"),
+            System.getenv("DB_NAME"),
+            "mms"
+        );
+
+        return "jdbc:postgresql://" + host + ":" + port + "/" + database;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static String normalizeFormat(String format) {

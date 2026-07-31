@@ -13,7 +13,7 @@ export const config = {
     database: process.env.DB_NAME || 'mms',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'your_jwt_secret_key_change_this',
+    secret: process.env.JWT_SECRET || 'mms123',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
   cors: {
