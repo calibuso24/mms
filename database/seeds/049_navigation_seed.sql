@@ -59,6 +59,14 @@ VALUES
     (7, 'MAIN', 'MENU', 'Audit Logs', '/admin/audit-logs', 'history', 2, true, false),
     (7, 'MAIN', 'MENU', 'System Settings', '/admin/system-settings', 'settings', 3, true, false);
 
+UPDATE navigation
+SET permission_code = 'VIEW',
+    log_module_updated = 'system_settings',
+    log_date_updated = NOW()
+WHERE route = '/admin/system-settings'
+  AND context = 'MAIN'
+  AND is_deleted = FALSE;
+
 -- REPORTS Context Navigation
 -- Reports main categories
 INSERT INTO navigation (context, navigation_type, title, icon, display_order, is_visible, is_deleted)

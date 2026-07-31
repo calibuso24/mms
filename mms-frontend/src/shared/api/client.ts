@@ -292,6 +292,27 @@ export const navigationApi = {
   getReportCatalogSidebar: () => ApiClient.get('/navigation/report-catalog-sidebar'),
 };
 
+// System Settings API
+export const systemSettingsApi = {
+  listCategories: () => ApiClient.get('/system-settings/categories'),
+  getCategory: (categoryCode: string) => ApiClient.get(`/system-settings/categories/${categoryCode}`),
+  listCategorySettings: (categoryCode: string) =>
+    ApiClient.get(`/system-settings/categories/${categoryCode}/settings`),
+  createCategory: (data: any) => ApiClient.post('/system-settings/categories', data),
+  updateCategory: (categoryId: number, data: any) =>
+    ApiClient.put(`/system-settings/categories/${categoryId}`, data),
+  deleteCategory: (categoryId: number) => ApiClient.delete(`/system-settings/categories/${categoryId}`),
+  createSetting: (categoryCode: string, data: any) =>
+    ApiClient.post(`/system-settings/categories/${categoryCode}/settings`, data),
+  updateSetting: (settingId: number, data: any) =>
+    ApiClient.put(`/system-settings/settings/${settingId}`, data),
+  deleteSetting: (settingId: number) => ApiClient.delete(`/system-settings/settings/${settingId}`),
+  saveCategorySettings: (categoryCode: string, settings: any[]) =>
+    ApiClient.put(`/system-settings/categories/${categoryCode}/settings`, { settings }),
+  resetCategory: (categoryCode: string) =>
+    ApiClient.post(`/system-settings/categories/${categoryCode}/reset`, {}),
+};
+
 // Report API
 export const reportApi = {
   list: () => ApiClient.get('/reports'),

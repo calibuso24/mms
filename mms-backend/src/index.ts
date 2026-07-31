@@ -11,6 +11,7 @@ import navigationRoutes from './routes/navigation.js';
 import roleRoutes from './routes/roles.js';
 import partyRoutes from './routes/party.js';
 import reportRoutes from './routes/report.js';
+import systemSettingsRoutes from './routes/systemSettings.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/accounts', authMiddleware, accountRoutes);
 app.use('/api/roles', authMiddleware, roleRoutes);
 app.use('/api/navigation', authMiddleware, navigationRoutes);
 app.use('/api/reports', authMiddleware, reportRoutes);
+app.use('/api/system-settings', authMiddleware, systemSettingsRoutes);
 app.use('/api', authMiddleware, productRoutes);
 app.use('/api', authMiddleware, partyRoutes);
 

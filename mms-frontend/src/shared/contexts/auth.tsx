@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi } from '../api/client.js';
+import { accountApi, authApi } from '../api/client.js';
 
 interface AuthContextType {
   account: any | null;
@@ -24,8 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (token && !account) {
       setIsLoading(true);
-      // Could fetch current account here if needed
-      setIsLoading(false);
+      accountApi
+        .getMe()
+        .then((me) => setAccount(me))
+        .catch(() => {
+          localStorage.removeItem('authToken');
+          setToken(null);
+        })
+        .finally(() => setIsLoading(false));
     }
   }, [token, account]);
 

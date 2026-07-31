@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "concurrently \"npm --prefix mms-backend run dev\" \"npm --prefix mms-frontend run dev\" \"npm run reporting\"",
     "reporting": "cd reporting-service && mvn exec:java",
-    "rebuild": "rimraf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install && cd reporting-service && mvn clean package"
+    "rebuild": "rimraf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install && cd reporting-service && mvn clean package",
+    "build": "rimraf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
