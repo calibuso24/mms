@@ -13,6 +13,7 @@ import LoginPage from './pages/Login.js';
 import MaterialsPage from './pages/Materials.js';
 import ManageUsersPage from './pages/ManageUsers.js';
 import ManageRolesPage from './pages/ManageRoles.js';
+import SystemSettingsPage from './pages/SystemSettings.js';
 import { ProjectManagementPage, SupplierManagementPage } from './pages/PartyManagement.js';
 import ReportRunnerPage from './pages/ReportRunner.js';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -84,6 +85,10 @@ function DynamicPage({ route }: { route: string | null }) {
 
   if (route?.includes('supplier-management')) {
     return <SupplierManagementPage />;
+  }
+
+  if (route?.includes('system-settings')) {
+    return <SystemSettingsPage />;
   }
 
   if (route?.startsWith('/reports/')) {

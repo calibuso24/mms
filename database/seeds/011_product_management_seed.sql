@@ -40,7 +40,7 @@ FROM (
         ('INSULATION', 'RUBBER_INSULATION', 'Rubber Insulation')
 ) AS source(category_code, sub_category_code, sub_category_name)
 JOIN category c ON c.category_code = source.category_code
-ON CONFLICT (category_id, sub_category_name) DO NOTHING;
+ON CONFLICT (category_id, sub_category_code) DO NOTHING;
 
 INSERT INTO unit_of_measure (uom_name, abbreviation)
 VALUES
