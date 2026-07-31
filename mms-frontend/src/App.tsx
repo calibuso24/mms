@@ -14,6 +14,7 @@ import MaterialsPage from './pages/Materials.js';
 import ManageUsersPage from './pages/ManageUsers.js';
 import ManageRolesPage from './pages/ManageRoles.js';
 import SystemSettingsPage from './pages/SystemSettings.js';
+import ProfilePage from './pages/Profile.js';
 import { ProjectManagementPage, SupplierManagementPage } from './pages/PartyManagement.js';
 import ReportRunnerPage from './pages/ReportRunner.js';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -91,6 +92,10 @@ function DynamicPage({ route }: { route: string | null }) {
     return <SystemSettingsPage />;
   }
 
+  if (route?.includes('profile')) {
+    return <ProfilePage />;
+  }
+
   if (route?.startsWith('/reports/')) {
     const reportCode = route.split('/')[2] || '';
     if (reportCode) {
@@ -126,6 +131,11 @@ function AppShell() {
       return;
     }
 
+    if (routeParts[0] === 'profile') {
+      setPageTitle('My Profile');
+      return;
+    }
+
     const derivedTitle = routeParts[routeParts.length - 1]
       .split('-')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -136,6 +146,14 @@ function AppShell() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleProfile = () => {
+    navigate('/app/profile');
+  };
+
+  const handleChangePassword = () => {
+    navigate('/app/profile?section=password');
   };
 
   const handleNavigate = (route: string, title?: string) => {
@@ -194,7 +212,9 @@ function AppShell() {
       <TopBar
         onMenuClick={() => setSidebarOpen(true)}
         pageTitle={pageTitle}
-        userName={account?.full_name || account?.user_name || 'User'}
+        account={account}
+        onProfile={handleProfile}
+        onChangePassword={handleChangePassword}
         onLogout={handleLogout}
       />
 

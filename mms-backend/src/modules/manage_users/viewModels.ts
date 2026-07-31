@@ -43,6 +43,41 @@ export interface UserEmailViewModel {
   is_primary: boolean;
 }
 
+export interface UserContactViewModel {
+  contact_id: number;
+  parent_contact_id: number | null;
+  entity_type_id: number;
+  prefix_id: number | null;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  suffix_id: number | null;
+  contact_name: string;
+}
+
+export interface UserProfileViewModel {
+  avatar: {
+    data_url: string | null;
+    updated_at: string | null;
+  } | null;
+  preferences: {
+    theme: string | null;
+    language: string | null;
+    date_format: string | null;
+    time_format: string | null;
+    time_zone: string | null;
+    notifications: {
+      email: boolean;
+      sms: boolean;
+      in_app: boolean;
+    };
+  } | null;
+  security: {
+    last_login_at: string | null;
+    last_password_change_at: string | null;
+  } | null;
+}
+
 export interface RelatedContactViewModel {
   contact_id: number;
   prefix_id: number | null;
@@ -63,6 +98,8 @@ export interface ManagedUserDetailViewModel {
   full_name: string | null;
   is_active: boolean;
   contact_id: number | null;
+  profile: UserProfileViewModel | null;
+  contact: UserContactViewModel | null;
   roles: UserRoleViewModel[];
   permissions: UserPermissionViewModel[];
   addresses: UserAddressViewModel[];

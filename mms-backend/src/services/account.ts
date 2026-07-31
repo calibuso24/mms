@@ -7,6 +7,7 @@ import { AccountRepository } from '../repositories/account.js';
 import { ContactRepository } from '../repositories/contact.js';
 import { RoleRepository } from '../repositories/role.js';
 import { AuditLogRepository } from '../repositories/auditLog.js';
+import { mergeUserProfile, UserProfileData } from '../utils/profile.js';
 import {
   CreateManagedUserDto,
   UpdateManagedUserDto,
@@ -37,6 +38,103 @@ export class AccountService {
     }
 
     return this.buildAccountDetailViewModel(account.account_id);
+  }
+
+  async updateCurrentProfile(accountId: number, req: {
+    display_name?: string | null;
+    first_name?: string | null;
+    middle_name?: string | null;
+    last_name?: string | null;
+    avatar_data_url?: string | null;
+    preferences?: Partial<NonNullable<UserProfileData['preferences']>> | null;
+    addresses?: AddressDto[];
+    phones?: PhoneDto[];
+    emails?: EmailDto[];
+  }): Promise<ManagedUserDetailViewModel> {
+  const existingAccount = await this.accountRepository.findById(accountId);
+  if (!existingAccount) {
+    throw new NotFoundError('Account not found');
+  }
+
+  if (!existingAccount.contact_id) {
+    throw new ValidationError('Account does not have a contact record');
+  }
+
+  const existingContact = await this.contactRepository.findById(existingAccount.contact_id);
+  if (!existingContact) {
+    throw new NotFoundError('Contact not found');
+  }
+
+  const nextDisplayName =
+    typeof req.display_name === 'string' ? req.display_name.trim() : existingAccount.full_name;
+  if (req.display_name !== undefined && nextDisplayName.length === 0) {
+    throw new ValidationError('Display name is required');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const updatedProfile = mergeUserProfile(existingAccount.profile as UserProfileData | null, {
+      avatar: req.avatar_data_url === undefined
+        ? undefined
+        : req.avatar_data_url
+          ? { data_url: req.avatar_data_url, updated_at: new Date().toISOString() }
+          : null,
+      preferences: req.preferences === undefined ? undefined : {
+        theme: req.preferences?.theme ?? null,
+        language: req.preferences?.language ?? null,
+        date_format: req.preferences?.date_format ?? null,
+        time_format: req.preferences?.time_format ?? null,
+        time_zone: req.preferences?.time_zone ?? null,
+        notifications: req.preferences?.notifications === undefined ? undefined : {
+          email: req.preferences?.notifications?.email ?? false,
+          sms: req.preferences?.notifications?.sms ?? false,
+          in_app: req.preferences?.notifications?.in_app ?? false,
+        },
+      },
+    });
+
+    await this.accountRepository.update(
+      accountId,
+      {
+        full_name: nextDisplayName,
+        profile: updatedProfile,
+      },
+      accountId,
+      client
+    );
+
+    await this.contactRepository.update(
+      existingContact.contact_id,
+      {
+        contact_name: nextDisplayName,
+        first_name: req.first_name !== undefined ? req.first_name : existingContact.first_name,
+        middle_name: req.middle_name !== undefined ? req.middle_name : existingContact.middle_name,
+        last_name: req.last_name !== undefined ? req.last_name : existingContact.last_name,
+      },
+      accountId,
+      client
+    );
+
+    if (req.addresses) {
+      await this.syncAddresses(existingContact.contact_id, req.addresses, accountId, client);
+    }
+    if (req.phones) {
+      await this.syncPhones(existingContact.contact_id, req.phones, accountId, client);
+    }
+    if (req.emails) {
+      await this.syncEmails(existingContact.contact_id, req.emails, accountId, client);
+    }
+
+    await client.query('COMMIT');
+    return this.buildAccountDetailViewModel(accountId);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
   }
 
   async listAccounts(
@@ -846,6 +944,8 @@ export class AccountService {
       throw new NotFoundError('Account not found');
     }
 
+	const rootContact = account.contact_id ? await this.contactRepository.findById(account.contact_id) : null;
+
     const roles = await this.roleRepository.getRolesForAccount(accountId);
     const permissions = await this.getAccountPermissions(accountId);
 
@@ -885,6 +985,20 @@ export class AccountService {
       full_name: account.full_name,
       is_active: account.is_active,
       contact_id: account.contact_id,
+      profile: this.normalizeProfile(account.profile as UserProfileData | null),
+      contact: rootContact
+		? {
+		    contact_id: rootContact.contact_id,
+		    parent_contact_id: rootContact.parent_contact_id,
+		    entity_type_id: rootContact.entity_type_id,
+		    prefix_id: rootContact.prefix_id,
+		    first_name: rootContact.first_name,
+		    middle_name: rootContact.middle_name,
+		    last_name: rootContact.last_name,
+		    suffix_id: rootContact.suffix_id,
+		    contact_name: rootContact.contact_name,
+		  }
+		: null,
       roles: roles.map((role) => ({
         role_id: role.role_id,
         role_code: role.role_code,
@@ -922,6 +1036,37 @@ export class AccountService {
       })),
       contacts,
       created_at: account.log_date_created,
+    };
+  }
+
+  private normalizeProfile(profile: UserProfileData | null): NonNullable<ManagedUserDetailViewModel['profile']> {
+    return {
+      avatar: profile?.avatar
+        ? {
+            data_url: profile.avatar.data_url ?? null,
+            updated_at: profile.avatar.updated_at ?? null,
+          }
+        : null,
+      preferences: profile?.preferences
+        ? {
+            theme: profile.preferences.theme ?? null,
+            language: profile.preferences.language ?? null,
+            date_format: profile.preferences.date_format ?? null,
+            time_format: profile.preferences.time_format ?? null,
+            time_zone: profile.preferences.time_zone ?? null,
+            notifications: {
+              email: profile.preferences.notifications?.email ?? false,
+              sms: profile.preferences.notifications?.sms ?? false,
+              in_app: profile.preferences.notifications?.in_app ?? false,
+            },
+          }
+        : null,
+      security: profile?.security
+        ? {
+            last_login_at: profile.security.last_login_at ?? null,
+            last_password_change_at: profile.security.last_password_change_at ?? null,
+          }
+        : null,
     };
   }
 

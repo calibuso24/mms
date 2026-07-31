@@ -10,6 +10,7 @@ router.use(authMiddleware);
 
 // Account CRUD
 router.get('/me', (req, res, next) => controller.getMe(req, res, next));
+router.put('/me', (req, res, next) => controller.updateMe(req, res, next));
 router.get('/meta/roles', requirePermission('User Management', 'VIEW'), (req, res, next) =>
 	controller.listRoles(req, res, next)
 );
