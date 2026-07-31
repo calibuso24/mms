@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { navigationApi } from '../api/client.js';
+import { useAuth } from './auth.js';
 
 export interface NavigationItem {
   navigation_id: number;
@@ -50,13 +51,14 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isLoggedIn } = useAuth();
   const [mainNavigation, setMainNavigation] = useState<NavigationItem[]>([]);
   const [reportsNavigation, setReportsNavigation] = useState<NavigationItem[]>([]);
   const [reportGroups, setReportGroups] = useState<ReportGroup[]>([]);
   const [currentContext, setCurrentContext] = useState<'MAIN' | 'REPORTS'>('MAIN');
   const [pageTitle, setPageTitleState] = useState<string>('Dashboard');
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadNavigation = async () => {
@@ -91,8 +93,18 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      setMainNavigation([]);
+      setReportsNavigation([]);
+      setReportGroups([]);
+      setExpandedItems(new Set());
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     loadNavigation();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleToggleExpandedItem = (id: number) => {
     const newExpanded = new Set(expandedItems);
