@@ -4,6 +4,7 @@ import { RoleRepository } from '../repositories/role.js';
 import { hashPassword, verifyPassword, generateToken } from '../utils/auth.js';
 import { UnauthorizedError, ValidationError, NotFoundError } from '../utils/errors.js';
 import { pool } from '../config/database.js';
+import { mergeUserProfile } from '../utils/profile.js';
 
 export class AuthService {
   private accountRepository = new AccountRepository();
@@ -36,6 +37,14 @@ export class AuthService {
       throw new UnauthorizedError('Invalid account name or password');
     }
 
+    const loginProfile = mergeUserProfile(account.profile, {
+      security: {
+        last_login_at: new Date().toISOString(),
+      },
+    });
+
+    await this.accountRepository.update(account.account_id, { profile: loginProfile }, account.account_id);
+
     const token = generateToken({
       accountId: account.account_id,
       userName: account.user_name,
@@ -50,6 +59,7 @@ export class AuthService {
         user_name: account.user_name,
         full_name: account.full_name,
         is_active: account.is_active,
+        profile: loginProfile,
         roles: account.roles || [],
       },
     };
@@ -82,5 +92,13 @@ export class AuthService {
 
     const hashedPassword = await hashPassword(newPassword);
     await this.accountRepository.update(accountId, { password: hashedPassword }, accountId);
+
+    const updatedProfile = mergeUserProfile(account.profile, {
+      security: {
+        last_password_change_at: new Date().toISOString(),
+      },
+    });
+
+    await this.accountRepository.update(accountId, { profile: updatedProfile }, accountId);
   }
 }

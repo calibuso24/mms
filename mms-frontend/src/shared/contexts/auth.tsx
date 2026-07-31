@@ -1,32 +1,37 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { accountApi, authApi } from '../api/client.js';
+import { CurrentAccount } from '../types/account.js';
 
 interface AuthContextType {
-  account: any | null;
+  account: CurrentAccount | null;
   token: string | null;
   isLoggedIn: boolean;
   isLoading: boolean;
   login: (userName: string, password: string) => Promise<void>;
   logout: () => void;
   setPassword: (password: string, currentPassword?: string) => Promise<void>;
+  refreshAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [account, setAccount] = useState<any | null>(null);
+  const [account, setAccount] = useState<CurrentAccount | null>(null);
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem('authToken')
   );
   const [isLoading, setIsLoading] = useState(false);
 
+  const refreshAccount = async () => {
+    const me = await accountApi.getMe();
+    setAccount(me);
+  };
+
   // Restore session on mount
   useEffect(() => {
     if (token && !account) {
       setIsLoading(true);
-      accountApi
-        .getMe()
-        .then((me) => setAccount(me))
+      refreshAccount()
         .catch(() => {
           localStorage.removeItem('authToken');
           setToken(null);
@@ -67,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         setPassword,
+        refreshAccount,
       }}
     >
       {children}

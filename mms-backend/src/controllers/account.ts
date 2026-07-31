@@ -18,6 +18,19 @@ export class AccountController {
     }
   }
 
+  async updateMe(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.accountId) {
+        throw new Error('Unauthorized');
+      }
+
+      const account = await this.accountService.updateCurrentProfile(req.accountId, req.body);
+      res.json(account);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getAccount(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;

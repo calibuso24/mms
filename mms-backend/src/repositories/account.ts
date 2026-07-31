@@ -7,6 +7,7 @@ export interface Account {
   password: string | null;
   full_name: string;
   contact_id: number | null;
+  profile: any;
   is_active: boolean;
   is_deleted: boolean;
   log_date_created: string;
@@ -173,7 +174,7 @@ export class AccountRepository {
 
   async update(
     accountId: number,
-    updates: Partial<Pick<Account, 'user_name' | 'full_name' | 'is_active' | 'password'>>,
+    updates: Partial<Pick<Account, 'user_name' | 'full_name' | 'is_active' | 'password' | 'profile'>>,
     updatedByAccountId: number | null = null,
     client?: PoolClient
   ): Promise<Account> {
@@ -196,6 +197,10 @@ export class AccountRepository {
     if (updates.password !== undefined) {
       fields.push(`password = $${paramCount++}`);
       values.push(updates.password);
+    }
+    if (updates.profile !== undefined) {
+      fields.push(`profile = $${paramCount++}::jsonb`);
+      values.push(updates.profile === null ? null : JSON.stringify(updates.profile));
     }
 
     fields.push(`log_date_updated = now()`);

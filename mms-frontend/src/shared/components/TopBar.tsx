@@ -9,12 +9,17 @@ import {
   Badge,
   Menu,
   MenuItem,
+  Avatar,
+  Button,
+  Stack,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import { styled } from '@mui/material/styles';
+import { CurrentAccount } from '../types/account.js';
+import { getAccountAvatarSrc, getAccountDisplayName, getAccountInitials } from '../utils/account.js';
 
 const Search = styled(Box)(({ theme }) => ({
   position: 'relative',
@@ -41,18 +46,25 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 interface TopBarProps {
   onMenuClick: () => void;
   pageTitle: string;
-  userName?: string;
+  account?: CurrentAccount | null;
+  onProfile?: () => void;
+  onChangePassword?: () => void;
   onLogout?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   onMenuClick,
   pageTitle,
-  userName = 'User',
+  account,
+  onProfile,
+  onChangePassword,
   onLogout,
 }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const isMenuOpen = Boolean(anchorEl);
+  const displayName = getAccountDisplayName(account);
+  const avatarSrc = getAccountAvatarSrc(account);
+  const initials = getAccountInitials(displayName);
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -65,6 +77,16 @@ export const TopBar: React.FC<TopBarProps> = ({
   const handleLogout = () => {
     handleMenuClose();
     onLogout?.();
+  };
+
+  const handleProfile = () => {
+    handleMenuClose();
+    onProfile?.();
+  };
+
+  const handleChangePassword = () => {
+    handleMenuClose();
+    onChangePassword?.();
   };
 
   return (
@@ -115,18 +137,35 @@ export const TopBar: React.FC<TopBarProps> = ({
             </Badge>
           </IconButton>
 
-          <IconButton
+          <Button
             onClick={handleProfileClick}
-            size="small"
+            variant="text"
+            disableRipple
             sx={{
-              color: '#0078D4',
+              color: '#0b2748',
               '&:hover': {
                 backgroundColor: '#F5F7FA',
               },
+              borderRadius: 999,
+              px: 1,
+              py: 0.75,
+              textTransform: 'none',
             }}
           >
-            <AccountCircleIcon />
-          </IconButton>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Avatar
+                src={avatarSrc ?? undefined}
+                alt={displayName}
+                sx={{ width: 32, height: 32, bgcolor: '#005A9E', fontSize: '0.8rem', fontWeight: 700 }}
+              >
+                {initials}
+              </Avatar>
+              <Typography variant="body2" sx={{ fontWeight: 600, maxWidth: 160 }} noWrap>
+                {displayName}
+              </Typography>
+              <KeyboardArrowDownRoundedIcon fontSize="small" />
+            </Stack>
+          </Button>
 
           <Menu
             anchorEl={anchorEl}
@@ -137,11 +176,11 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <MenuItem disabled>
               <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                {userName}
+                {displayName}
               </Typography>
             </MenuItem>
-            <MenuItem onClick={handleMenuClose}>Profile</MenuItem>
-            <MenuItem onClick={handleMenuClose}>Settings</MenuItem>
+            <MenuItem onClick={handleProfile}>My Profile</MenuItem>
+            <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
             <MenuItem onClick={handleLogout}>Logout</MenuItem>
           </Menu>
         </Box>

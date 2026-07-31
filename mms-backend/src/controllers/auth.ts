@@ -26,7 +26,8 @@ export class AuthController {
         throw new Error('Unauthorized');
       }
 
-      const { password, currentPassword } = req.body;
+      const password = req.body.password ?? req.body.new_password;
+      const currentPassword = req.body.currentPassword ?? req.body.current_password;
 
       if (!password) {
         throw new ValidationError('Password is required');

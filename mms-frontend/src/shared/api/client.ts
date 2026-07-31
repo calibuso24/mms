@@ -100,12 +100,13 @@ export const authApi = {
   login: (userName: string, password: string) =>
     ApiClient.post('/auth/login', { user_name: userName, password }),
   setPassword: (password: string, currentPassword?: string) =>
-    ApiClient.post('/auth/set-password', { password, current_password: currentPassword }),
+    ApiClient.post('/auth/set-password', { password, currentPassword }),
 };
 
 // Account API
 export const accountApi = {
   getMe: () => ApiClient.get('/accounts/me'),
+  updateMe: (data: any) => ApiClient.put('/accounts/me', data),
   getAccount: (id: number) => ApiClient.get(`/accounts/${id}`),
   listAccounts: (limit?: number, offset?: number, search?: string) => {
     const params = new URLSearchParams();
