@@ -53,6 +53,8 @@ Backend API modules currently exposed:
 - Navigation (MAIN and REPORTS contexts)
 - Report catalog and generation
 - System settings
+- Material Control and Material Control Item CRUD
+- Material Control Item bulk import preview and import workflow
 
 Frontend pages currently implemented:
 

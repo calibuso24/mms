@@ -90,6 +90,26 @@ Security model:
 | PUT | /api/material-controls/:id | Material Control UPDATE |
 | DELETE | /api/material-controls/:id | Material Control DELETE |
 
+### Material Control Item routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/material-control-items | Material Control VIEW |
+| GET | /api/material-control-items/:id | Material Control VIEW |
+| POST | /api/material-control-items | Material Control CREATE |
+| PUT | /api/material-control-items/:id | Material Control UPDATE |
+| DELETE | /api/material-control-items/:id | Material Control DELETE |
+| GET | /api/material-control-items/import/template | Material Control VIEW |
+| POST | /api/material-control-items/import/preview | Material Control CREATE |
+| POST | /api/material-control-items/import/import | Material Control CREATE |
+
+Material control item import workflow:
+
+- Upload an XLSX or CSV file from the Material Control page.
+- The preview step validates required columns, positive quantities, and duplicate rows.
+- Existing materials are matched by code, description, brand, or unit of measure.
+- Missing materials are flagged for review before import, and only valid rows are inserted transactionally.
+
 ### Material Request routes
 
 | Method | Path | Permission |

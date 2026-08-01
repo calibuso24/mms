@@ -37,8 +37,15 @@ export class ApiClient {
       credentials: 'include',
     };
 
-    if (options.body) {
-      requestOptions.body = JSON.stringify(options.body);
+    if (options.body !== undefined) {
+      if (options.body instanceof FormData) {
+        const headers = this.getHeaders();
+        delete headers['Content-Type'];
+        requestOptions.headers = headers;
+        requestOptions.body = options.body;
+      } else {
+        requestOptions.body = JSON.stringify(options.body);
+      }
     }
 
     const response = await fetch(url, requestOptions);
@@ -60,6 +67,10 @@ export class ApiClient {
     return this.request(endpoint, { method: 'POST', body });
   }
 
+  static postFormData(endpoint: string, body: FormData): Promise<any> {
+    return this.request(endpoint, { method: 'POST', body });
+  }
+
   static put(endpoint: string, body: any): Promise<any> {
     return this.request(endpoint, { method: 'PUT', body });
   }
@@ -76,8 +87,15 @@ export class ApiClient {
       credentials: 'include',
     };
 
-    if (options.body) {
-      requestOptions.body = JSON.stringify(options.body);
+    if (options.body !== undefined) {
+      if (options.body instanceof FormData) {
+        const headers = this.getHeaders();
+        delete headers['Content-Type'];
+        requestOptions.headers = headers;
+        requestOptions.body = options.body;
+      } else {
+        requestOptions.body = JSON.stringify(options.body);
+      }
     }
 
     const response = await fetch(url, requestOptions);
@@ -246,6 +264,35 @@ export const materialControlApi = {
   create: (data: any) => ApiClient.post('/material-controls', data),
   update: (id: number, data: any) => ApiClient.put(`/material-controls/${id}`, data),
   delete: (id: number) => ApiClient.delete(`/material-controls/${id}`),
+};
+
+// Material Control Item API
+export const materialControlItemApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; material_control_id?: number; material_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.material_control_id) params.append('material_control_id', filters.material_control_id.toString());
+    if (filters?.material_id) params.append('material_id', filters.material_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/material-controls/${filters?.material_control_id ? `${filters.material_control_id}/items` : 'items'}?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/material-controls/items/${id}`),
+  create: (data: any) => ApiClient.post('/material-controls/items', data),
+  update: (id: number, data: any) => ApiClient.put(`/material-controls/items/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/material-controls/items/${id}`),
+  previewImport: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return ApiClient.postFormData('/material-controls/import/preview', formData);
+  },
+  importRows: (materialControlId: number, rows: any[]) => ApiClient.post('/material-controls/import/import', {
+    material_control_id: materialControlId,
+    rows,
+  }),
+  downloadTemplate: (format: 'xlsx' | 'csv' = 'xlsx') => ApiClient.requestBlob(`/material-controls/import/template?format=${format}`),
 };
 
 // Material Request API

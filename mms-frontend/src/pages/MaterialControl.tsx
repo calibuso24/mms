@@ -39,7 +39,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { accountApi, lookupApi, materialControlApi, projectApi } from '../shared/api/client.js';
+import { accountApi, lookupApi, materialApi, materialControlApi, materialControlItemApi, projectApi, uomApi } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
 
 type SortField = 'control_code' | 'project_code' | 'project_name' | 'budget' | 'total_estimated_cost' | 'status_name' | 'created_at' | 'reviewed_at';
@@ -82,6 +82,21 @@ interface FormState {
   total_estimated_cost: string;
   status_id: string;
   notes: string;
+}
+
+interface DetailRow {
+  material_control_item_id?: number;
+  material_id: string;
+  material_code?: string;
+  material_name?: string;
+  estimated_quantity: string;
+  uom_id: string;
+  uom_name?: string;
+  uom_abbreviation?: string;
+  estimated_unit_cost: string;
+  estimated_total_cost: string;
+  remarks: string;
+  line_no: string;
 }
 
 const emptyForm = (): FormState => ({
@@ -147,6 +162,28 @@ export default function MaterialControlPage() {
   const [deleteItem, setDeleteItem] = useState<MaterialControlItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importSummary, setImportSummary] = useState<any>(null);
+  const [importTargetId, setImportTargetId] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState('');
+  const [detailRows, setDetailRows] = useState<DetailRow[]>([]);
+  const [detailMaterials, setDetailMaterials] = useState<any[]>([]);
+  const [detailUoms, setDetailUoms] = useState<any[]>([]);
+  const [detailForm, setDetailForm] = useState({
+    material_id: '',
+    estimated_quantity: '',
+    uom_id: '',
+    estimated_unit_cost: '',
+    estimated_total_cost: '',
+    remarks: '',
+    line_no: '',
+  });
+  const [editingDetailIndex, setEditingDetailIndex] = useState<number | null>(null);
+  const [detailError, setDetailError] = useState('');
 
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Material Control:VIEW');
@@ -222,10 +259,73 @@ export default function MaterialControlPage() {
     }
   };
 
-  const openCreate = () => {
+  const resetDetailForm = () => {
+    setDetailForm({
+      material_id: '',
+      estimated_quantity: '',
+      uom_id: '',
+      estimated_unit_cost: '',
+      estimated_total_cost: '',
+      remarks: '',
+      line_no: '',
+    });
+    setEditingDetailIndex(null);
+    setDetailError('');
+  };
+
+  const loadDetailLookups = async () => {
+    try {
+      const [materialsData, uomsData] = await Promise.all([
+        materialApi.list(100, 0).catch(() => ({ items: [] })),
+        uomApi.list(100, 0).catch(() => ({ items: [] })),
+      ]);
+
+      setDetailMaterials(Array.isArray(materialsData?.items) ? materialsData.items : []);
+      setDetailUoms(Array.isArray(uomsData?.items) ? uomsData.items : []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load detail lookups');
+    }
+  };
+
+  const loadDetailRows = async (controlId: number) => {
+    if (!controlId) {
+      setDetailRows([]);
+      return;
+    }
+
+    try {
+      const result = await materialControlItemApi.list(100, 0, { material_control_id: controlId });
+      setDetailRows(
+        Array.isArray(result?.items)
+          ? result.items.map((row: any) => ({
+              material_control_item_id: row.material_control_item_id,
+              material_id: row.material_id?.toString() || '',
+              material_code: row.material_code,
+              material_name: row.material_name,
+              estimated_quantity: row.estimated_quantity ?? '',
+              uom_id: row.uom_id?.toString() || '',
+              uom_name: row.uom_name,
+              uom_abbreviation: row.uom_abbreviation,
+              estimated_unit_cost: row.estimated_unit_cost ?? '',
+              estimated_total_cost: row.estimated_total_cost ?? '',
+              remarks: row.remarks ?? '',
+              line_no: row.line_no?.toString() || '',
+            }))
+          : []
+      );
+    } catch (err: any) {
+      setDetailRows([]);
+      setError(err.message || 'Failed to load material control items');
+    }
+  };
+
+  const openCreate = async () => {
     setEditingId(null);
     setForm(emptyForm());
+    setDetailRows([]);
+    resetDetailForm();
     setDialogOpen(true);
+    await loadDetailLookups();
   };
 
   const openEdit = async (item: MaterialControlItem) => {
@@ -238,7 +338,10 @@ export default function MaterialControlPage() {
       status_id: item.status_id.toString(),
       notes: item.notes ?? '',
     });
+    resetDetailForm();
     setDialogOpen(true);
+    await loadDetailLookups();
+    await loadDetailRows(item.material_control_id);
   };
 
   const openView = async (item: MaterialControlItem) => {
@@ -258,6 +361,60 @@ export default function MaterialControlPage() {
 
   const statusIdByCode = (code: string) => statuses.find((item) => item.code === code)?.look_up_id;
 
+  const handleEditDetailRow = (index: number) => {
+    const row = detailRows[index];
+    if (!row) {
+      return;
+    }
+
+    setEditingDetailIndex(index);
+    setDetailForm({
+      material_id: row.material_id,
+      estimated_quantity: row.estimated_quantity,
+      uom_id: row.uom_id,
+      estimated_unit_cost: row.estimated_unit_cost,
+      estimated_total_cost: row.estimated_total_cost,
+      remarks: row.remarks,
+      line_no: row.line_no,
+    });
+    setDetailError('');
+  };
+
+  const handleRemoveDetailRow = (index: number) => {
+    setDetailRows((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    if (editingDetailIndex === index) {
+      resetDetailForm();
+    } else if (editingDetailIndex !== null && editingDetailIndex > index) {
+      setEditingDetailIndex((current) => (current === null ? null : current - 1));
+    }
+  };
+
+  const handleSaveDetailRow = () => {
+    if (!detailForm.material_id || !detailForm.estimated_quantity || !detailForm.uom_id) {
+      setDetailError('Material, quantity, and unit of measure are required');
+      return;
+    }
+
+    const normalizedLineNo = detailForm.line_no.trim() || String(detailRows.length + 1);
+    const nextRow: DetailRow = {
+      material_id: detailForm.material_id,
+      estimated_quantity: detailForm.estimated_quantity,
+      uom_id: detailForm.uom_id,
+      estimated_unit_cost: detailForm.estimated_unit_cost,
+      estimated_total_cost: detailForm.estimated_total_cost,
+      remarks: detailForm.remarks,
+      line_no: normalizedLineNo,
+    };
+
+    if (editingDetailIndex === null) {
+      setDetailRows((current) => [...current, nextRow]);
+    } else {
+      setDetailRows((current) => current.map((row, index) => (index === editingDetailIndex ? { ...row, ...nextRow } : row)));
+    }
+
+    resetDetailForm();
+  };
+
   const submitForm = async () => {
     setSaving(true);
     setError('');
@@ -272,17 +429,49 @@ export default function MaterialControlPage() {
         notes: form.notes.trim() || null,
       };
 
+      let savedControl: any;
       if (editingId) {
-        await materialControlApi.update(editingId, payload);
-        setSuccess('Material Control updated');
+        savedControl = await materialControlApi.update(editingId, payload);
       } else {
-        await materialControlApi.create(payload);
-        setSuccess('Material Control created');
+        savedControl = await materialControlApi.create(payload);
       }
 
+      const controlId = savedControl?.material_control_id;
+      if (!controlId) {
+        throw new Error('Material Control could not be saved');
+      }
+
+      if (editingId) {
+        const existingItemsResult = await materialControlItemApi.list(100, 0, { material_control_id: editingId });
+        const existingItems = Array.isArray(existingItemsResult?.items) ? existingItemsResult.items : [];
+        for (const item of existingItems) {
+          await materialControlItemApi.delete(item.material_control_item_id);
+        }
+      }
+
+      for (const row of detailRows) {
+        if (!row.material_id || !row.estimated_quantity || !row.uom_id) {
+          continue;
+        }
+
+        await materialControlItemApi.create({
+          material_control_id: controlId,
+          material_id: Number(row.material_id),
+          estimated_quantity: Number(row.estimated_quantity),
+          uom_id: Number(row.uom_id),
+          estimated_unit_cost: row.estimated_unit_cost === '' ? null : Number(row.estimated_unit_cost),
+          estimated_total_cost: row.estimated_total_cost === '' ? null : Number(row.estimated_total_cost),
+          remarks: row.remarks.trim() || null,
+          line_no: Number(row.line_no || String(detailRows.indexOf(row) + 1)),
+        });
+      }
+
+      setSuccess(editingId ? 'Material Control updated' : 'Material Control created');
       setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
+      setDetailRows([]);
+      resetDetailForm();
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save material control');
@@ -339,6 +528,68 @@ export default function MaterialControlPage() {
       setSortDir('asc');
     }
     setPage(0);
+  };
+
+  const handleImportPreview = async () => {
+    if (!importFile) {
+      setImportError('Select a file first');
+      return;
+    }
+
+    setImporting(true);
+    setImportError('');
+    setImportSuccess('');
+
+    try {
+      const result = await materialControlItemApi.previewImport(importFile);
+      setImportPreview(result.rows || []);
+      setImportSummary(result.summary || null);
+      setImportTargetId('');
+    } catch (err: any) {
+      setImportError(err.message || 'Failed to preview import file');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    if (!importTargetId || !importPreview.length) {
+      setImportError('Select a material control and preview rows before importing');
+      return;
+    }
+
+    setImporting(true);
+    setImportError('');
+    setImportSuccess('');
+
+    try {
+      const result = await materialControlItemApi.importRows(Number(importTargetId), importPreview.filter((row) => row.classification === 'existing' || (row.classification === 'missing' && row.resolvedMaterialId)));
+      setImportSuccess(`Imported ${result.imported} rows`);
+      setImportOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      setImportSummary(null);
+      setImportTargetId('');
+      await loadItems();
+    } catch (err: any) {
+      setImportError(err.message || 'Failed to import material control items');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = async (format: 'xlsx' | 'csv' = 'xlsx') => {
+    try {
+      const { blob } = await materialControlItemApi.downloadTemplate(format);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = format === 'csv' ? 'material_control_item_import_template.csv' : 'material_control_item_import_template.xlsx';
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setImportError(err.message || 'Failed to download template');
+    }
   };
 
   if (!canView) {
@@ -442,9 +693,14 @@ export default function MaterialControlPage() {
                   Refresh
                 </Button>
                 {canCreate && (
-                  <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-                    New
-                  </Button>
+                  <>
+                    <Button variant="outlined" onClick={() => setImportOpen(true)}>
+                      Import Items
+                    </Button>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => void openCreate()}>
+                      New
+                    </Button>
+                  </>
                 )}
               </Stack>
             </Grid>
@@ -637,6 +893,158 @@ export default function MaterialControlPage() {
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
               />
             </Grid>
+            <Grid item xs={12}>
+              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                    <Typography variant="subtitle2" fontWeight={600}>Line Items</Typography>
+                    <Typography variant="body2" color="text.secondary">Add materials directly in this form and save them with the control record.</Typography>
+                  </Stack>
+                  {detailError && <Alert severity="error">{detailError}</Alert>}
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={detailForm.material_id}
+                          displayEmpty
+                          onChange={(event) => setDetailForm((current) => ({ ...current, material_id: event.target.value }))}
+                        >
+                          <MenuItem value="">Select Material</MenuItem>
+                          {detailMaterials.map((material) => (
+                            <MenuItem key={material.material_id} value={material.material_id.toString()}>
+                              {material.product_code} - {material.product_name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Qty"
+                        type="number"
+                        inputProps={{ min: 0, step: '0.01' }}
+                        value={detailForm.estimated_quantity}
+                        onChange={(event) => setDetailForm((current) => ({ ...current, estimated_quantity: event.target.value }))}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={detailForm.uom_id}
+                          displayEmpty
+                          onChange={(event) => setDetailForm((current) => ({ ...current, uom_id: event.target.value }))}
+                        >
+                          <MenuItem value="">Select UOM</MenuItem>
+                          {detailUoms.map((uom) => (
+                            <MenuItem key={uom.uom_id} value={uom.uom_id.toString()}>
+                              {uom.abbreviation || uom.uom_name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Unit Cost"
+                        type="number"
+                        inputProps={{ min: 0, step: '0.01' }}
+                        value={detailForm.estimated_unit_cost}
+                        onChange={(event) => setDetailForm((current) => ({ ...current, estimated_unit_cost: event.target.value }))}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Total Cost"
+                        type="number"
+                        inputProps={{ min: 0, step: '0.01' }}
+                        value={detailForm.estimated_total_cost}
+                        onChange={(event) => setDetailForm((current) => ({ ...current, estimated_total_cost: event.target.value }))}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Line No"
+                        type="number"
+                        inputProps={{ min: 1, step: '1' }}
+                        value={detailForm.line_no}
+                        onChange={(event) => setDetailForm((current) => ({ ...current, line_no: event.target.value }))}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={8}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Remarks"
+                        value={detailForm.remarks}
+                        onChange={(event) => setDetailForm((current) => ({ ...current, remarks: event.target.value }))}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Stack direction="row" spacing={1}>
+                        <Button variant="contained" onClick={handleSaveDetailRow}>
+                          {editingDetailIndex === null ? 'Add Item' : 'Update Item'}
+                        </Button>
+                        {editingDetailIndex !== null && (
+                          <Button variant="outlined" onClick={resetDetailForm}>
+                            Cancel
+                          </Button>
+                        )}
+                      </Stack>
+                    </Grid>
+                  </Grid>
+                  <Divider />
+                  {detailRows.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">No line items yet. Add the first item above.</Typography>
+                  ) : (
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Line</TableCell>
+                            <TableCell>Material</TableCell>
+                            <TableCell>Qty</TableCell>
+                            <TableCell>UOM</TableCell>
+                            <TableCell>Unit Cost</TableCell>
+                            <TableCell>Total Cost</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {detailRows.map((row, index) => (
+                            <TableRow key={`${row.material_id || 'new'}-${index}`}>
+                              <TableCell>{row.line_no}</TableCell>
+                              <TableCell>{row.material_name || row.material_code || row.material_id}</TableCell>
+                              <TableCell>{row.estimated_quantity}</TableCell>
+                              <TableCell>{row.uom_abbreviation || row.uom_name || row.uom_id}</TableCell>
+                              <TableCell>{row.estimated_unit_cost}</TableCell>
+                              <TableCell>{row.estimated_total_cost}</TableCell>
+                              <TableCell align="right">
+                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                  <IconButton size="small" onClick={() => handleEditDetailRow(index)}>
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton size="small" onClick={() => handleRemoveDetailRow(index)}>
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </Stack>
+              </Box>
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -644,6 +1052,84 @@ export default function MaterialControlPage() {
           <Button variant="contained" onClick={() => void submitForm()} disabled={saving}>
             {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
           </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={importOpen} onClose={() => !importing && setImportOpen(false)} fullWidth maxWidth="lg">
+        <DialogTitle>Import Material Control Items</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Typography variant="body2" color="text.secondary">
+              Upload an Excel or CSV file with Material Code, Material Description, Category, Sub Category, Unit of Measure, Quantity, and Remarks columns.
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="flex-start">
+              <Button variant="outlined" component="label">
+                Choose File
+                <input hidden type="file" accept=".csv,.xlsx,.xls" onChange={(event) => setImportFile(event.target.files?.[0] || null)} />
+              </Button>
+              <Button variant="outlined" onClick={() => void handleDownloadTemplate('xlsx')}>
+                Download XLSX Template
+              </Button>
+              <Button variant="outlined" onClick={() => void handleDownloadTemplate('csv')}>
+                Download CSV Template
+              </Button>
+            </Stack>
+            {importFile && <Typography variant="body2">Selected file: {importFile.name}</Typography>}
+            <FormControl fullWidth size="small">
+              <Select value={importTargetId} displayEmpty onChange={(event) => setImportTargetId(event.target.value)}>
+                <MenuItem value="">Select Material Control</MenuItem>
+                {items.map((item) => (
+                  <MenuItem key={item.material_control_id} value={item.material_control_id.toString()}>
+                    {item.control_code}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {importError && <Alert severity="error">{importError}</Alert>}
+            {importSuccess && <Alert severity="success">{importSuccess}</Alert>}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              <Button variant="contained" onClick={() => void handleImportPreview()} disabled={importing || !importFile}>
+                {importing ? 'Preparing...' : 'Preview'}
+              </Button>
+              <Button variant="contained" onClick={() => void handleImportSubmit()} disabled={importing || !importPreview.length || !importTargetId}>
+                {importing ? 'Importing...' : 'Import'}
+              </Button>
+            </Stack>
+            {importSummary && (
+              <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <Typography variant="subtitle2" fontWeight={600}>Summary</Typography>
+                <Typography variant="body2">Existing: {importSummary.existing} • Missing: {importSummary.missing} • Duplicate: {importSummary.duplicate} • Invalid: {importSummary.invalid}</Typography>
+              </Box>
+            )}
+            {importPreview.length > 0 && (
+              <TableContainer sx={{ maxHeight: 320 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Row</TableCell>
+                      <TableCell>Material</TableCell>
+                      <TableCell>Qty</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Errors</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {importPreview.map((row) => (
+                      <TableRow key={`${row.rowNumber}-${row.materialCode}`}>
+                        <TableCell>{row.rowNumber}</TableCell>
+                        <TableCell>{row.materialCode || row.materialDescription}</TableCell>
+                        <TableCell>{row.quantity}</TableCell>
+                        <TableCell>{row.classification}</TableCell>
+                        <TableCell>{row.validationErrors?.join(', ') || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportOpen(false)} disabled={importing}>Close</Button>
         </DialogActions>
       </Dialog>
 
