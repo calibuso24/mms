@@ -35,6 +35,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -43,6 +44,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { accountApi, lookupApi, materialApi, materialRequestApi, projectApi, uomApi } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 type SortField = 'mr_number' | 'project_code' | 'project_name' | 'status_name' | 'requested_at' | 'created_at' | 'item_count';
 type SortDir = 'asc' | 'desc';
@@ -63,6 +65,10 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
+  source_description?: string | null;
+  brand_name?: string | null;
+  specification_name?: string | null;
+  stock_uom_id?: number | null;
 }
 
 interface UomItem {
@@ -72,7 +78,12 @@ interface UomItem {
 }
 
 interface RequestItemForm {
+  row_id: string;
+  material_request_item_id?: number;
   material_id: string;
+  description: string;
+  specification: string;
+  brand: string;
   requested_quantity: string;
   approved_quantity: string;
   estimated_quantity: string;
@@ -138,7 +149,12 @@ interface FormState {
 }
 
 const emptyItem = (): RequestItemForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  material_request_item_id: undefined,
   material_id: '',
+  description: '',
+  specification: '',
+  brand: '',
   requested_quantity: '',
   approved_quantity: '',
   estimated_quantity: '',
@@ -305,7 +321,12 @@ export default function MaterialRequestPage() {
         notes: detail.notes || '',
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
+              row_id: `${Date.now()}-${row.material_request_item_id}`,
+              material_request_item_id: row.material_request_item_id,
               material_id: row.material_id.toString(),
+              description: row.material_name,
+              specification: '',
+              brand: '',
               requested_quantity: row.requested_quantity,
               approved_quantity: row.approved_quantity || '',
               estimated_quantity: row.estimated_quantity || '',
@@ -361,6 +382,13 @@ export default function MaterialRequestPage() {
   });
 
   const submitForm = async () => {
+    const validationErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = validationErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -424,6 +452,91 @@ export default function MaterialRequestPage() {
   };
 
   const statusByCode = (code: string) => statuses.find((item) => item.code === code)?.look_up_id;
+
+  const detailColumns = useMemo<GridColDef<RequestItemForm>[]>(() => {
+    const materialOptions = materials.map((material) => ({
+      value: material.material_id.toString(),
+      label: `${material.product_code} - ${material.product_name}`,
+    }));
+    const uomOptions = uoms.map((uom) => ({ value: uom.uom_id.toString(), label: uom.abbreviation }));
+
+    return [
+      {
+        field: 'material_id',
+        headerName: 'Material',
+        minWidth: 240,
+        flex: 1,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: materialOptions,
+      },
+      { field: 'description', headerName: 'Description', minWidth: 220, flex: 1.1 },
+      { field: 'specification', headerName: 'Specification', minWidth: 180, flex: 0.9 },
+      { field: 'brand', headerName: 'Brand', minWidth: 150, flex: 0.8 },
+      {
+        field: 'uom_id',
+        headerName: 'UOM',
+        minWidth: 110,
+        flex: 0.6,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: uomOptions,
+      },
+      { field: 'requested_quantity', headerName: 'Quantity', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'approved_quantity', headerName: 'Approved', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'estimated_quantity', headerName: 'Estimated', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'area_usage', headerName: 'Area Usage', minWidth: 150, flex: 0.8, editable: true },
+      { field: 'remarks', headerName: 'Remarks', minWidth: 180, flex: 1, editable: true },
+      { field: 'notes', headerName: 'Item Notes', minWidth: 180, flex: 1, editable: true },
+    ];
+  }, [materials, uoms]);
+
+  const detailTotals = useMemo(() => {
+    const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.requested_quantity) || 0), 0);
+    return {
+      totalItems: form.items.length,
+      totalQuantity,
+      totalAmount: 0,
+    };
+  }, [form.items]);
+
+  const validateDetailRow = (row: RequestItemForm, rows: RequestItemForm[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const quantity = Number(row.requested_quantity);
+
+    if (!row.material_id) {
+      errors.material_id = 'Material is required';
+    }
+
+    if (!row.uom_id) {
+      errors.uom_id = 'UOM is required';
+    }
+
+    if (!row.requested_quantity || Number.isNaN(quantity) || quantity <= 0) {
+      errors.requested_quantity = 'Quantity must be greater than zero';
+    }
+
+    const duplicateCount = rows.filter((candidate) => candidate.material_id && candidate.material_id === row.material_id).length;
+    if (row.material_id && duplicateCount > 1) {
+      errors.material_id = 'Duplicate material is not allowed';
+    }
+
+    return errors;
+  };
+
+  const processDetailRowUpdate = (newRow: RequestItemForm): RequestItemForm => {
+    const material = materials.find((item) => item.material_id === Number(newRow.material_id));
+    const nextRow = { ...newRow };
+    if (material) {
+      nextRow.description = material.product_name || '';
+      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.brand = material.brand_name || '';
+      if (material.stock_uom_id && !nextRow.uom_id) {
+        nextRow.uom_id = String(material.stock_uom_id);
+      }
+    }
+    return nextRow;
+  };
 
   const transition = async (action: 'submit' | 'approve' | 'reject' | 'cancel' | 'close') => {
     if (!viewItem) return;
@@ -595,54 +708,26 @@ export default function MaterialRequestPage() {
             <Grid item xs={12} md={3}><FormControlLabel control={<Checkbox checked={form.ceo_approval_required} onChange={(event) => setForm((current) => ({ ...current, ceo_approval_required: event.target.checked }))} />} label="CEO Approval Required" /></Grid>
             <Grid item xs={12}><TextField fullWidth label="Notes" multiline minRows={3} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></Grid>
             <Grid item xs={12}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                <Typography variant="h6" fontWeight={600}>Line Items</Typography>
-                <Button startIcon={<AddIcon />} onClick={addItemRow}>Add Item</Button>
-              </Stack>
-              <Stack spacing={1.5}>
-                {form.items.map((item, index) => (
-                  <Paper key={index} variant="outlined" sx={{ p: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                      <Typography fontWeight={600}>Item {index + 1}</Typography>
-                      <IconButton size="small" onClick={() => removeItemRow(index)} disabled={form.items.length === 1}><DeleteIcon fontSize="small" /></IconButton>
-                    </Stack>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={5}>
-                        <FormControl fullWidth size="small">
-                          <Select value={item.material_id} displayEmpty onChange={(event) => updateItem(index, 'material_id', event.target.value)}>
-                            <MenuItem value="">Select Material</MenuItem>
-                            {materials.map((material) => <MenuItem key={material.material_id} value={material.material_id.toString()}>{material.product_code} - {material.product_name}</MenuItem>)}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField fullWidth size="small" label="Requested Qty" type="number" inputProps={{ min: 0, step: '0.01' }} value={item.requested_quantity} onChange={(event) => updateItem(index, 'requested_quantity', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <TextField fullWidth size="small" label="UOM" select value={item.uom_id} onChange={(event) => updateItem(index, 'uom_id', event.target.value)}>
-                          <MenuItem value="">Select</MenuItem>
-                          {uoms.map((uom) => <MenuItem key={uom.uom_id} value={uom.uom_id.toString()}>{uom.abbreviation}</MenuItem>)}
-                        </TextField>
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <TextField fullWidth size="small" label="Approved Qty" type="number" inputProps={{ min: 0, step: '0.01' }} value={item.approved_quantity} onChange={(event) => updateItem(index, 'approved_quantity', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <TextField fullWidth size="small" label="Estimated Qty" type="number" inputProps={{ min: 0, step: '0.01' }} value={item.estimated_quantity} onChange={(event) => updateItem(index, 'estimated_quantity', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField fullWidth size="small" label="Area Usage" value={item.area_usage} onChange={(event) => updateItem(index, 'area_usage', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField fullWidth size="small" label="Remarks" value={item.remarks} onChange={(event) => updateItem(index, 'remarks', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <TextField fullWidth size="small" label="Item Notes" value={item.notes} onChange={(event) => updateItem(index, 'notes', event.target.value)} />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                ))}
-              </Stack>
+              <EditableLineItemsGrid
+                rows={form.items}
+                setRows={(nextRows) => {
+                  setForm((current) => ({
+                    ...current,
+                    items: typeof nextRows === 'function' ? nextRows(current.items) : nextRows,
+                  }));
+                }}
+                columns={detailColumns}
+                createRow={emptyItem}
+                getRowId={(row) => row.row_id}
+                processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+                validateRow={validateDetailRow}
+                shouldConfirmDelete={(row) => Boolean(row.material_request_item_id)}
+                getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
+                addRowLabel="Add Row"
+                focusField="material_id"
+                totals={detailTotals}
+                disabled={saving}
+              />
             </Grid>
           </Grid>
         </DialogContent>

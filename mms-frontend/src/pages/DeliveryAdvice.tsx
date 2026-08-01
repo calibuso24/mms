@@ -33,6 +33,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -41,6 +42,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { accountApi, deliveryAdviceApi, lookupApi, purchaseOrderApi } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 type SortField = 'da_number' | 'reference_code' | 'po_number' | 'status_name' | 'issued_at' | 'received_at' | 'created_at' | 'item_count';
 type SortDir = 'asc' | 'desc';
@@ -99,7 +101,11 @@ interface DeliveryAdviceDetail extends DeliveryAdviceListItem {
 }
 
 interface AdviceItemForm {
+  row_id: string;
+  delivery_advice_item_id?: number;
   purchase_order_item_id: string;
+  material_label: string;
+  uom_label: string;
   advised_quantity: string;
   received_quantity: string;
   notes: string;
@@ -115,7 +121,11 @@ interface FormState {
 }
 
 const emptyItem = (): AdviceItemForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  delivery_advice_item_id: undefined,
   purchase_order_item_id: '',
+  material_label: '',
+  uom_label: '',
   advised_quantity: '',
   received_quantity: '0',
   notes: '',
@@ -271,7 +281,11 @@ export default function DeliveryAdvicePage() {
         notes: detail.notes || '',
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
+              row_id: `${Date.now()}-${row.delivery_advice_item_id}`,
+              delivery_advice_item_id: row.delivery_advice_item_id,
               purchase_order_item_id: row.purchase_order_item_id ? row.purchase_order_item_id.toString() : '',
+              material_label: `${row.material_code} - ${row.material_name}`,
+              uom_label: row.uom_abbreviation,
               advised_quantity: row.advised_quantity,
               received_quantity: row.received_quantity,
               notes: row.notes || '',
@@ -326,6 +340,13 @@ export default function DeliveryAdvicePage() {
   };
 
   const submitForm = async () => {
+    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -405,6 +426,64 @@ export default function DeliveryAdvicePage() {
   };
 
   const getPoItemById = (id: string) => poItems.find((row) => row.purchase_order_item_id === Number(id));
+
+  const detailColumns = useMemo<GridColDef<AdviceItemForm>[]>(() => {
+    const poItemOptions = poItems.map((row) => ({ value: row.purchase_order_item_id.toString(), label: `#${row.purchase_order_item_id} - ${row.material_code}` }));
+    return [
+      {
+        field: 'purchase_order_item_id',
+        headerName: 'PO Item',
+        minWidth: 200,
+        flex: 0.9,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: poItemOptions,
+      },
+      { field: 'material_label', headerName: 'Material', minWidth: 240, flex: 1.1 },
+      { field: 'uom_label', headerName: 'UOM', minWidth: 110, flex: 0.6 },
+      { field: 'advised_quantity', headerName: 'Quantity', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'received_quantity', headerName: 'Received', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'notes', headerName: 'Remarks', minWidth: 200, flex: 1, editable: true },
+    ];
+  }, [poItems]);
+
+  const detailTotals = useMemo(() => {
+    const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.advised_quantity) || 0), 0);
+    return {
+      totalItems: form.items.length,
+      totalQuantity,
+      totalAmount: 0,
+    };
+  }, [form.items]);
+
+  const validateDetailRow = (row: AdviceItemForm, rows: AdviceItemForm[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const quantity = Number(row.advised_quantity);
+    if (!row.purchase_order_item_id) {
+      errors.purchase_order_item_id = 'PO item is required';
+    }
+    if (!row.advised_quantity || Number.isNaN(quantity) || quantity <= 0) {
+      errors.advised_quantity = 'Quantity must be greater than zero';
+    }
+    const duplicateCount = rows.filter((candidate) => candidate.purchase_order_item_id && candidate.purchase_order_item_id === row.purchase_order_item_id).length;
+    if (row.purchase_order_item_id && duplicateCount > 1) {
+      errors.purchase_order_item_id = 'Duplicate PO item is not allowed';
+    }
+    return errors;
+  };
+
+  const processDetailRowUpdate = (newRow: AdviceItemForm): AdviceItemForm => {
+    const nextRow = { ...newRow };
+    const poItem = getPoItemById(nextRow.purchase_order_item_id);
+    if (poItem) {
+      nextRow.material_label = `${poItem.material_code} - ${poItem.material_name}`;
+      nextRow.uom_label = poItem.uom_abbreviation;
+    } else {
+      nextRow.material_label = '';
+      nextRow.uom_label = '';
+    }
+    return nextRow;
+  };
 
   return (
     <Box>
@@ -648,67 +727,26 @@ export default function DeliveryAdvicePage() {
           </Grid>
 
           <Divider sx={{ my: 2 }} />
-
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight={600}>Line Items</Typography>
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={addItemRow}>Add Item</Button>
-          </Stack>
-
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ minWidth: 240 }}>PO Item</TableCell>
-                  <TableCell>Material</TableCell>
-                  <TableCell>UOM</TableCell>
-                  <TableCell>Advised Qty</TableCell>
-                  <TableCell>Received Qty</TableCell>
-                  <TableCell>Notes</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {form.items.map((item, index) => {
-                  const poItem = getPoItemById(item.purchase_order_item_id);
-                  return (
-                    <TableRow key={`${index}-${item.purchase_order_item_id}`}>
-                      <TableCell>
-                        <Select
-                          fullWidth
-                          size="small"
-                          value={item.purchase_order_item_id}
-                          onChange={(event) => updateItem(index, 'purchase_order_item_id', event.target.value as string)}
-                        >
-                          <MenuItem value="">Select PO item</MenuItem>
-                          {poItems.map((row) => (
-                            <MenuItem key={row.purchase_order_item_id} value={row.purchase_order_item_id.toString()}>
-                              #{row.purchase_order_item_id} - {row.material_code}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </TableCell>
-                      <TableCell>{poItem ? `${poItem.material_code} - ${poItem.material_name}` : '-'}</TableCell>
-                      <TableCell>{poItem ? poItem.uom_abbreviation : '-'}</TableCell>
-                      <TableCell>
-                        <TextField size="small" type="number" value={item.advised_quantity} onChange={(event) => updateItem(index, 'advised_quantity', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </TableCell>
-                      <TableCell>
-                        <TextField size="small" type="number" value={item.received_quantity} onChange={(event) => updateItem(index, 'received_quantity', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </TableCell>
-                      <TableCell>
-                        <TextField size="small" value={item.notes} onChange={(event) => updateItem(index, 'notes', event.target.value)} />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" color="error" onClick={() => removeItemRow(index)}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <EditableLineItemsGrid
+            rows={form.items}
+            setRows={(nextRows) => {
+              setForm((current) => ({
+                ...current,
+                items: typeof nextRows === 'function' ? nextRows(current.items) : nextRows,
+              }));
+            }}
+            columns={detailColumns}
+            createRow={emptyItem}
+            getRowId={(row) => row.row_id}
+            processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+            validateRow={validateDetailRow}
+            shouldConfirmDelete={(row) => Boolean(row.delivery_advice_item_id)}
+            getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
+            addRowLabel="Add Row"
+            focusField="purchase_order_item_id"
+            totals={detailTotals}
+            disabled={saving}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>

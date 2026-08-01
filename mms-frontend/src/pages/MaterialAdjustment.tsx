@@ -32,6 +32,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -47,6 +48,7 @@ import {
   uomApi,
 } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 type SortField = 'material_adjustment_number' | 'project_name' | 'status_name' | 'requested_at' | 'approved_at' | 'item_count';
 type SortDir = 'asc' | 'desc';
@@ -67,6 +69,10 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
+  source_description?: string | null;
+  brand_name?: string | null;
+  specification_name?: string | null;
+  stock_uom_id?: number | null;
 }
 
 interface UomItem {
@@ -108,7 +114,12 @@ interface MaterialAdjustmentDetail extends MaterialAdjustmentListItem {
 }
 
 interface ItemForm {
+  row_id: string;
+  material_adjustment_item_id?: number;
   material_id: string;
+  description: string;
+  specification: string;
+  brand: string;
   uom_id: string;
   system_quantity: string;
   adjustment_quantity: string;
@@ -125,7 +136,12 @@ interface FormState {
 }
 
 const emptyItem = (): ItemForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  material_adjustment_item_id: undefined,
   material_id: '',
+  description: '',
+  specification: '',
+  brand: '',
   uom_id: '',
   system_quantity: '',
   adjustment_quantity: '',
@@ -273,7 +289,12 @@ export default function MaterialAdjustmentPage() {
         notes: detail.notes || '',
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
+              row_id: `${Date.now()}-${row.material_adjustment_item_id}`,
+              material_adjustment_item_id: row.material_adjustment_item_id,
               material_id: row.material_id.toString(),
+              description: row.material_name,
+              specification: '',
+              brand: '',
               uom_id: row.uom_id.toString(),
               system_quantity: row.system_quantity,
               adjustment_quantity: row.adjustment_quantity,
@@ -330,6 +351,13 @@ export default function MaterialAdjustmentPage() {
   };
 
   const submitForm = async () => {
+    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -402,6 +430,90 @@ export default function MaterialAdjustmentPage() {
     } catch (err: any) {
       setError(err.message || `Failed to ${action} material adjustment`);
     }
+  };
+
+  const detailColumns = useMemo<GridColDef<ItemForm>[]>(() => {
+    const materialOptions = materials.map((row) => ({ value: row.material_id.toString(), label: `${row.product_code} - ${row.product_name}` }));
+    const uomOptions = uoms.map((row) => ({ value: row.uom_id.toString(), label: row.abbreviation }));
+
+    return [
+      {
+        field: 'material_id',
+        headerName: 'Material',
+        minWidth: 240,
+        flex: 1,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: materialOptions,
+      },
+      { field: 'description', headerName: 'Description', minWidth: 220, flex: 1 },
+      { field: 'specification', headerName: 'Specification', minWidth: 160, flex: 0.8 },
+      { field: 'brand', headerName: 'Brand', minWidth: 140, flex: 0.7 },
+      {
+        field: 'uom_id',
+        headerName: 'UOM',
+        minWidth: 110,
+        flex: 0.6,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: uomOptions,
+      },
+      { field: 'system_quantity', headerName: 'System Qty', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'adjustment_quantity', headerName: 'Adjustment Qty', minWidth: 130, flex: 0.75, editable: true },
+      { field: 'resulting_quantity', headerName: 'Quantity', minWidth: 120, flex: 0.7 },
+      { field: 'notes', headerName: 'Remarks', minWidth: 180, flex: 0.9, editable: true },
+    ];
+  }, [materials, uoms]);
+
+  const detailTotals = useMemo(() => {
+    const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.resulting_quantity) || 0), 0);
+    return {
+      totalItems: form.items.length,
+      totalQuantity,
+      totalAmount: 0,
+    };
+  }, [form.items]);
+
+  const validateDetailRow = (row: ItemForm, rows: ItemForm[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+
+    if (!row.material_id) {
+      errors.material_id = 'Material is required';
+    }
+    if (!row.uom_id) {
+      errors.uom_id = 'UOM is required';
+    }
+    if (row.resulting_quantity === '' || Number.isNaN(Number(row.resulting_quantity))) {
+      errors.resulting_quantity = 'Resulting quantity is required';
+    }
+
+    const duplicateCount = rows.filter((candidate) => candidate.material_id && candidate.material_id === row.material_id).length;
+    if (row.material_id && duplicateCount > 1) {
+      errors.material_id = 'Duplicate material is not allowed';
+    }
+
+    return errors;
+  };
+
+  const processDetailRowUpdate = (newRow: ItemForm): ItemForm => {
+    const nextRow = { ...newRow };
+    const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
+    if (material) {
+      nextRow.description = material.product_name || '';
+      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.brand = material.brand_name || '';
+      if (material.stock_uom_id && !nextRow.uom_id) {
+        nextRow.uom_id = String(material.stock_uom_id);
+      }
+    }
+
+    const systemQty = Number(nextRow.system_quantity);
+    const adjustmentQty = Number(nextRow.adjustment_quantity);
+    if (!Number.isNaN(systemQty) && !Number.isNaN(adjustmentQty)) {
+      nextRow.resulting_quantity = (systemQty + adjustmentQty).toString();
+    }
+
+    return nextRow;
   };
 
   return (
@@ -592,48 +704,26 @@ export default function MaterialAdjustmentPage() {
           </Grid>
 
           <Box sx={{ mt: 2 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600}>Line Items</Typography>
-              <Button variant="outlined" startIcon={<AddIcon />} onClick={addItemRow}>Add Item</Button>
-            </Stack>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Material</TableCell>
-                    <TableCell>UOM</TableCell>
-                    <TableCell>System Qty</TableCell>
-                    <TableCell>Adjustment Qty</TableCell>
-                    <TableCell>Resulting Qty</TableCell>
-                    <TableCell>Notes</TableCell>
-                    <TableCell align="right">Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {form.items.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Select fullWidth size="small" value={item.material_id} onChange={(event) => updateItem(index, 'material_id', event.target.value as string)}>
-                          <MenuItem value="">Select material</MenuItem>
-                          {materials.map((row) => <MenuItem key={row.material_id} value={row.material_id.toString()}>{row.product_code} - {row.product_name}</MenuItem>)}
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select fullWidth size="small" value={item.uom_id} onChange={(event) => updateItem(index, 'uom_id', event.target.value as string)}>
-                          <MenuItem value="">Select UOM</MenuItem>
-                          {uoms.map((row) => <MenuItem key={row.uom_id} value={row.uom_id.toString()}>{row.abbreviation}</MenuItem>)}
-                        </Select>
-                      </TableCell>
-                      <TableCell><TextField size="small" type="number" value={item.system_quantity} onChange={(event) => updateItem(index, 'system_quantity', event.target.value)} inputProps={{ step: '0.01' }} /></TableCell>
-                      <TableCell><TextField size="small" type="number" value={item.adjustment_quantity} onChange={(event) => updateItem(index, 'adjustment_quantity', event.target.value)} inputProps={{ step: '0.01' }} /></TableCell>
-                      <TableCell><TextField size="small" type="number" value={item.resulting_quantity} onChange={(event) => updateItem(index, 'resulting_quantity', event.target.value)} inputProps={{ step: '0.01' }} /></TableCell>
-                      <TableCell><TextField size="small" value={item.notes} onChange={(event) => updateItem(index, 'notes', event.target.value)} /></TableCell>
-                      <TableCell align="right"><IconButton size="small" color="error" onClick={() => removeItemRow(index)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <EditableLineItemsGrid
+              rows={form.items}
+              setRows={(nextRows) => {
+                setForm((current) => ({
+                  ...current,
+                  items: typeof nextRows === 'function' ? nextRows(current.items) : nextRows,
+                }));
+              }}
+              columns={detailColumns}
+              createRow={emptyItem}
+              getRowId={(row) => row.row_id}
+              processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+              validateRow={validateDetailRow}
+              shouldConfirmDelete={(row) => Boolean(row.material_adjustment_item_id)}
+              getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
+              addRowLabel="Add Row"
+              focusField="material_id"
+              totals={detailTotals}
+              disabled={saving}
+            />
           </Box>
         </DialogContent>
         <DialogActions>

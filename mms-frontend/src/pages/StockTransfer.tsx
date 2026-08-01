@@ -32,6 +32,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -49,6 +50,7 @@ import {
   uomApi,
 } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 type SortField = 'stock_transfer_number' | 'transfer_type_name' | 'source_name' | 'destination_name' | 'status_name' | 'transfer_date' | 'created_at';
 type SortDir = 'asc' | 'desc';
@@ -69,6 +71,10 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
+  source_description?: string | null;
+  brand_name?: string | null;
+  specification_name?: string | null;
+  stock_uom_id?: number | null;
 }
 
 interface UomItem {
@@ -125,8 +131,13 @@ interface StockTransferDetail extends StockTransferListItem {
 }
 
 interface ItemForm {
+  row_id: string;
+  stock_transfer_item_id?: number;
   purchase_order_item_id: string;
   material_id: string;
+  description: string;
+  specification: string;
+  brand: string;
   uom_id: string;
   quantity: string;
   notes: string;
@@ -144,8 +155,13 @@ interface FormState {
 }
 
 const emptyItem = (): ItemForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  stock_transfer_item_id: undefined,
   purchase_order_item_id: '',
   material_id: '',
+  description: '',
+  specification: '',
+  brand: '',
   uom_id: '',
   quantity: '',
   notes: '',
@@ -324,8 +340,13 @@ export default function StockTransferPage() {
         notes: detail.notes || '',
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
+              row_id: `${Date.now()}-${row.stock_transfer_item_id}`,
+              stock_transfer_item_id: row.stock_transfer_item_id,
               purchase_order_item_id: row.purchase_order_item_id ? row.purchase_order_item_id.toString() : '',
               material_id: row.material_id.toString(),
+              description: row.material_name,
+              specification: '',
+              brand: '',
               uom_id: row.uom_id.toString(),
               quantity: row.quantity,
               notes: row.notes || '',
@@ -391,6 +412,13 @@ export default function StockTransferPage() {
   };
 
   const submitForm = async () => {
+    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -464,6 +492,102 @@ export default function StockTransferPage() {
     } catch (err: any) {
       setError(err.message || `Failed to ${action} stock transfer`);
     }
+  };
+
+  const detailColumns = useMemo<GridColDef<ItemForm>[]>(() => {
+    const poItemOptions = poItems.map((row) => ({ value: row.purchase_order_item_id.toString(), label: `#${row.purchase_order_item_id}` }));
+    const materialOptions = materials.map((row) => ({ value: row.material_id.toString(), label: `${row.product_code} - ${row.product_name}` }));
+    const uomOptions = uoms.map((row) => ({ value: row.uom_id.toString(), label: row.abbreviation }));
+
+    return [
+      {
+        field: 'purchase_order_item_id',
+        headerName: 'PO Item',
+        minWidth: 140,
+        flex: 0.6,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: poItemOptions,
+      },
+      {
+        field: 'material_id',
+        headerName: 'Material',
+        minWidth: 240,
+        flex: 1,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: materialOptions,
+      },
+      { field: 'description', headerName: 'Description', minWidth: 220, flex: 1 },
+      { field: 'specification', headerName: 'Specification', minWidth: 160, flex: 0.8 },
+      { field: 'brand', headerName: 'Brand', minWidth: 140, flex: 0.7 },
+      {
+        field: 'uom_id',
+        headerName: 'UOM',
+        minWidth: 110,
+        flex: 0.6,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: uomOptions,
+      },
+      { field: 'quantity', headerName: 'Quantity', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'notes', headerName: 'Remarks', minWidth: 180, flex: 0.9, editable: true },
+    ];
+  }, [poItems, materials, uoms]);
+
+  const detailTotals = useMemo(() => {
+    const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+    return {
+      totalItems: form.items.length,
+      totalQuantity,
+      totalAmount: 0,
+    };
+  }, [form.items]);
+
+  const validateDetailRow = (row: ItemForm, rows: ItemForm[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const quantity = Number(row.quantity);
+
+    if (!row.material_id) {
+      errors.material_id = 'Material is required';
+    }
+    if (!row.uom_id) {
+      errors.uom_id = 'UOM is required';
+    }
+    if (!row.quantity || Number.isNaN(quantity) || quantity <= 0) {
+      errors.quantity = 'Quantity must be greater than zero';
+    }
+
+    const duplicateCount = rows.filter((candidate) => candidate.material_id && candidate.material_id === row.material_id).length;
+    if (row.material_id && duplicateCount > 1) {
+      errors.material_id = 'Duplicate material is not allowed';
+    }
+
+    return errors;
+  };
+
+  const processDetailRowUpdate = (newRow: ItemForm): ItemForm => {
+    const nextRow = { ...newRow };
+
+    if (nextRow.purchase_order_item_id) {
+      const poItem = poItems.find((row) => row.purchase_order_item_id === Number(nextRow.purchase_order_item_id));
+      if (poItem) {
+        nextRow.material_id = poItem.material_id.toString();
+        nextRow.uom_id = poItem.uom_id.toString();
+      }
+    }
+
+    const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
+    if (material) {
+      nextRow.description = material.product_name || '';
+      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.brand = material.brand_name || '';
+      if (material.stock_uom_id && !nextRow.uom_id) {
+        nextRow.uom_id = String(material.stock_uom_id);
+      }
+    }
+
+    return nextRow;
   };
 
   return (
@@ -677,51 +801,26 @@ export default function StockTransferPage() {
           </Grid>
 
           <Box sx={{ mt: 2 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600}>Line Items</Typography>
-              <Button variant="outlined" startIcon={<AddIcon />} onClick={addItemRow}>Add Item</Button>
-            </Stack>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ minWidth: 180 }}>PO Item</TableCell>
-                    <TableCell>Material</TableCell>
-                    <TableCell>UOM</TableCell>
-                    <TableCell>Quantity</TableCell>
-                    <TableCell>Notes</TableCell>
-                    <TableCell align="right">Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {form.items.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Select fullWidth size="small" value={item.purchase_order_item_id} onChange={(event) => updateItem(index, 'purchase_order_item_id', event.target.value as string)}>
-                          <MenuItem value="">None</MenuItem>
-                          {poItems.map((row) => <MenuItem key={row.purchase_order_item_id} value={row.purchase_order_item_id.toString()}>#{row.purchase_order_item_id}</MenuItem>)}
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select fullWidth size="small" value={item.material_id} onChange={(event) => updateItem(index, 'material_id', event.target.value as string)}>
-                          <MenuItem value="">Select material</MenuItem>
-                          {materials.map((row) => <MenuItem key={row.material_id} value={row.material_id.toString()}>{row.product_code} - {row.product_name}</MenuItem>)}
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select fullWidth size="small" value={item.uom_id} onChange={(event) => updateItem(index, 'uom_id', event.target.value as string)}>
-                          <MenuItem value="">Select UOM</MenuItem>
-                          {uoms.map((row) => <MenuItem key={row.uom_id} value={row.uom_id.toString()}>{row.abbreviation}</MenuItem>)}
-                        </Select>
-                      </TableCell>
-                      <TableCell><TextField size="small" type="number" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} inputProps={{ min: 0, step: '0.01' }} /></TableCell>
-                      <TableCell><TextField size="small" value={item.notes} onChange={(event) => updateItem(index, 'notes', event.target.value)} /></TableCell>
-                      <TableCell align="right"><IconButton size="small" color="error" onClick={() => removeItemRow(index)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <EditableLineItemsGrid
+              rows={form.items}
+              setRows={(nextRows) => {
+                setForm((current) => ({
+                  ...current,
+                  items: typeof nextRows === 'function' ? nextRows(current.items) : nextRows,
+                }));
+              }}
+              columns={detailColumns}
+              createRow={emptyItem}
+              getRowId={(row) => row.row_id}
+              processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+              validateRow={validateDetailRow}
+              shouldConfirmDelete={(row) => Boolean(row.stock_transfer_item_id)}
+              getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
+              addRowLabel="Add Row"
+              focusField="material_id"
+              totals={detailTotals}
+              disabled={saving}
+            />
           </Box>
         </DialogContent>
         <DialogActions>

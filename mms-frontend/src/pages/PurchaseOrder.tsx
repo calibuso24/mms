@@ -31,6 +31,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -48,6 +49,7 @@ import {
   uomApi,
 } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 type SortField = 'po_number' | 'project_code' | 'project_name' | 'supplier_party_name' | 'order_type_name' | 'status_name' | 'prepared_at' | 'expected_delivery_date' | 'total_amount' | 'item_count' | 'created_at';
 type SortDir = 'asc' | 'desc';
@@ -74,6 +76,10 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
+  source_description?: string | null;
+  brand_name?: string | null;
+  specification_name?: string | null;
+  stock_uom_id?: number | null;
 }
 
 interface UomItem {
@@ -91,8 +97,13 @@ interface RequestItemSummary {
 }
 
 interface PurchaseOrderItemForm {
+  row_id: string;
+  purchase_order_item_id?: number;
   material_request_item_id: string;
   material_id: string;
+  description: string;
+  specification: string;
+  brand: string;
   requested_quantity: string;
   ordered_quantity: string;
   received_quantity: string;
@@ -164,8 +175,13 @@ interface FormState {
 }
 
 const emptyItem = (): PurchaseOrderItemForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  purchase_order_item_id: undefined,
   material_request_item_id: '',
   material_id: '',
+  description: '',
+  specification: '',
+  brand: '',
   requested_quantity: '',
   ordered_quantity: '',
   received_quantity: '0',
@@ -366,8 +382,13 @@ export default function PurchaseOrderPage() {
         notes: detail.notes ?? '',
         items: detail.items.length > 0
           ? detail.items.map((line) => ({
+              row_id: `${Date.now()}-${line.purchase_order_item_id}`,
+              purchase_order_item_id: line.purchase_order_item_id,
               material_request_item_id: line.material_request_item_id ? String(line.material_request_item_id) : '',
               material_id: String(line.material_id),
+              description: line.material_name,
+              specification: '',
+              brand: '',
               requested_quantity: line.requested_quantity,
               ordered_quantity: line.ordered_quantity,
               received_quantity: line.received_quantity,
@@ -429,8 +450,12 @@ export default function PurchaseOrderPage() {
         project_id: String(detail.project_id),
         items: detail.items.length > 0
           ? detail.items.map((line) => ({
+              row_id: `${Date.now()}-${line.material_request_item_id}`,
               material_request_item_id: String(line.material_request_item_id),
               material_id: String(line.material_id),
+              description: line.material_name,
+              specification: '',
+              brand: '',
               requested_quantity: line.requested_quantity,
               ordered_quantity: line.requested_quantity,
               received_quantity: '0',
@@ -449,6 +474,13 @@ export default function PurchaseOrderPage() {
   };
 
   const handleSave = async () => {
+    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
+    }
+
     if (!form.project_id || !form.supplier_party_id || !form.order_type_id) {
       setError('Project, supplier, and order type are required');
       return;
@@ -555,6 +587,101 @@ export default function PurchaseOrderPage() {
       }
       return { ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) };
     });
+  };
+
+  const detailColumns = useMemo<GridColDef<PurchaseOrderItemForm>[]>(() => {
+    const materialOptions = materials.map((material) => ({
+      value: material.material_id.toString(),
+      label: `${material.product_code} - ${material.product_name}`,
+    }));
+    const uomOptions = uoms.map((uom) => ({
+      value: uom.uom_id.toString(),
+      label: `${uom.uom_name} (${uom.abbreviation})`,
+    }));
+
+    return [
+      {
+        field: 'material_id',
+        headerName: 'Material',
+        minWidth: 240,
+        flex: 1,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: materialOptions,
+      },
+      { field: 'description', headerName: 'Description', minWidth: 220, flex: 1 },
+      { field: 'specification', headerName: 'Specification', minWidth: 160, flex: 0.8 },
+      { field: 'brand', headerName: 'Brand', minWidth: 140, flex: 0.7 },
+      {
+        field: 'uom_id',
+        headerName: 'UOM',
+        minWidth: 130,
+        flex: 0.7,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: uomOptions,
+      },
+      { field: 'requested_quantity', headerName: 'Req Qty', minWidth: 110, flex: 0.65, editable: true },
+      { field: 'ordered_quantity', headerName: 'Qty', minWidth: 100, flex: 0.6, editable: true },
+      { field: 'unit_price', headerName: 'Unit Cost', minWidth: 120, flex: 0.7, editable: true },
+      { field: 'line_total', headerName: 'Amount', minWidth: 120, flex: 0.7 },
+      { field: 'received_quantity', headerName: 'Received', minWidth: 110, flex: 0.65, editable: true },
+      { field: 'supplier_reference', headerName: 'Supplier Ref', minWidth: 150, flex: 0.9, editable: true },
+      { field: 'notes', headerName: 'Remarks', minWidth: 180, flex: 1, editable: true },
+    ];
+  }, [materials, uoms]);
+
+  const detailTotals = useMemo(() => {
+    const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.ordered_quantity) || 0), 0);
+    const totalAmount = form.items.reduce((sum, row) => sum + (Number(row.line_total) || 0), 0);
+    return {
+      totalItems: form.items.length,
+      totalQuantity,
+      totalAmount,
+    };
+  }, [form.items]);
+
+  const validateDetailRow = (row: PurchaseOrderItemForm, rows: PurchaseOrderItemForm[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const quantity = Number(row.ordered_quantity);
+
+    if (!row.material_id) {
+      errors.material_id = 'Material is required';
+    }
+
+    if (!row.uom_id) {
+      errors.uom_id = 'UOM is required';
+    }
+
+    if (!row.ordered_quantity || Number.isNaN(quantity) || quantity <= 0) {
+      errors.ordered_quantity = 'Quantity must be greater than zero';
+    }
+
+    const duplicateCount = rows.filter((candidate) => candidate.material_id && candidate.material_id === row.material_id).length;
+    if (row.material_id && duplicateCount > 1) {
+      errors.material_id = 'Duplicate material is not allowed';
+    }
+
+    return errors;
+  };
+
+  const processDetailRowUpdate = (newRow: PurchaseOrderItemForm): PurchaseOrderItemForm => {
+    const nextRow = { ...newRow };
+    const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
+    if (material) {
+      nextRow.description = material.product_name || '';
+      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.brand = material.brand_name || '';
+      if (material.stock_uom_id && !nextRow.uom_id) {
+        nextRow.uom_id = String(material.stock_uom_id);
+      }
+    }
+
+    const quantity = Number(nextRow.ordered_quantity) || 0;
+    const unitCost = Number(nextRow.unit_price) || 0;
+    nextRow.line_total = quantity > 0 && unitCost > 0 ? (quantity * unitCost).toFixed(2) : '';
+
+    return nextRow;
   };
 
   return (
@@ -893,68 +1020,26 @@ export default function PurchaseOrderPage() {
             </Grid>
             <Grid item xs={12}>
               <Divider sx={{ my: 1 }} />
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="h6">Line Items</Typography>
-                <Button variant="outlined" startIcon={<AddIcon />} onClick={addItem}>
-                  Add Item
-                </Button>
-              </Stack>
-              <Stack spacing={2}>
-                {form.items.map((item, index) => (
-                  <Paper key={index} variant="outlined" sx={{ p: 2 }}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={3}>
-                        <TextField select fullWidth label="Material" value={item.material_id} onChange={(event) => updateItem(index, 'material_id', event.target.value)}>
-                          <MenuItem value="">Select material</MenuItem>
-                          {materials.map((material) => (
-                            <MenuItem key={material.material_id} value={material.material_id}>
-                              {material.product_code} - {material.product_name}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField select fullWidth label="UOM" value={item.uom_id} onChange={(event) => updateItem(index, 'uom_id', event.target.value)}>
-                          <MenuItem value="">Select UOM</MenuItem>
-                          {uoms.map((uom) => (
-                            <MenuItem key={uom.uom_id} value={uom.uom_id}>
-                              {uom.uom_name} ({uom.abbreviation})
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <TextField fullWidth type="number" label="Requested Qty" value={item.requested_quantity} onChange={(event) => updateItem(index, 'requested_quantity', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <TextField fullWidth type="number" label="Ordered Qty" value={item.ordered_quantity} onChange={(event) => updateItem(index, 'ordered_quantity', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </Grid>
-                      <Grid item xs={12} md={2}>
-                        <TextField fullWidth type="number" label="Received Qty" value={item.received_quantity} onChange={(event) => updateItem(index, 'received_quantity', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField fullWidth type="number" label="Unit Price" value={item.unit_price} onChange={(event) => updateItem(index, 'unit_price', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField fullWidth type="number" label="Line Total" value={item.line_total} onChange={(event) => updateItem(index, 'line_total', event.target.value)} inputProps={{ min: 0, step: '0.01' }} />
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField fullWidth label="Supplier Ref" value={item.supplier_reference} onChange={(event) => updateItem(index, 'supplier_reference', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={5}>
-                        <TextField fullWidth label="Notes" value={item.notes} onChange={(event) => updateItem(index, 'notes', event.target.value)} />
-                      </Grid>
-                      <Grid item xs={12} md={1}>
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', height: '100%', alignItems: 'center' }}>
-                          <IconButton color="error" onClick={() => removeItem(index)} disabled={form.items.length === 1}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                ))}
-              </Stack>
+              <EditableLineItemsGrid
+                rows={form.items}
+                setRows={(nextRows) => {
+                  setForm((current) => ({
+                    ...current,
+                    items: typeof nextRows === 'function' ? nextRows(current.items) : nextRows,
+                  }));
+                }}
+                columns={detailColumns}
+                createRow={emptyItem}
+                getRowId={(row) => row.row_id}
+                processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+                validateRow={validateDetailRow}
+                shouldConfirmDelete={(row) => Boolean(row.purchase_order_item_id)}
+                getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
+                addRowLabel="Add Row"
+                focusField="material_id"
+                totals={detailTotals}
+                disabled={saving}
+              />
             </Grid>
           </Grid>
         </DialogContent>

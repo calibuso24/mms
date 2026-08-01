@@ -33,6 +33,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -42,6 +43,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { accountApi, lookupApi, projectApi, purchaseOrderApi, supplierApi, supplierDeliveryApi } from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 type SortField = 'supplier_delivery_number' | 'po_number' | 'supplier_name' | 'project_name' | 'status_name' | 'delivery_date' | 'created_at' | 'item_count';
 type SortDir = 'asc' | 'desc';
@@ -125,7 +127,13 @@ interface SupplierDeliveryDetail extends SupplierDeliveryListItem {
 }
 
 interface DeliveryItemForm {
+  row_id: string;
+  supplier_delivery_item_id?: number;
   purchase_order_item_id: string;
+  material_label: string;
+  uom_label: string;
+  ordered_quantity: string;
+  received_quantity: string;
   delivered_quantity: string;
   accepted_quantity: string;
   rejected_quantity: string;
@@ -144,7 +152,13 @@ interface FormState {
 }
 
 const emptyItem = (): DeliveryItemForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  supplier_delivery_item_id: undefined,
   purchase_order_item_id: '',
+  material_label: '',
+  uom_label: '',
+  ordered_quantity: '',
+  received_quantity: '',
   delivered_quantity: '',
   accepted_quantity: '',
   rejected_quantity: '',
@@ -327,7 +341,13 @@ export default function SupplierDeliveryPage() {
         delivery_advice_ids: detail.advices.map((advice) => advice.delivery_advice_id).join(', '),
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
+              row_id: `${Date.now()}-${row.supplier_delivery_item_id}`,
+              supplier_delivery_item_id: row.supplier_delivery_item_id,
               purchase_order_item_id: row.purchase_order_item_id.toString(),
+              material_label: `${row.material_code} - ${row.material_name}`,
+              uom_label: row.uom_abbreviation,
+              ordered_quantity: '',
+              received_quantity: '',
               delivered_quantity: row.delivered_quantity,
               accepted_quantity: row.accepted_quantity,
               rejected_quantity: row.rejected_quantity,
@@ -424,6 +444,13 @@ export default function SupplierDeliveryPage() {
   };
 
   const submitForm = async () => {
+    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -510,6 +537,92 @@ export default function SupplierDeliveryPage() {
   };
 
   const getPoItemById = (id: string) => poItems.find((item) => item.purchase_order_item_id === Number(id));
+
+  const detailColumns = useMemo<GridColDef<DeliveryItemForm>[]>(() => {
+    const poItemOptions = poItems.map((row) => ({ value: row.purchase_order_item_id.toString(), label: `#${row.purchase_order_item_id} - ${row.material_code}` }));
+    return [
+      {
+        field: 'purchase_order_item_id',
+        headerName: 'PO Item',
+        minWidth: 210,
+        flex: 0.9,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: poItemOptions,
+      },
+      { field: 'material_label', headerName: 'Material', minWidth: 230, flex: 1.05 },
+      { field: 'uom_label', headerName: 'UOM', minWidth: 100, flex: 0.55 },
+      { field: 'ordered_quantity', headerName: 'Ordered', minWidth: 105, flex: 0.6 },
+      { field: 'received_quantity', headerName: 'Received', minWidth: 105, flex: 0.6 },
+      { field: 'delivered_quantity', headerName: 'Quantity', minWidth: 105, flex: 0.6, editable: true },
+      { field: 'accepted_quantity', headerName: 'Accepted', minWidth: 105, flex: 0.6, editable: true },
+      { field: 'rejected_quantity', headerName: 'Rejected', minWidth: 105, flex: 0.6, editable: true },
+      { field: 'notes', headerName: 'Remarks', minWidth: 180, flex: 0.9, editable: true },
+    ];
+  }, [poItems]);
+
+  const detailTotals = useMemo(() => {
+    const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.delivered_quantity) || 0), 0);
+    return {
+      totalItems: form.items.length,
+      totalQuantity,
+      totalAmount: 0,
+    };
+  }, [form.items]);
+
+  const validateDetailRow = (row: DeliveryItemForm, rows: DeliveryItemForm[]): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const delivered = Number(row.delivered_quantity);
+    const accepted = Number(row.accepted_quantity);
+
+    if (!row.purchase_order_item_id) {
+      errors.purchase_order_item_id = 'PO item is required';
+    }
+    if (!row.delivered_quantity || Number.isNaN(delivered) || delivered <= 0) {
+      errors.delivered_quantity = 'Quantity must be greater than zero';
+    }
+    if (!row.accepted_quantity || Number.isNaN(accepted) || accepted < 0) {
+      errors.accepted_quantity = 'Accepted quantity is required';
+    }
+    if (!Number.isNaN(delivered) && !Number.isNaN(accepted) && accepted > delivered) {
+      errors.accepted_quantity = 'Accepted quantity cannot exceed delivered quantity';
+    }
+
+    const duplicateCount = rows.filter((candidate) => candidate.purchase_order_item_id && candidate.purchase_order_item_id === row.purchase_order_item_id).length;
+    if (row.purchase_order_item_id && duplicateCount > 1) {
+      errors.purchase_order_item_id = 'Duplicate PO item is not allowed';
+    }
+
+    return errors;
+  };
+
+  const processDetailRowUpdate = (newRow: DeliveryItemForm): DeliveryItemForm => {
+    const nextRow = { ...newRow };
+    const poItem = getPoItemById(nextRow.purchase_order_item_id);
+
+    if (poItem) {
+      nextRow.material_label = `${poItem.material_code} - ${poItem.material_name}`;
+      nextRow.uom_label = poItem.uom_abbreviation;
+      nextRow.ordered_quantity = poItem.ordered_quantity;
+      nextRow.received_quantity = poItem.received_quantity;
+    } else {
+      nextRow.material_label = '';
+      nextRow.uom_label = '';
+      nextRow.ordered_quantity = '';
+      nextRow.received_quantity = '';
+    }
+
+    if (nextRow.delivered_quantity && nextRow.accepted_quantity === '') {
+      nextRow.accepted_quantity = nextRow.delivered_quantity;
+    }
+    if (nextRow.delivered_quantity && nextRow.accepted_quantity) {
+      const delivered = Number(nextRow.delivered_quantity) || 0;
+      const accepted = Number(nextRow.accepted_quantity) || 0;
+      nextRow.rejected_quantity = (delivered - accepted).toString();
+    }
+
+    return nextRow;
+  };
 
   return (
     <Box>
@@ -831,100 +944,26 @@ export default function SupplierDeliveryPage() {
           </Grid>
 
           <Divider sx={{ my: 2 }} />
-
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight={600}>Line Items</Typography>
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={addItemRow}>Add Item</Button>
-          </Stack>
-
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ minWidth: 240 }}>PO Item</TableCell>
-                  <TableCell>Material</TableCell>
-                  <TableCell>UOM</TableCell>
-                  <TableCell>Ordered</TableCell>
-                  <TableCell>Received</TableCell>
-                  <TableCell>Delivered</TableCell>
-                  <TableCell>Accepted</TableCell>
-                  <TableCell>Rejected</TableCell>
-                  <TableCell>Notes</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {form.items.map((item, index) => {
-                  const poItem = getPoItemById(item.purchase_order_item_id);
-                  const remaining = poItem ? Number(poItem.ordered_quantity) - Number(poItem.received_quantity) : null;
-
-                  return (
-                    <TableRow key={`${index}-${item.purchase_order_item_id}`}>
-                      <TableCell>
-                        <Select
-                          fullWidth
-                          size="small"
-                          value={item.purchase_order_item_id}
-                          onChange={(event) => updateItem(index, 'purchase_order_item_id', event.target.value as string)}
-                        >
-                          <MenuItem value="">Select PO item</MenuItem>
-                          {poItems.map((row) => (
-                            <MenuItem key={row.purchase_order_item_id} value={row.purchase_order_item_id.toString()}>
-                              #{row.purchase_order_item_id} - {row.material_code}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </TableCell>
-                      <TableCell>{poItem ? `${poItem.material_code} - ${poItem.material_name}` : '-'}</TableCell>
-                      <TableCell>{poItem ? poItem.uom_abbreviation : '-'}</TableCell>
-                      <TableCell>{poItem ? formatNumber(poItem.ordered_quantity) : '-'}</TableCell>
-                      <TableCell>{poItem ? formatNumber(poItem.received_quantity) : '-'}</TableCell>
-                      <TableCell>
-                        <TextField
-                          size="small"
-                          type="number"
-                          value={item.delivered_quantity}
-                          onChange={(event) => updateItem(index, 'delivered_quantity', event.target.value)}
-                          inputProps={{ min: 0, step: '0.01' }}
-                          helperText={remaining !== null ? `Remaining: ${formatNumber(remaining)}` : ' '}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          size="small"
-                          type="number"
-                          value={item.accepted_quantity}
-                          onChange={(event) => updateItem(index, 'accepted_quantity', event.target.value)}
-                          inputProps={{ min: 0, step: '0.01' }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          size="small"
-                          type="number"
-                          value={item.rejected_quantity}
-                          onChange={(event) => updateItem(index, 'rejected_quantity', event.target.value)}
-                          inputProps={{ min: 0, step: '0.01' }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          size="small"
-                          value={item.notes}
-                          onChange={(event) => updateItem(index, 'notes', event.target.value)}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" color="error" onClick={() => removeItemRow(index)}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <EditableLineItemsGrid
+            rows={form.items}
+            setRows={(nextRows) => {
+              setForm((current) => ({
+                ...current,
+                items: typeof nextRows === 'function' ? nextRows(current.items) : nextRows,
+              }));
+            }}
+            columns={detailColumns}
+            createRow={emptyItem}
+            getRowId={(row) => row.row_id}
+            processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+            validateRow={validateDetailRow}
+            shouldConfirmDelete={(row) => Boolean(row.supplier_delivery_item_id)}
+            getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
+            addRowLabel="Add Row"
+            focusField="purchase_order_item_id"
+            totals={detailTotals}
+            disabled={saving}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
