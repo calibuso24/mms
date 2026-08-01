@@ -1,10 +1,24 @@
 
 BEGIN;
 
+TRUNCATE account CASCADE;
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 ALTER TABLE source.tbluser ADD COLUMN IF NOT EXISTS account_id BIGINT;
 ALTER TABLE source.tbluser ADD COLUMN IF NOT EXISTS contact_id BIGINT;
+
+SELECT setval(
+    pg_get_serial_sequence('public.account', 'account_id'),
+    COALESCE((SELECT MAX(account_id) FROM public.account), 1),
+    TRUE
+);
+
+SELECT setval(
+    pg_get_serial_sequence('public.contact', 'contact_id'),
+    COALESCE((SELECT MAX(contact_id) FROM public.contact), 1),
+    TRUE
+);
 
 UPDATE source.tbluser
 SET account_id = nextval('account_id_seq'),
@@ -18,9 +32,9 @@ SELECT contact_id, name,
 FROM source.tbluser
 ;
 
-INSERT INTO account(account_id, user_name, password, log_date_created, log_date_updated, is_active, contact_id)
-SELECT account_id,userid,crypt(password, gen_salt('bf')),datecreated,datemodified,
-CASE WHEN status = 1 THEN true ELSE false END as status,
+INSERT INTO account(account_id, full_name, user_name, password, log_date_created, log_date_updated, is_active, contact_id)
+SELECT account_id, name, userid, crypt(password, gen_salt('bf')), datecreated, datemodified,
+CASE WHEN status = 1 THEN true ELSE false END as is_active,
 contact_id
 FROM source.tbluser
 ;
