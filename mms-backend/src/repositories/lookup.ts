@@ -34,4 +34,17 @@ export class LookupRepository {
     );
     return result.rows[0] || null;
   }
+
+  async findByTypeAndCode(type: string, code: string): Promise<LookupEntry | null> {
+    const result = await pool.query(
+      `SELECT *
+       FROM look_up
+       WHERE look_up_type = $1
+         AND code = $2
+         AND is_deleted = false`,
+      [type, code]
+    );
+
+    return result.rows[0] || null;
+  }
 }

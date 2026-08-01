@@ -107,6 +107,12 @@ npm install
 npm run dev
 ```
 
+On Unix-like systems, the same workflow is also available via:
+
+```bash
+./dev.sh
+```
+
 This runs:
 
 - backend dev server

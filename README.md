@@ -78,6 +78,7 @@ Navigation entries seeded but still showing "under development" in frontend are 
 	- Frontend: npm --prefix mms-frontend install
 4. Run all services from root:
 	- npm run dev
+	- or, on Unix-like systems, ./dev.sh
 
 Default local endpoints:
 

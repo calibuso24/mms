@@ -14,6 +14,10 @@ import MaterialsPage from './pages/Materials.js';
 import MaterialControlPage from './pages/MaterialControl.js';
 import MaterialRequestPage from './pages/MaterialRequest.js';
 import PurchaseOrderPage from './pages/PurchaseOrder.js';
+import DeliveryAdvicePage from './pages/DeliveryAdvice.js';
+import SupplierDeliveryPage from './pages/SupplierDelivery.js';
+import StockTransferPage from './pages/StockTransfer.js';
+import MaterialAdjustmentPage from './pages/MaterialAdjustment.js';
 import ManageUsersPage from './pages/ManageUsers.js';
 import ManageRolesPage from './pages/ManageRoles.js';
 import SystemSettingsPage from './pages/SystemSettings.js';
@@ -85,6 +89,22 @@ function DynamicPage({ route }: { route: string | null }) {
 
   if (route?.includes('purchase-order')) {
     return <PurchaseOrderPage />;
+  }
+
+  if (route?.includes('delivery-advice')) {
+    return <DeliveryAdvicePage />;
+  }
+
+  if (route?.includes('supplier-delivery')) {
+    return <SupplierDeliveryPage />;
+  }
+
+  if (route?.includes('stock-transfer')) {
+    return <StockTransferPage />;
+  }
+
+  if (route?.includes('material-adjustment')) {
+    return <MaterialAdjustmentPage />;
   }
 
   if (route?.includes('manage-users')) {

@@ -295,6 +295,98 @@ export const purchaseOrderApi = {
   cancel: (id: number) => ApiClient.post(`/purchase-orders/${id}/cancel`, {}),
 };
 
+// Supplier Delivery API
+export const supplierDeliveryApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; purchase_order_id?: number; supplier_id?: number; project_id?: number; status_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.purchase_order_id) params.append('purchase_order_id', filters.purchase_order_id.toString());
+    if (filters?.supplier_id) params.append('supplier_id', filters.supplier_id.toString());
+    if (filters?.project_id) params.append('project_id', filters.project_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/supplier-deliveries?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/supplier-deliveries/${id}`),
+  create: (data: any) => ApiClient.post('/supplier-deliveries', data),
+  update: (id: number, data: any) => ApiClient.put(`/supplier-deliveries/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/supplier-deliveries/${id}`),
+  post: (id: number) => ApiClient.post(`/supplier-deliveries/${id}/post`, {}),
+  cancel: (id: number) => ApiClient.post(`/supplier-deliveries/${id}/cancel`, {}),
+};
+
+// Delivery Advice API
+export const deliveryAdviceApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; purchase_order_id?: number; status_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.purchase_order_id) params.append('purchase_order_id', filters.purchase_order_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/delivery-advices?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/delivery-advices/${id}`),
+  create: (data: any) => ApiClient.post('/delivery-advices', data),
+  update: (id: number, data: any) => ApiClient.put(`/delivery-advices/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/delivery-advices/${id}`),
+  submit: (id: number) => ApiClient.post(`/delivery-advices/${id}/submit`, {}),
+  complete: (id: number) => ApiClient.post(`/delivery-advices/${id}/complete`, {}),
+  cancel: (id: number) => ApiClient.post(`/delivery-advices/${id}/cancel`, {}),
+};
+
+// Stock Transfer API
+export const stockTransferApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; transfer_type_id?: number; source_id?: number; destination_id?: number; status_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.transfer_type_id) params.append('transfer_type_id', filters.transfer_type_id.toString());
+    if (filters?.source_id) params.append('source_id', filters.source_id.toString());
+    if (filters?.destination_id) params.append('destination_id', filters.destination_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/stock-transfers?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/stock-transfers/${id}`),
+  create: (data: any) => ApiClient.post('/stock-transfers', data),
+  update: (id: number, data: any) => ApiClient.put(`/stock-transfers/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/stock-transfers/${id}`),
+  submit: (id: number) => ApiClient.post(`/stock-transfers/${id}/submit`, {}),
+  approve: (id: number) => ApiClient.post(`/stock-transfers/${id}/approve`, {}),
+  cancel: (id: number) => ApiClient.post(`/stock-transfers/${id}/cancel`, {}),
+};
+
+// Material Adjustment API
+export const materialAdjustmentApi = {
+  list: (limit?: number, offset?: number, filters?: { search?: string; project_id?: number; status_id?: number; reason_id?: number; sort_by?: string; sort_dir?: 'asc' | 'desc' }) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.project_id) params.append('project_id', filters.project_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.reason_id) params.append('reason_id', filters.reason_id.toString());
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_dir) params.append('sort_dir', filters.sort_dir);
+    return ApiClient.get(`/material-adjustments?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/material-adjustments/${id}`),
+  create: (data: any) => ApiClient.post('/material-adjustments', data),
+  update: (id: number, data: any) => ApiClient.put(`/material-adjustments/${id}`, data),
+  delete: (id: number) => ApiClient.delete(`/material-adjustments/${id}`),
+  approve: (id: number) => ApiClient.post(`/material-adjustments/${id}/approve`, {}),
+  reject: (id: number) => ApiClient.post(`/material-adjustments/${id}/reject`, {}),
+  complete: (id: number) => ApiClient.post(`/material-adjustments/${id}/complete`, {}),
+};
+
 // Project Management API
 export const projectApi = {
   list: (limit?: number, offset?: number, search?: string, sortBy?: string, sortDir?: 'asc' | 'desc') => {
