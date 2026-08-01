@@ -88,8 +88,15 @@ Routes mounted in src/index.ts:
 - /api/navigation
 - /api/reports
 - /api/system-settings
-- /api (product routes)
-- /api (party routes)
+- /api/material-controls
+- /api/material-requests
+- /api/purchase-orders
+- /api/delivery-advices
+- /api/supplier-deliveries
+- /api/stock-transfers
+- /api/material-adjustments
+- /api (product routes: categories, brands, uom, subcategories, lookups, materials)
+- /api (party routes: projects, suppliers)
 
 ## Permission Modules in Use
 
@@ -99,6 +106,13 @@ Current requirePermission checks rely on these module names:
 - Manage Roles
 - Project Management
 - Supplier
+- Material Control
+- Material Request
+- Purchase Order
+- Delivery Advice
+- Supplier Delivery
+- Stock Transfer
+- Inventory Adjustment
 - System Settings
 - Report Catalog (REPORT_<code>)
 

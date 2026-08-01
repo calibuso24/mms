@@ -58,6 +58,8 @@ cp .env.example .env
 npm install
 ```
 
+The current backend implementation includes authentication, role-based access, product master data, project/supplier management, and the procurement/inventory workflow modules for material control, material requests, purchase orders, delivery advice, supplier delivery, stock transfer, and material adjustment.
+
 Optional helper for test account passwords:
 
 ```bash
@@ -157,6 +159,7 @@ This runs:
 3. Login page loads in frontend.
 4. Login works with seeded account after setting passwords.
 5. Sidebar loads MAIN navigation and report groups.
+6. Procurement and inventory pages such as Material Request, Purchase Order, Supplier Delivery, and Stock Transfer are reachable from the main navigation.
 
 ## Troubleshooting
 

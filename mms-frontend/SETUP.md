@@ -45,7 +45,15 @@ Required variable:
 Current pages under src/pages:
 
 - Login
-- Materials
+- Dashboard (placeholder KPIs)
+- Materials (product management)
+- MaterialControl
+- MaterialRequest
+- PurchaseOrder
+- DeliveryAdvice
+- SupplierDelivery
+- StockTransfer
+- MaterialAdjustment
 - ManageUsers
 - ManageRoles
 - PartyManagement (Project + Supplier modes)
@@ -59,15 +67,22 @@ Core route behavior is centralized in App.tsx:
 
 - Public route: /login
 - Protected shell: /app/*
+- /app/dashboard -> Dashboard placeholder
 - /app/profile -> Profile page
-- /app routes containing:
-  - product-management -> Materials
-  - manage-users -> ManageUsers
-  - manage-roles -> ManageRoles
-  - project-management -> ProjectManagement
-  - supplier-management -> SupplierManagement
-  - system-settings -> SystemSettings
-  - /reports/<code> -> ReportRunner
+- /app/product-management -> Materials page
+- /app/material-control -> MaterialControl page
+- /app/material-request -> MaterialRequest page
+- /app/purchase-order -> PurchaseOrder page
+- /app/delivery-advice -> DeliveryAdvice page
+- /app/supplier-delivery -> SupplierDelivery page
+- /app/stock-transfer -> StockTransfer page
+- /app/material-adjustment -> MaterialAdjustment page
+- /app/manage-users -> ManageUsers page
+- /app/manage-roles -> ManageRoles page
+- /app/project-management -> ProjectManagement page
+- /app/supplier-management -> SupplierManagement page
+- /app/system-settings -> SystemSettings page
+- /reports/<code> -> ReportRunner page
 
 If a navigation route is present but not mapped to a dedicated page component, frontend shows "This page is under development."
 
