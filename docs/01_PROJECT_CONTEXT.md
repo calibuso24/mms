@@ -129,6 +129,7 @@ mms/
 - /api/accounts
 - /api/roles
 - /api/navigation
+- /api/dashboard
 - /api/reports
 - /api/system-settings
 - /api/categories, /api/brands, /api/uom, /api/subcategories, /api/lookups, /api/materials
@@ -144,7 +145,7 @@ mms/
 ### Frontend pages currently implemented
 
 - Login
-- Dashboard (KPI placeholders)
+- Dashboard (database-driven departmental widgets)
 - Product Management
 - Manage Users
 - Manage Roles

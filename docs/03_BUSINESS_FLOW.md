@@ -30,6 +30,8 @@ The repository contains broad procurement and inventory schema support, but curr
 - Stock Transfer
 - Material Adjustment
 
+Dashboard support now uses role-aware, database-driven widgets for Coordinating, Purchasing, Inventory, and Administrator perspectives.
+
 ## Implemented End-to-End Flows
 
 ### 1. Authentication and session flow
@@ -137,6 +139,14 @@ The repository contains broad procurement and inventory schema support, but curr
 3. Backend validates required parameters and format support.
 4. Backend calls reporting-service for rendering.
 5. Generated file is downloaded and report_history is updated (RUNNING to SUCCESS/FAILED).
+
+### 14. Dashboard flow
+
+1. Frontend requests available dashboard types from GET /api/dashboard/types.
+2. Backend resolves dashboard visibility from role-derived permissions and returns only permitted department dashboards.
+3. Dashboard widgets load independently from GET /api/dashboard/:dashboardType/widgets/:widgetKey.
+4. Widget endpoints support pagination (limit/offset) for list-like data and optional date filtering (from/to) for trend-style data.
+5. Slow widgets do not block faster widgets because each widget request executes separately.
 
 ## Seeded Data Flows Not Yet Fully Exposed in UI/API
 

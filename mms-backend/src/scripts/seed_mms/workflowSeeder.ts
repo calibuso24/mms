@@ -63,6 +63,7 @@ export class WorkflowSeeder {
     await this.seedSupplierDeliveries(context, deliveryAdvices);
     await this.seedStockTransfers(context, materialRequests, purchaseOrders);
     await this.seedMaterialAdjustments(context);
+    await this.seedDashboardTelemetry(context);
   }
 
   private async cleanupGeneratedWorkflow(context: SeedRunContext): Promise<void> {
@@ -1377,6 +1378,80 @@ export class WorkflowSeeder {
       updated: 0,
       reused: 0,
       notes: 'Material adjustment records seeded with reason/status combinations for reporting filters.',
+    });
+  }
+
+  private async seedDashboardTelemetry(context: SeedRunContext): Promise<void> {
+    await context.client.query(
+      `DELETE FROM audit_log
+       WHERE reference_code LIKE 'SEED-DASH-%'`
+    );
+
+    const operations = [
+      { table: 'material_request', op: 'CREATE', notes: 'Seed dashboard activity for request creation', module: 'material_request' },
+      { table: 'purchase_order', op: 'UPDATE', notes: 'Seed dashboard activity for PO updates', module: 'purchase_order' },
+      { table: 'supplier_delivery', op: 'UPDATE', notes: 'Seed dashboard activity for delivery posting', module: 'supplier_delivery' },
+      { table: 'stock_transfer', op: 'APPROVE', notes: 'Seed dashboard activity for transfer approvals', module: 'stock_transfer' },
+      { table: 'material_adjustment', op: 'UPDATE', notes: 'Seed dashboard activity for adjustments', module: 'material_adjustment' },
+      { table: 'auth', op: 'LOGIN_FAILED', notes: 'login failed for seeded account', module: 'auth' },
+      { table: 'system', op: 'ERROR', notes: 'Synthetic error event for dashboard system error widget', module: 'system' },
+    ] as const;
+
+    const totalRows = Math.max(120, context.config.counts.materialRequests);
+
+    for (let i = 1; i <= totalRows; i += 1) {
+      const event = operations[(i - 1) % operations.length];
+      const changedAtDays = context.random.int(0, 40);
+      const changedAtHours = context.random.int(0, 23);
+
+      await context.client.query(
+        `INSERT INTO audit_log (
+          entity_table,
+          entity_id,
+          operation,
+          changed_by,
+          changed_at,
+          changes,
+          reference_code,
+          notes,
+          transaction_id,
+          is_deleted,
+          log_module_created
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          NOW() - ($5 || ' days')::interval - ($6 || ' hours')::interval,
+          $7::jsonb,
+          $8,
+          $9,
+          NULL,
+          FALSE,
+          $10
+        )`,
+        [
+          event.table,
+          i,
+          event.op,
+          context.actorAccountId,
+          changedAtDays,
+          changedAtHours,
+          JSON.stringify({ seed: true, ordinal: i, module: event.module }),
+          `SEED-DASH-${String(i).padStart(6, '0')}`,
+          event.notes,
+          event.module,
+        ]
+      );
+    }
+
+    pushSummary(context, {
+      module: 'Dashboard Telemetry',
+      created: totalRows,
+      updated: 0,
+      reused: 0,
+      notes: 'Seeded activity, failed login, and error telemetry for dashboard widgets.',
     });
   }
 }

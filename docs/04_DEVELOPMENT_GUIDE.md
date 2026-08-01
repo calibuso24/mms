@@ -217,6 +217,14 @@ Material list filters:
 | GET | /api/navigation/context/:context |
 | GET | /api/navigation/report-catalog-sidebar |
 
+### Dashboard routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/dashboard/types | Dashboard VIEW |
+| GET | /api/dashboard/:dashboardType/widgets | Dashboard VIEW |
+| GET | /api/dashboard/:dashboardType/widgets/:widgetKey | Dashboard VIEW |
+
 ### System settings routes
 
 | Method | Path | Permission |
@@ -300,6 +308,7 @@ Current page routing behavior:
 - /app/profile -> Profile page
 - /app/... route matching via DynamicPage string matching
 - /app/reports/<reportCode> -> ReportRunner
+- /app/dashboard -> Department-aware, database-driven dashboard widgets
 - Unknown menu routes show "under development"
 
 ## Backend Architecture Notes
@@ -341,6 +350,17 @@ Recommended local workflow:
 3. Start all services with npm run dev from repository root.
 4. Validate backend with /health and reporting-service with /health.
 5. Test auth flow and page permission gates with seeded accounts.
+
+Backend test command:
+
+```bash
+cd mms-backend
+npm run test
+```
+
+Dashboard seed note:
+
+- `npm run seed:mms` also inserts synthetic dashboard telemetry in `audit_log` to populate activity, failed login, and system error widgets for local validation.
 
 When changing RBAC/navigation:
 

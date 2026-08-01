@@ -19,6 +19,7 @@ import stockTransferRoutes from './routes/stockTransfer.js';
 import materialAdjustmentRoutes from './routes/materialAdjustment.js';
 import reportRoutes from './routes/report.js';
 import systemSettingsRoutes from './routes/systemSettings.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/accounts', authMiddleware, accountRoutes);
 app.use('/api/roles', authMiddleware, roleRoutes);
 app.use('/api/navigation', authMiddleware, navigationRoutes);
 app.use('/api/reports', authMiddleware, reportRoutes);
+app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/system-settings', authMiddleware, systemSettingsRoutes);
 app.use('/api/material-controls', authMiddleware, materialControlRoutes);
 app.use('/api/material-requests', authMiddleware, materialRequestRoutes);

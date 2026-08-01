@@ -7,9 +7,9 @@ import { NavigationProvider, useNavigation } from './shared/contexts/navigation.
 import { MainSidebar } from './shared/components/Sidebar.js';
 import { ReportsSidebar } from './shared/components/ReportsSidebarMUI.js';
 import { TopBar } from './shared/components/TopBar.js';
-import { KPICard } from './shared/components/KPICard.js';
 import { muiTheme } from './shared/theme/muiTheme.js';
 import LoginPage from './pages/Login.js';
+import DashboardPage from './pages/Dashboard.js';
 import MaterialsPage from './pages/Materials.js';
 import MaterialControlPage from './pages/MaterialControl.js';
 import MaterialRequestPage from './pages/MaterialRequest.js';
@@ -24,55 +24,15 @@ import SystemSettingsPage from './pages/SystemSettings.js';
 import ProfilePage from './pages/Profile.js';
 import { ProjectManagementPage, SupplierManagementPage } from './pages/PartyManagement.js';
 import ReportRunnerPage from './pages/ReportRunner.js';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import PendingActionsIcon from '@mui/icons-material/PendingActions';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-
-function DefaultPage() {
-  return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(2, 1fr)',
-            md: 'repeat(3, 1fr)',
-          },
-          gap: 2,
-        }}>
-          <KPICard
-            label="Open Requests"
-            value="24"
-            icon={<TrendingUpIcon />}
-            color="info"
-          />
-          <KPICard
-            label="Pending POs"
-            value="8"
-            icon={<PendingActionsIcon />}
-            color="warning"
-          />
-          <KPICard
-            label="Stock Transfers"
-            value="15"
-            icon={<SwapHorizIcon />}
-            color="info"
-          />
-        </Box>
-      </Box>
-    </Box>
-  );
-}
 
 function DynamicPage({ route }: { route: string | null }) {
   const { pageTitle } = useNavigation();
   if (!route) {
-    return <DefaultPage />;
+    return <DashboardPage />;
   }
 
   if (route?.includes('dashboard')) {
-    return <DefaultPage />;
+    return <DashboardPage />;
   }
 
   if (route?.includes('product-management')) {

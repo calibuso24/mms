@@ -1298,3 +1298,26 @@ Implement reusable infrastructure for:
 - Audit History Component
 
 Future document modules must reuse this infrastructure instead of creating new implementations.
+
+# Dashboard Development Standards
+
+All dashboards must:
+
+- Be fully database-driven.
+- Never use hardcoded values.
+- Load each widget independently.
+- Follow RBAC permissions.
+- Support loading, empty, and error states.
+- Be responsive.
+- Use efficient SQL queries.
+- Reuse existing services and repositories.
+- Avoid duplicate business logic.
+- Use the appropriate chart type:
+  - Line: trends
+  - Bar: comparisons
+  - Horizontal Bar: Top-N rankings
+  - Pie/Donut: distributions
+  - Area: growth over time
+  - Gauge: completion/progress
+- Display only information relevant to the user's department.
+- Support future filtering, auto-refresh, and personalization.

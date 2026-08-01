@@ -532,3 +532,22 @@ export const reportApi = {
   generate: (reportCode: string, payload: { parameters: Record<string, unknown>; format: string }) =>
     ApiClient.requestBlob(`/reports/${reportCode}/generate`, { method: 'POST', body: payload }),
 };
+
+// Dashboard API
+export const dashboardApi = {
+  listTypes: () => ApiClient.get('/dashboard/types'),
+  listWidgets: (dashboardType: string) => ApiClient.get(`/dashboard/${dashboardType}/widgets`),
+  getWidget: (
+    dashboardType: string,
+    widgetKey: string,
+    options?: { limit?: number; offset?: number; from?: string; to?: string }
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.limit !== undefined) params.append('limit', options.limit.toString());
+    if (options?.offset !== undefined) params.append('offset', options.offset.toString());
+    if (options?.from) params.append('from', options.from);
+    if (options?.to) params.append('to', options.to);
+    const qs = params.toString();
+    return ApiClient.get(`/dashboard/${dashboardType}/widgets/${widgetKey}${qs ? `?${qs}` : ''}`);
+  },
+};

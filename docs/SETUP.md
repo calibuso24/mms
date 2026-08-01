@@ -60,6 +60,12 @@ npm install
 
 The current backend implementation includes authentication, role-based access, product master data, project/supplier management, and the procurement/inventory workflow modules for material control, material requests, purchase orders, delivery advice, supplier delivery, stock transfer, and material adjustment.
 
+Backend tests:
+
+```bash
+npm run test
+```
+
 Optional helper for test account passwords:
 
 ```bash
@@ -90,6 +96,7 @@ This seeding command:
 3. Preserves schema constraints and workflow links across:
 	Product -> Material Control -> Material Request -> (Stock Transfer or Purchase Order) -> Delivery Advice -> Supplier Delivery -> Material Adjustment.
 4. Is idempotent for generated seed records (safe to rerun).
+5. Seeds dashboard telemetry rows in `audit_log` for activity, failed login, and system error widgets.
 
 Configuration can be provided as environment variables or CLI flags.
 
