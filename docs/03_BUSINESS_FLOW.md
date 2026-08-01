@@ -25,6 +25,10 @@ The repository contains broad procurement and inventory schema support, but curr
 - Material Control
 - Material Request
 - Purchase Order
+- Delivery Advice
+- Supplier Delivery
+- Stock Transfer
+- Material Adjustment
 
 ## Implemented End-to-End Flows
 
@@ -79,7 +83,44 @@ The repository contains broad procurement and inventory schema support, but curr
 4. Status transitions use lookup-driven values from purchase_order_status.
 5. Approval and cancellation are tracked as workflow actions on the order header.
 
-### 8. System settings flow
+### 8. Supplier delivery flow
+
+1. Supplier deliveries are created against an approved purchase order with one or more line items.
+2. Supplier and PO validation is enforced by both service checks and database trigger validation.
+3. Draft records can be edited, cancelled, or posted.
+4. Posting is executed through `post_supplier_delivery(...)`, which:
+  - writes stock movements for accepted quantities,
+  - updates stock balance and stock layers,
+  - updates PO line received quantities,
+  - transitions PO status to Partially Delivered or Delivered,
+  - marks supplier delivery as Posted.
+5. Audit logs record create, update, delete, post, and cancel operations.
+
+### 9. Delivery advice flow
+
+1. Delivery advice records are created for a purchase order with one or more delivery_advice_item rows.
+2. DA numbers are generated in DA-YYYY-000001 format.
+3. reference_code is required and must be unique.
+4. Workflow transitions are draft -> submitted -> completed, with cancel supported from draft/submitted.
+5. Audit logs record create, update, delete, submit, complete, and cancel actions.
+
+### 10. Stock transfer flow
+
+1. Stock transfers are created between source and destination parties with one or more stock_transfer_item rows.
+2. ST numbers are generated in ST-YYYY-000001 format.
+3. Optional purchase_order links are validated when provided.
+4. Workflow transitions are draft -> submitted -> approved, with cancel supported from draft/submitted.
+5. Audit logs record create, update, delete, submit, approve, and cancel actions.
+
+### 11. Material adjustment flow
+
+1. Material adjustments are created per project with one or more material_adjustment_item rows.
+2. MA numbers are generated in MA-YYYY-000001 format.
+3. Workflow statuses use material_adjustment_status lookups: pending, approved, rejected, completed.
+4. Transitions enforce pending -> approved/rejected and approved -> completed.
+5. Audit logs record create, update, delete, approve, reject, and complete actions.
+
+### 12. System settings flow
 
 1. Settings categories are loaded from system_setting_category.
 2. Category settings are lazy-loaded from system_setting.
@@ -89,7 +130,7 @@ The repository contains broad procurement and inventory schema support, but curr
   - SAVE: persist value updates
   - RESET: reset category to defaults
 
-### 9. Report generation flow
+### 13. Report generation flow
 
 1. Sidebar and report pages read report definitions and parameters.
 2. User chooses an enabled format and enters required parameters.

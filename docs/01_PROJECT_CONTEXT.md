@@ -135,6 +135,10 @@ mms/
 - /api/material-controls
 - /api/material-requests
 - /api/purchase-orders
+- /api/delivery-advices
+- /api/supplier-deliveries
+- /api/stock-transfers
+- /api/material-adjustments
 - /api/projects, /api/suppliers
 
 ### Frontend pages currently implemented
@@ -152,6 +156,10 @@ mms/
 - Material Control
 - Material Request
 - Purchase Order
+- Delivery Advice
+- Supplier Delivery
+- Stock Transfer
+- Material Adjustment
 
 ### Reporting integration
 

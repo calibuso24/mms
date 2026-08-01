@@ -13,6 +13,10 @@ import partyRoutes from './routes/party.js';
 import materialControlRoutes from './routes/materialControl.js';
 import materialRequestRoutes from './routes/materialRequest.js';
 import purchaseOrderRoutes from './routes/purchaseOrder.js';
+import deliveryAdviceRoutes from './routes/deliveryAdvice.js';
+import supplierDeliveryRoutes from './routes/supplierDelivery.js';
+import stockTransferRoutes from './routes/stockTransfer.js';
+import materialAdjustmentRoutes from './routes/materialAdjustment.js';
 import reportRoutes from './routes/report.js';
 import systemSettingsRoutes from './routes/systemSettings.js';
 
@@ -43,6 +47,10 @@ app.use('/api/system-settings', authMiddleware, systemSettingsRoutes);
 app.use('/api/material-controls', authMiddleware, materialControlRoutes);
 app.use('/api/material-requests', authMiddleware, materialRequestRoutes);
 app.use('/api/purchase-orders', authMiddleware, purchaseOrderRoutes);
+app.use('/api/delivery-advices', authMiddleware, deliveryAdviceRoutes);
+app.use('/api/supplier-deliveries', authMiddleware, supplierDeliveryRoutes);
+app.use('/api/stock-transfers', authMiddleware, stockTransferRoutes);
+app.use('/api/material-adjustments', authMiddleware, materialAdjustmentRoutes);
 app.use('/api', authMiddleware, productRoutes);
 app.use('/api', authMiddleware, partyRoutes);
 

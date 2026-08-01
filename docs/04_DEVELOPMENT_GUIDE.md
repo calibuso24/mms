@@ -117,6 +117,57 @@ Security model:
 | POST | /api/purchase-orders/:id/approve | Purchase Order APPROVE |
 | POST | /api/purchase-orders/:id/cancel | Purchase Order APPROVE |
 
+### Supplier Delivery routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/supplier-deliveries | Supplier Delivery VIEW |
+| GET | /api/supplier-deliveries/:id | Supplier Delivery VIEW |
+| POST | /api/supplier-deliveries | Supplier Delivery CREATE |
+| PUT | /api/supplier-deliveries/:id | Supplier Delivery UPDATE |
+| DELETE | /api/supplier-deliveries/:id | Supplier Delivery DELETE |
+| POST | /api/supplier-deliveries/:id/post | Supplier Delivery APPROVE |
+| POST | /api/supplier-deliveries/:id/cancel | Supplier Delivery APPROVE |
+
+### Delivery Advice routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/delivery-advices | Delivery Advice VIEW |
+| GET | /api/delivery-advices/:id | Delivery Advice VIEW |
+| POST | /api/delivery-advices | Delivery Advice CREATE |
+| PUT | /api/delivery-advices/:id | Delivery Advice UPDATE |
+| DELETE | /api/delivery-advices/:id | Delivery Advice DELETE |
+| POST | /api/delivery-advices/:id/submit | Delivery Advice UPDATE |
+| POST | /api/delivery-advices/:id/complete | Delivery Advice APPROVE |
+| POST | /api/delivery-advices/:id/cancel | Delivery Advice UPDATE |
+
+### Stock Transfer routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/stock-transfers | Stock Transfer VIEW |
+| GET | /api/stock-transfers/:id | Stock Transfer VIEW |
+| POST | /api/stock-transfers | Stock Transfer CREATE |
+| PUT | /api/stock-transfers/:id | Stock Transfer UPDATE |
+| DELETE | /api/stock-transfers/:id | Stock Transfer DELETE |
+| POST | /api/stock-transfers/:id/submit | Stock Transfer UPDATE |
+| POST | /api/stock-transfers/:id/approve | Stock Transfer APPROVE |
+| POST | /api/stock-transfers/:id/cancel | Stock Transfer APPROVE |
+
+### Material Adjustment routes
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | /api/material-adjustments | Inventory Adjustment VIEW |
+| GET | /api/material-adjustments/:id | Inventory Adjustment VIEW |
+| POST | /api/material-adjustments | Inventory Adjustment CREATE |
+| PUT | /api/material-adjustments/:id | Inventory Adjustment UPDATE |
+| DELETE | /api/material-adjustments/:id | Inventory Adjustment DELETE |
+| POST | /api/material-adjustments/:id/approve | Inventory Adjustment APPROVE |
+| POST | /api/material-adjustments/:id/reject | Inventory Adjustment APPROVE |
+| POST | /api/material-adjustments/:id/complete | Inventory Adjustment APPROVE |
+
 Material list filters:
 
 - search
@@ -191,6 +242,10 @@ Main permission modules currently enforced in code:
 - Supplier
 - System Settings
 - Report Catalog (REPORT_<report_code>)
+- Supplier Delivery
+- Delivery Advice
+- Stock Transfer
+- Inventory Adjustment
 
 ## Reporting Integration
 

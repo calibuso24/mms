@@ -85,6 +85,8 @@ Current migration files in database/migrations:
 | 051_supplier_business_hours.sql | supplier_business_hours |
 | 052_material_type.sql | material_type table and material.material_type_id FK |
 | 053_system_settings.sql | system_setting_category, system_setting |
+| 054_delivery_advice_status.sql | delivery_advice_status lookups |
+| 055_stock_transfer_lookups.sql | stock_transfer_status lookups, stock_transfer_type alignment |
 | 999_rename_sequence.sql | sequence naming maintenance |
 
 ## Core Schema Notes
@@ -208,6 +210,10 @@ Permission modules added/used by current backend routes:
 - Manage Roles
 - Project Management
 - Supplier
+- Delivery Advice
+- Supplier Delivery
+- Stock Transfer
+- Inventory Adjustment
 - System Settings
 - Report Catalog (per-report permission codes: REPORT_<REPORT_CODE>)
 

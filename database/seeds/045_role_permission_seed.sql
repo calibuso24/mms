@@ -178,7 +178,14 @@ VALUES
     ('Delivery Advice', 'UPDATE', 'Update Delivery Advice', 'Update delivery advice records', TRUE),
     ('Delivery Advice', 'DELETE', 'Delete Delivery Advice', 'Delete delivery advice', TRUE),
     ('Delivery Advice', 'EXPORT', 'Export Delivery Advice', 'Export delivery advice data', TRUE),
-    ('Delivery Advice', 'PRINT', 'Print Delivery Advice', 'Print delivery advice', TRUE)
+    ('Delivery Advice', 'PRINT', 'Print Delivery Advice', 'Print delivery advice', TRUE),
+    ('Supplier Delivery', 'VIEW', 'View Supplier Deliveries', 'View supplier delivery records', TRUE),
+    ('Supplier Delivery', 'CREATE', 'Create Supplier Deliveries', 'Create new supplier deliveries', TRUE),
+    ('Supplier Delivery', 'UPDATE', 'Update Supplier Deliveries', 'Update supplier delivery records', TRUE),
+    ('Supplier Delivery', 'DELETE', 'Delete Supplier Deliveries', 'Delete supplier deliveries', TRUE),
+    ('Supplier Delivery', 'APPROVE', 'Post Supplier Deliveries', 'Post or cancel supplier deliveries', TRUE),
+    ('Supplier Delivery', 'EXPORT', 'Export Supplier Deliveries', 'Export supplier delivery data', TRUE),
+    ('Supplier Delivery', 'PRINT', 'Print Supplier Deliveries', 'Print supplier delivery records', TRUE)
 ON CONFLICT (module_name, permission_code) DO NOTHING;
 
 -- Insert permission codes for Accounting modules

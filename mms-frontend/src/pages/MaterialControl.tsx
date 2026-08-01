@@ -148,6 +148,12 @@ export default function MaterialControlPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [permissions, setPermissions] = useState<string[]>([]);
 
+  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
+  const canView = permissionSet.has('Material Control:VIEW');
+  const canCreate = permissionSet.has('Material Control:CREATE');
+  const canUpdate = permissionSet.has('Material Control:UPDATE');
+  const canDelete = permissionSet.has('Material Control:DELETE');
+
   useEffect(() => {
     void loadLookups();
   }, []);
@@ -159,12 +165,6 @@ export default function MaterialControlPage() {
   useEffect(() => {
     void loadItems();
   }, [canView, page, rowsPerPage, search, sortBy, sortDir, filters.project_id, filters.status_id]);
-
-  const permissionSet = useMemo(() => new Set(permissions), [permissions]);
-  const canView = permissionSet.has('Material Control:VIEW');
-  const canCreate = permissionSet.has('Material Control:CREATE');
-  const canUpdate = permissionSet.has('Material Control:UPDATE');
-  const canDelete = permissionSet.has('Material Control:DELETE');
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
