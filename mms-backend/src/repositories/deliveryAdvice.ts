@@ -191,7 +191,7 @@ export class DeliveryAdviceRepository {
         m.product_code AS material_code,
         m.product_name AS material_name,
         dai.material_brand_id,
-        mb.brand_name AS material_brand_name,
+        b.brand_name AS material_brand_name,
         dai.uom_id,
         u.uom_name,
         u.abbreviation AS uom_abbreviation,
@@ -202,6 +202,7 @@ export class DeliveryAdviceRepository {
       JOIN material m ON m.material_id = dai.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = dai.uom_id AND u.is_deleted = false
       LEFT JOIN material_brand mb ON mb.material_brand_id = dai.material_brand_id AND mb.is_deleted = false
+      LEFT JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
       WHERE dai.delivery_advice_id = $1
         AND dai.is_deleted = false
       ORDER BY dai.delivery_advice_item_id ASC`,

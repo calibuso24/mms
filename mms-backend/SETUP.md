@@ -49,6 +49,24 @@ npm run dev
 
 Backend default URL: http://localhost:3001
 
+## Deterministic Workflow Seeding
+
+From mms-backend folder, run:
+
+```bash
+npm run seed:mms
+```
+
+You can tune record counts and seed value using either environment variables or CLI flags.
+
+Examples:
+
+```bash
+MMS_SEED_VALUE=20260801 MMS_SEED_PROJECTS=60 MMS_SEED_SUPPLIERS=45 npm run seed:mms
+npm run seed:mms -- --seed=20260801 --materialRequests=420 --stockTransfers=180
+npm run seed:mms -- --dry-run
+```
+
 Health check:
 
 ```bash

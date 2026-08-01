@@ -74,6 +74,38 @@ npm run dev
 
 Backend default URL: http://localhost:3001
 
+## Comprehensive Workflow Seeding
+
+After base database deployment, you can generate large, deterministic, construction-focused seed data for product, party, procurement, and inventory workflows:
+
+```bash
+# From repository root
+npm run seed:mms
+```
+
+This seeding command:
+
+1. Uses a fixed default random seed for deterministic output.
+2. Supports configurable record counts per module.
+3. Preserves schema constraints and workflow links across:
+	Product -> Material Control -> Material Request -> (Stock Transfer or Purchase Order) -> Delivery Advice -> Supplier Delivery -> Material Adjustment.
+4. Is idempotent for generated seed records (safe to rerun).
+
+Configuration can be provided as environment variables or CLI flags.
+
+Examples:
+
+```bash
+# Environment variable configuration
+MMS_SEED_VALUE=20260801 MMS_SEED_PRODUCTS=300 MMS_SEED_MATERIAL_REQUESTS=400 npm run seed:mms
+
+# CLI override configuration
+npm run seed:mms -- --seed=20260801 --projects=50 --suppliers=40 --purchaseOrders=220
+
+# Dry run (executes then rolls back)
+npm run seed:mms -- --dry-run
+```
+
 ## Frontend Setup
 
 ```bash

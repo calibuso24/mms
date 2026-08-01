@@ -156,7 +156,7 @@ export class StockTransferRepository {
         m.product_code AS material_code,
         m.product_name AS material_name,
         sti.material_brand_id,
-        mb.brand_name AS material_brand_name,
+        b.brand_name AS material_brand_name,
         sti.uom_id,
         u.uom_name,
         u.abbreviation AS uom_abbreviation,
@@ -166,6 +166,7 @@ export class StockTransferRepository {
       JOIN material m ON m.material_id = sti.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = sti.uom_id AND u.is_deleted = false
       LEFT JOIN material_brand mb ON mb.material_brand_id = sti.material_brand_id AND mb.is_deleted = false
+      LEFT JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
       WHERE sti.stock_transfer_id = $1
         AND sti.is_deleted = false
       ORDER BY sti.stock_transfer_item_id ASC`,

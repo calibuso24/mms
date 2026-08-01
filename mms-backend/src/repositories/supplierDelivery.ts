@@ -242,7 +242,7 @@ export class SupplierDeliveryRepository {
         m.product_code AS material_code,
         m.product_name AS material_name,
         sdi.material_brand_id,
-        mb.brand_name AS material_brand_name,
+        b.brand_name AS material_brand_name,
         sdi.uom_id,
         u.uom_name,
         u.abbreviation AS uom_abbreviation,
@@ -255,6 +255,7 @@ export class SupplierDeliveryRepository {
       JOIN material m ON m.material_id = sdi.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = sdi.uom_id AND u.is_deleted = false
       LEFT JOIN material_brand mb ON mb.material_brand_id = sdi.material_brand_id AND mb.is_deleted = false
+      LEFT JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
       WHERE sdi.supplier_delivery_id = $1
         AND sdi.is_deleted = false
       ORDER BY sdi.supplier_delivery_item_id ASC`,

@@ -187,6 +187,12 @@ Current seed files in database/seeds:
 - 053_system_settings_permission_seed.sql
 - 054_system_settings_seed.sql
 
+Additional programmatic seeding tool:
+
+- mms-backend/src/scripts/seed_mms/index.ts
+	- Deterministic, idempotent workflow seeding with configurable per-module record counts.
+	- Generates linked construction-industry data across Product, Party, Material Control, Material Request, Purchase Order, Delivery Advice, Supplier Delivery, Stock Transfer, and Material Adjustment modules.
+
 Report-related seed notes:
 
 - report_seed defines 34 report catalog entries (INV, PUR, WAR, WH, PRO, PRJ, ACC, ADM, MLS code groups).
