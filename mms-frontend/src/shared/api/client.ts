@@ -108,11 +108,13 @@ export const accountApi = {
   getMe: () => ApiClient.get('/accounts/me'),
   updateMe: (data: any) => ApiClient.put('/accounts/me', data),
   getAccount: (id: number) => ApiClient.get(`/accounts/${id}`),
-  listAccounts: (limit?: number, offset?: number, search?: string) => {
+  listAccounts: (limit?: number, offset?: number, search?: string, sortBy?: string, sortDir?: 'asc' | 'desc') => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
     if (search) params.append('search', search);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortDir) params.append('sort_dir', sortDir);
     return ApiClient.get(`/accounts?${params.toString()}`);
   },
   listRoles: () => ApiClient.get('/accounts/meta/roles'),

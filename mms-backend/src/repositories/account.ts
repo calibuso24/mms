@@ -83,7 +83,9 @@ export class AccountRepository {
   async findAllWithDetails(
     limit: number = 50,
     offset: number = 0,
-    search?: string
+    search?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
   ): Promise<{ accounts: any[]; total: number }> {
     const whereParts = ['a.is_deleted = false'];
     const countParams: any[] = [];
@@ -97,6 +99,15 @@ export class AccountRepository {
     }
 
     const whereClause = whereParts.join(' AND ');
+
+    const allowedSortFields: Record<string, string> = {
+      user_name: 'a.user_name',
+      full_name: 'a.full_name',
+      is_active: 'a.is_active',
+      created_at: 'a.log_date_created',
+    };
+    const sortField = allowedSortFields[sortBy ?? ''] ?? 'a.log_date_created';
+    const sortDirection = sortDir === 'desc' ? 'DESC' : 'ASC';
 
     const countResult = await pool.query(
       `SELECT COUNT(*) as total FROM account a WHERE ${whereClause}`,
@@ -143,7 +154,7 @@ export class AccountRepository {
       LEFT JOIN role r ON ar.role_id = r.role_id AND r.is_deleted = false
       WHERE ${whereClause}
       GROUP BY a.account_id
-      ORDER BY a.log_date_created DESC
+      ORDER BY ${sortField} ${sortDirection}, a.log_date_created DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       [...queryParams, limit, offset]
     );

@@ -52,8 +52,10 @@ export class AccountController {
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const offset = parseInt(req.query.offset as string) || 0;
       const search = (req.query.search as string) || undefined;
+      const sortBy = (req.query.sort_by as string) || undefined;
+      const sortDir = (req.query.sort_dir as string) === 'desc' ? 'desc' : 'asc';
 
-      const result = await this.accountService.listAccounts(limit, offset, search);
+      const result = await this.accountService.listAccounts(limit, offset, search, sortBy, sortDir);
       res.json(result);
     } catch (error) {
       next(error);

@@ -140,9 +140,11 @@ export class AccountService {
   async listAccounts(
     limit: number = 50,
     offset: number = 0,
-    search?: string
+    search?: string,
+    sortBy?: string,
+    sortDir?: 'asc' | 'desc'
   ): Promise<ManagedUserListViewModel> {
-    const result = await this.accountRepository.findAllWithDetails(limit, offset, search);
+    const result = await this.accountRepository.findAllWithDetails(limit, offset, search, sortBy, sortDir);
 
     return {
       items: result.accounts.map((row) => ({
