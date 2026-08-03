@@ -111,15 +111,16 @@ if errorlevel 1 (
 
 :: Stop and remove existing services before re-registering
 nssm stop   MMS-Backend   2>nul
-nssm remove MMS-Backend   confirm 2>nul
 nssm stop   MMS-Reporting 2>nul
-nssm remove MMS-Reporting confirm 2>nul
 nssm stop   MMS-Nginx     2>nul
+
+nssm remove MMS-Backend   confirm 2>nul
+nssm remove MMS-Reporting confirm 2>nul
 nssm remove MMS-Nginx     confirm 2>nul
 
 :: Backend (Node.js / Express)
 nssm install MMS-Backend node.exe
-nssm set     MMS-Backend AppParameters       "dist/index.js"
+nssm set     MMS-Backend AppParameters       "C:\mms\backend\index.js"
 nssm set     MMS-Backend AppDirectory        "C:\mms\backend"
 nssm set     MMS-Backend AppEnvironmentExtra "NODE_ENV=production"
 nssm set     MMS-Backend AppStdout           "C:\mms\logs\backend-stdout.log"
