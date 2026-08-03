@@ -7,7 +7,8 @@
     "reporting": "cd reporting-service && mvn exec:java",
     "rebuild": "rimraf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install && cd reporting-service && mvn clean package",
     "build": "rimraf mms-backend/node_modules mms-frontend/node_modules mms-backend/package-lock.json mms-frontend/package-lock.json && npm --prefix mms-backend install && npm --prefix mms-frontend install",
-    "seed:mms": "npm --prefix mms-backend run seed:mms --"
+    "seed:mms": "npm --prefix mms-backend run seed:mms --",
+    "publish": "scripts\\publish.bat"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
