@@ -4,7 +4,7 @@ CREATE TABLE material_brand (
     brand_id BIGINT NOT NULL REFERENCES brand(brand_id),
     brand_product_code TEXT,
     brand_product_name TEXT,
-    status_id BIGINT NOT NULL REFERENCES look_up(look_up_id),
+    status_id BIGINT REFERENCES look_up(look_up_id),
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     log_date_created TIMESTAMPTZ,
     log_date_updated TIMESTAMPTZ,

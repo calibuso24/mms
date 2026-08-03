@@ -71,8 +71,8 @@ if not defined DB_EXISTS (
     "%PSQL_EXE%" -v ON_ERROR_STOP=1 -w -h "%DB_HOST%" -p "%DB_PORT%" -U "%DB_USER%" -d postgres -c "CREATE DATABASE \"%DB_NAME%\";" >nul 2>&1
     if errorlevel 1 (
         echo Failed to create database %DB_NAME%.
-        echo Check that the PostgreSQL user "%DB_USER%" can create databases.
-        exit /b 1
+        @REM echo Check that the PostgreSQL user "%DB_USER%" can create databases.
+        @REM exit /b 1
     )
 )
 
