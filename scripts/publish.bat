@@ -39,15 +39,10 @@ mkdir C:\mms\uploads 2>nul
 mkdir C:\mms\scripts 2>nul
 
 :: ----------------------------
-:: Nginx
+:: Nginx config (nginx.exe lives at C:\nginx)
 :: ----------------------------
 
-mkdir C:\mms\nginx 2>nul
-mkdir C:\mms\nginx\conf 2>nul
-mkdir C:\mms\nginx\logs 2>nul
-mkdir C:\mms\nginx\temp 2>nul
-
-copy scripts\nginx.conf C:\mms\nginx\conf\nginx.conf /Y
+copy scripts\nginx.conf C:\nginx\conf\nginx.conf /Y
 
 :: ----------------------------
 :: Frontend
@@ -103,25 +98,58 @@ copy reporting-service\target\*.jar C:\mms\reporting\
 xcopy reporting-service\reports\* C:\mms\reporting\reports\ /E /I /Y
 
 :: ----------------------------
-:: Startup scripts
+:: Register Windows Services via NSSM
+:: Services auto-start on boot and auto-restart on crash
 :: ----------------------------
 
-(
-echo @echo off
-echo cd /d C:\mms\backend
-echo node dist/index.js
-) > C:\mms\scripts\start-backend.bat
+where nssm >nul 2>&1
+if errorlevel 1 (
+    echo WARNING: nssm.exe not found in PATH. Services will not be registered.
+    echo          Download NSSM from https://nssm.cc and place it in C:\Windows\System32
+    goto :skip_services
+)
 
-(
-echo @echo off
-echo set REPORTS_BASE_DIR=C:\mms\reporting\reports
-echo set REPORT_DB_HOST=localhost
-echo set REPORT_DB_PORT=5432
-echo set REPORT_DB_NAME=mms
-echo set REPORT_DB_USER=postgres
-echo set REPORT_DB_PASSWORD=
-echo java -jar C:\mms\reporting\*.jar
-) > C:\mms\scripts\start-reporting.bat
+:: Stop and remove existing services before re-registering
+nssm stop   MMS-Backend   2>nul
+nssm remove MMS-Backend   confirm 2>nul
+nssm stop   MMS-Reporting 2>nul
+nssm remove MMS-Reporting confirm 2>nul
+nssm stop   MMS-Nginx     2>nul
+nssm remove MMS-Nginx     confirm 2>nul
+
+:: Backend (Node.js / Express)
+nssm install MMS-Backend node.exe
+nssm set     MMS-Backend AppParameters       "dist/index.js"
+nssm set     MMS-Backend AppDirectory        "C:\mms\backend"
+nssm set     MMS-Backend AppEnvironmentExtra "NODE_ENV=production"
+nssm set     MMS-Backend AppStdout           "C:\mms\logs\backend-stdout.log"
+nssm set     MMS-Backend AppStderr           "C:\mms\logs\backend-stderr.log"
+nssm set     MMS-Backend AppRotateFiles      1
+nssm set     MMS-Backend Start               SERVICE_AUTO_START
+
+:: Reporting service (Java / Javalin)
+nssm install MMS-Reporting java.exe
+nssm set     MMS-Reporting AppParameters       "-jar C:\mms\reporting\reporting-service-1.0.0.jar"
+nssm set     MMS-Reporting AppDirectory        "C:\mms\reporting"
+nssm set     MMS-Reporting AppEnvironmentExtra "REPORTS_BASE_DIR=C:\mms\reporting\reports"
+nssm set     MMS-Reporting AppStdout           "C:\mms\logs\reporting-stdout.log"
+nssm set     MMS-Reporting AppStderr           "C:\mms\logs\reporting-stderr.log"
+nssm set     MMS-Reporting AppRotateFiles      1
+nssm set     MMS-Reporting Start               SERVICE_AUTO_START
+
+:: Nginx (installed at C:\nginx)
+nssm install MMS-Nginx "C:\nginx\nginx.exe"
+nssm set     MMS-Nginx AppParameters  "-c C:\nginx\conf\nginx.conf"
+nssm set     MMS-Nginx AppDirectory   "C:\nginx"
+nssm set     MMS-Nginx AppStdout      "C:\mms\logs\nginx-stdout.log"
+nssm set     MMS-Nginx AppStderr      "C:\mms\logs\nginx-stderr.log"
+nssm set     MMS-Nginx Start          SERVICE_AUTO_START
+
+nssm start MMS-Reporting
+nssm start MMS-Backend
+nssm start MMS-Nginx
+
+:skip_services
 
 echo.
 echo =====================================
@@ -129,12 +157,10 @@ echo Deployment completed successfully.
 echo =====================================
 echo.
 echo Next steps:
-echo   1. Edit C:\mms\backend\.env and set DB_PASSWORD and CORS_ORIGIN
-echo   2. Edit C:\mms\scripts\start-reporting.bat and set REPORT_DB_PASSWORD
-echo   3. Copy nginx.exe and its bundled folders into C:\mms\nginx\
-echo   4. Run: C:\mms\nginx\nginx.exe -c C:\mms\nginx\conf\nginx.conf
-echo   5. Run: C:\mms\scripts\start-backend.bat
-echo   6. Run: C:\mms\scripts\start-reporting.bat
+echo   1. Edit C:\mms\backend\.env and set DB_PASSWORD, JWT_SECRET, and CORS_ORIGIN
+echo   2. Install NSSM from https://nssm.cc into C:\Windows\System32
+echo   3. Run publish.bat again -- it will register and start MMS-Backend,
+echo      MMS-Reporting, and MMS-Nginx as Windows Services (auto-start on boot)
 echo.
 
 pause
