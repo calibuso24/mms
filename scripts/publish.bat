@@ -120,7 +120,7 @@ nssm remove MMS-Nginx     confirm 2>nul
 
 :: Backend (Node.js / Express)
 nssm install MMS-Backend node.exe
-nssm set     MMS-Backend AppParameters       "C:\mms\backend\index.js"
+nssm set     MMS-Backend AppParameters       "dist/index.js"
 nssm set     MMS-Backend AppDirectory        "C:\mms\backend"
 nssm set     MMS-Backend AppEnvironmentExtra "NODE_ENV=production"
 nssm set     MMS-Backend AppStdout           "C:\mms\logs\backend-stdout.log"
@@ -132,7 +132,7 @@ nssm set     MMS-Backend Start               SERVICE_AUTO_START
 nssm install MMS-Reporting java.exe
 nssm set     MMS-Reporting AppParameters       "-jar C:\mms\reporting\reporting-service-1.0.0.jar"
 nssm set     MMS-Reporting AppDirectory        "C:\mms\reporting"
-nssm set     MMS-Reporting AppEnvironmentExtra "REPORTS_BASE_DIR=C:\mms\reporting\reports"
+nssm set     MMS-Reporting AppEnvironmentExtra "REPORTS_BASE_DIR=C:\mms\reporting"
 nssm set     MMS-Reporting AppStdout           "C:\mms\logs\reporting-stdout.log"
 nssm set     MMS-Reporting AppStderr           "C:\mms\logs\reporting-stderr.log"
 nssm set     MMS-Reporting AppRotateFiles      1
