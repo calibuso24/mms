@@ -1,4 +1,4 @@
-import { ValidationError } from '../../../utils/errors';
+import { ValidationError } from '../../../utils/errors.js';
 
 export class MaterialValidator {
   static validateCreateMaterial(data: any) {
