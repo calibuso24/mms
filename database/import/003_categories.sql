@@ -132,7 +132,8 @@ $$;
 -- ------------------------------------------------------------------
 
 ALTER TABLE source.tblsubcategory
-ADD COLUMN IF NOT EXISTS sub_category_id BIGINT;
+ADD COLUMN IF NOT EXISTS sub_category_id BIGINT,
+ADD COLUMN IF NOT EXISTS category_id BIGINT;
 
 -- ------------------------------------------------------------------
 -- STEP 2 : Assign new IDs only to unmapped records
@@ -144,6 +145,11 @@ SET sub_category_id = nextval(
 )
 WHERE sub_category_id IS NULL;
 
+UPDATE source.tblsubcategory a
+SET category_id = b.category_id
+FROM source.tblcategory b
+WHERE a.categoryid = b.categoryid
+;
 -- ------------------------------------------------------------------
 -- STEP 3 : Insert records
 -- ------------------------------------------------------------------

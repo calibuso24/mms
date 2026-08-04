@@ -1,6 +1,11 @@
 BEGIN;
 
 TRUNCATE material CASCADE;
+TRUNCATE material_type CASCADE;
+TRUNCATE material_brand CASCADE;
+TRUNCATE material_option CASCADE;
+TRUNCATE material_specification CASCADE;
+TRUNCATE unit_of_measure CASCADE;
 
 ALTER TABLE source.tblproduct
 ADD COLUMN IF NOT EXISTS brand_id BIGINT,
@@ -10,9 +15,34 @@ ADD COLUMN IF NOT EXISTS sub_category_id BIGINT,
 ADD COLUMN IF NOT EXISTS uom_id BIGINT
 ;
 
-ALTER TABLE source.tblcategory ADD COLUMN IF NOT EXISTS category_id BIGINT;
-UPDATE source.tblcategory SET category_id = nextval(pg_get_serial_sequence('public.category', 'category_id'))
-WHERE category_id IS NULL;  
+-- ALTER TABLE source.tblcategory ADD COLUMN IF NOT EXISTS category_id BIGINT;
+-- UPDATE source.tblcategory SET category_id = nextval(pg_get_serial_sequence('public.category', 'category_id'))
+-- -- WHERE category_id IS NULL
+-- ;  
+
+-- INSERT INTO public.category (
+--     category_id,
+--     category_code,
+--     category_name,
+--     is_active,
+--     is_deleted,
+--     log_date_created,
+--     log_module_created,
+--     log_module_updated
+-- )
+-- SELECT
+--     category_id,
+--     categoryid AS category_code,
+--     category AS category_name,
+--     TRUE AS is_active,
+--     FALSE AS is_deleted,
+--     NOW() AS log_date_created,
+--     'import_product' AS log_module_created,
+--     'import_product' AS log_module_updated
+-- FROM source.tblcategory
+-- WHERE category_id IS NOT NULL
+-- ;
+
 
 UPDATE source.tblproduct a
 SET category_id = b.category_id
@@ -20,12 +50,47 @@ FROM source.tblcategory b
 WHERE a.category = b.categoryid
 ;
 
-ALTER TABLE source.tblsubcategory ADD COLUMN IF NOT EXISTS sub_category_id BIGINT;
-UPDATE source.tblsubcategory SET sub_category_id = nextval(pg_get_serial_sequence('public.sub_category', 'sub_category_id'))
-WHERE sub_category_id IS NULL;
+-- ALTER TABLE source.tblsubcategory ADD COLUMN IF NOT EXISTS sub_category_id BIGINT;
+-- ALTER TABLE source.tblsubcategory ADD COLUMN IF NOT EXISTS category_id BIGINT;
+
+-- UPDATE source.tblsubcategory a
+-- SET category_id = b.category_id
+-- FROM source.tblcategory b
+-- WHERE a.categoryid = b.categoryid
+-- ;
+
+-- UPDATE source.tblsubcategory SET sub_category_id = nextval(pg_get_serial_sequence('public.sub_category', 'sub_category_id'))
+-- -- WHERE sub_category_id IS NULL
+-- ;
+
+-- INSERT INTO public.sub_category (
+--     sub_category_id,
+--     sub_category_code,
+--     sub_category_name,
+--     category_id,
+--     is_active,
+--     is_deleted,
+--     log_date_created,
+--     log_module_created,
+--     log_module_updated
+-- )
+-- SELECT
+--     sub_category_id,
+--     subcatid AS sub_category_code,
+--     subcategory AS sub_category_name,
+--     category_id,
+--     TRUE AS is_active,
+--     FALSE AS is_deleted,
+--     NOW() AS log_date_created,
+--     'import_product' AS log_module_created,
+--     'import_product' AS log_module_updated
+-- FROM source.tblsubcategory
+-- WHERE sub_category_id IS NOT NULL
+-- ;
 
 UPDATE source.tblproduct a
-SET sub_category_id = b.sub_category_id
+SET sub_category_id = b.sub_category_id,
+category_id = b.category_id
 FROM source.tblsubcategory b
 WHERE a.subcategory = b.subcatid
 AND a.category = b.categoryid
@@ -39,7 +104,8 @@ WHERE brand IS NOT NULL AND BTRIM(brand) <> '';
 ALTER TABLE source.tblbrand ADD COLUMN IF NOT EXISTS brand_id BIGINT;
 
 UPDATE source.tblbrand SET brand_id = nextval(pg_get_serial_sequence('public.brand', 'brand_id'))
-WHERE brand_id IS NULL; 
+-- WHERE brand_id IS NULL
+; 
 
 UPDATE source.tblproduct a 
 SET brand_id = b.brand_id
@@ -79,13 +145,15 @@ WHERE type IS NOT NULL AND BTRIM(type) <> ''
 ALTER TABLE source.tblmaterial_type ADD COLUMN IF NOT EXISTS material_type_id BIGINT;
 
 UPDATE source.tblmaterial_type SET material_type_id = nextval(pg_get_serial_sequence('public.material_type', 'material_type_id'))
-WHERE material_type_id IS NULL; 
+-- WHERE material_type_id IS NULL
+;
 
 UPDATE source.tblproduct a 
 SET material_type_id = b.material_type_id
 FROM source.tblmaterial_type b
 WHERE trim(lower(a.type)) = trim(lower(b.material_type))
 AND a.type IS NOT NULL 
+AND BTRIM(a.type) <> ''
 AND BTRIM(b.material_type) <> ''
 ;
 
@@ -107,14 +175,14 @@ SELECT
     'import_product',
     'import_product'    
 FROM source.tblmaterial_type b
-WHERE b.material_type_id IS NOT NULL    
+WHERE b.material_type_id IS NOT NULL  
 ;
 
-TRUNCATE public.unit_of_measure CASCADE;
 ALTER TABLE source.tblunit ADD COLUMN IF NOT EXISTS uom_id BIGINT;
 
 UPDATE source.tblunit SET uom_id = nextval(pg_get_serial_sequence('public.unit_of_measure', 'uom_id'))
-WHERE uom_id IS NULL;   
+-- WHERE uom_id IS NULL
+;   
 
 UPDATE source.tblproduct a
 SET uom_id = b.uom_id
@@ -147,7 +215,8 @@ WHERE u.uom_id IS NOT NULL;
 ALTER TABLE source.tblproduct ADD COLUMN IF NOT EXISTS material_id BIGINT;
 
 UPDATE source.tblproduct SET material_id = prodid
-WHERE material_id IS NULL;
+-- WHERE material_id IS NULL
+;
 
 INSERT INTO public.material (
     material_id,

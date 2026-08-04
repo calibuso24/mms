@@ -32,7 +32,7 @@ VALUES
     ('integrations', 'Integrations', 'Third-party integration and webhook settings.', 20, TRUE, FALSE, 'system_settings'),
     ('system', 'System', 'Environment and support contact settings.', 21, TRUE, FALSE, 'system_settings'),
     ('developer', 'Developer', 'Debug and development convenience settings.', 22, TRUE, FALSE, 'system_settings'),
-    ('license', 'License', 'License details and expiry tracking.', 23, TRUE, FALSE, 'system_settings'),
+    -- ('license', 'License', 'License details and expiry tracking.', 23, TRUE, FALSE, 'system_settings'),
     ('data_management', 'Data Management', 'Export, purge, and data lifecycle settings.', 24, TRUE, FALSE, 'system_settings')
 ON CONFLICT (category_code) DO NOTHING;
 

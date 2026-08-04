@@ -57,7 +57,7 @@ INSERT INTO brand (brand_name)
 VALUES
     ('Armaflex'),
     ('Rionfuse')
-ON CONFLICT (brand_name) DO NOTHING;
+;
 
 INSERT INTO material (
     product_code,
