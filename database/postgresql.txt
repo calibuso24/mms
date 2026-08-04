@@ -1,0 +1,27 @@
+----------------------------------
+CREATE USER
+----------------------------------
+sudo su - postgres
+
+create user alex
+
+ALTER USER alex WITH SUPERUSER;
+
+
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN('jasperserver','foodmart','sugarcrm');
+DROP DATABASE IF EXISTS jasperserver;
+DROP DATABASE IF EXISTS foodmart;
+DROP DATABASE IF EXISTS sugarcrm;
+
+
+---------------------------------
+BACKUP 
+---------------------------------
+open cmd as administrator
+cd C:\Program Files\PostgreSQL\18\bin
+
+pg_dump -Fc -Upostgres icpwi > icpwi.bak
+pg_dump -Fc -h 192.168.1.222 icpwi > icpwi.bak
+
+pg_restore -Upostgres -d icpwi -Fc icpwi.bak
+pg_restore -Upostgres -d icpwi -Fc icpwi_pgsql.bak
