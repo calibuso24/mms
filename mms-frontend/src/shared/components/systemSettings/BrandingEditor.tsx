@@ -83,11 +83,11 @@ export function BrandingEditor({ setting, value, onChange }: BrandingEditorProps
               }}
             />
           </Grid>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Avatar src={payload.companyLogo ?? undefined} alt={payload.companyName ?? 'Logo'} sx={{ width: 64, height: 64 }} />
-                <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('companyLogo', e.target.files?.[0] ?? null)} /></Button>
-                <Button variant="outlined" color="inherit" onClick={() => setField('companyLogo', null)}>Remove</Button>
-              </Stack>
+          <Grid item xs={12} md={4}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Avatar src={payload.companyLogo ?? undefined} alt={payload.companyName ?? 'Logo'} sx={{ width: 64, height: 64 }} />
+              <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('companyLogo', e.target.files?.[0] ?? null)} /></Button>
+              <Button variant="outlined" color="inherit" onClick={() => setField('companyLogo', null)}>Remove</Button>
             </Stack>
           </Grid>
 
