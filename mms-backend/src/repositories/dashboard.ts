@@ -488,6 +488,7 @@ export class DashboardRepository {
   private async quickActions(accountId: number): Promise<DashboardQuickActionItem[]> {
     const rows = await this.rows(
       `SELECT DISTINCT n.title, n.route
+       , n.display_order
        FROM navigation n
        WHERE n.context='MAIN' AND n.navigation_type='MENU' AND n.route IS NOT NULL AND n.route <> '/dashboard' AND n.is_deleted = false AND n.is_visible = true
          AND (

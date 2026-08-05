@@ -49,6 +49,10 @@ export default function LoginPage() {
     bgStyle.backgroundImage = 'linear-gradient(135deg, rgba(15, 59, 104, 0.05) 0%, rgba(0, 120, 212, 0.05) 100%)';
   }
   const layout = (branding?.loginLayout ?? branding?.login?.layout ?? 'centered').toString();
+  const overlayColor = branding?.login?.overlayColor ?? '#000000';
+  const overlayOpacity = Number(branding?.login?.overlayOpacity ?? 35);
+  const cardOpacity = Number(branding?.login?.cardOpacity ?? 90);
+  const cardBg = `rgba(255,255,255,${Math.max(0, Math.min(100, cardOpacity)) / 100})`;
 
   const renderFormCard = (cardSx: any = {}) => (
     <Card
