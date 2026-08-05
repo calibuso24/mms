@@ -24,8 +24,9 @@ import dashboardRoutes from './routes/dashboard.js';
 const app = express();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase JSON body size to support large branding payloads (images as data URLs)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors({
   origin: config.cors.origin,
   credentials: true,

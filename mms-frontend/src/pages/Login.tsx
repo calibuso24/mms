@@ -12,9 +12,11 @@ import {
   Paper,
 } from '@mui/material';
 import { useAuth } from '../shared/contexts/auth.js';
+import { useBranding } from '../shared/contexts/branding.js';
 
 export default function LoginPage() {
   const { login, isLoading } = useAuth();
+  const { branding } = useBranding();
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,6 +32,16 @@ export default function LoginPage() {
     }
   };
 
+  const bgStyle: Record<string, any> = {};
+  if (branding?.login?.backgroundImage) {
+    bgStyle.backgroundImage = `url(${branding.login.backgroundImage})`;
+    bgStyle.backgroundSize = 'cover';
+    bgStyle.backgroundPosition = 'center';
+  } else {
+    bgStyle.backgroundColor = '#F5F7FA';
+    bgStyle.backgroundImage = 'linear-gradient(135deg, rgba(15, 59, 104, 0.05) 0%, rgba(0, 120, 212, 0.05) 100%)';
+  }
+
   return (
     <Box
       sx={{
@@ -37,8 +49,7 @@ export default function LoginPage() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        backgroundColor: '#F5F7FA',
-        backgroundImage: 'linear-gradient(135deg, rgba(15, 59, 104, 0.05) 0%, rgba(0, 120, 212, 0.05) 100%)',
+        ...bgStyle,
       }}
     >
       <Container maxWidth="sm">
@@ -53,6 +64,12 @@ export default function LoginPage() {
           <CardContent sx={{ p: 4 }}>
             {/* Header */}
             <Box sx={{ mb: 3, textAlign: 'center' }}>
+              {branding?.login?.showLogo !== false && branding?.companyLogo ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                  <Box component="img" src={branding.companyLogo} alt={branding.companyName ?? 'Logo'} sx={{ height: 64 }} />
+                </Box>
+              ) : null}
+
               <Typography
                 variant="h4"
                 sx={{
@@ -61,7 +78,7 @@ export default function LoginPage() {
                   mb: 1,
                 }}
               >
-                Materials Management System
+                {branding?.login?.loginTitle ?? branding?.systemTitle ?? 'Materials Management System'}
               </Typography>
               <Typography
                 variant="subtitle1"
@@ -69,7 +86,7 @@ export default function LoginPage() {
                   color: '#666666',
                 }}
               >
-                Sign in to continue
+                {branding?.login?.loginSubtitle ?? 'Sign in to continue'}
               </Typography>
             </Box>
 
@@ -136,6 +153,22 @@ export default function LoginPage() {
             </Box>
 
             {/* Footer */}
+            {branding?.login?.footerText ? (
+              <Paper
+                elevation={0}
+                sx={{
+                  mt: 3,
+                  p: 2,
+                  backgroundColor: '#F5F7FA',
+                  borderRadius: 1,
+                  textAlign: 'center',
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#666666' }}>
+                  {branding.login.footerText}
+                </Typography>
+              </Paper>
+            ) : null}
             {/* <Paper
               elevation={0}
               sx={{

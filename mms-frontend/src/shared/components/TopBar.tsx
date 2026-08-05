@@ -19,6 +19,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import { styled } from '@mui/material/styles';
 import { CurrentAccount } from '../types/account.js';
+import { useBranding } from '../contexts/branding.js';
 import { getAccountAvatarSrc, getAccountDisplayName, getAccountInitials } from '../utils/account.js';
 
 const Search = styled(Box)(({ theme }) => ({
@@ -65,6 +66,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const displayName = getAccountDisplayName(account);
   const avatarSrc = getAccountAvatarSrc(account);
   const initials = getAccountInitials(displayName);
+  const { branding } = useBranding();
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -101,15 +103,20 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <MenuIcon />
           </IconButton>
-          <Typography
-            variant="h5"
-            sx={{
-              color: '#0b2748',
-              fontWeight: 600,
-            }}
-          >
-            {pageTitle}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {branding?.header?.companyLogo ? (
+              <Box component="img" src={branding.header.companyLogo} alt={branding.companyName ?? 'Logo'} sx={{ height: 28 }} />
+            ) : null}
+            <Typography
+              variant="h5"
+              sx={{
+                color: '#0b2748',
+                fontWeight: 600,
+              }}
+            >
+              {branding?.header?.systemTitle ?? pageTitle}
+            </Typography>
+          </Box>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

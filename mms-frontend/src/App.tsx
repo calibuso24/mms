@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useTheme } from '@mui/material/styles';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import { Box, Container, CssBaseline, Paper } from '@mui/material';
+import { Box, Container, Paper } from '@mui/material';
+import { BrandingProvider } from './shared/contexts/branding.js';
 import { AuthProvider, useAuth } from './shared/contexts/auth.js';
 import { NavigationProvider, useNavigation } from './shared/contexts/navigation.js';
 import { MainSidebar } from './shared/components/Sidebar.js';
@@ -108,6 +109,7 @@ function DynamicPage({ route }: { route: string | null }) {
 function AppShell() {
   const { isLoggedIn, logout, account } = useAuth();
   const { currentContext, setCurrentContext, pageTitle, setPageTitle } = useNavigation();
+  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [currentRoute, setCurrentRoute] = useState('/dashboard');
@@ -203,7 +205,7 @@ function AppShell() {
     );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#F5F7FA' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: theme.palette.background.default }}>
       <TopBar
         onMenuClick={() => setSidebarOpen(true)}
         pageTitle={pageTitle}
@@ -259,8 +261,7 @@ function AppShellWrapper() {
 
 export default function App() {
   return (
-    <ThemeProvider theme={muiTheme}>
-      <CssBaseline />
+    <BrandingProvider>
       <BrowserRouter>
         <AuthProvider>
           <NavigationProvider>
@@ -268,6 +269,6 @@ export default function App() {
           </NavigationProvider>
         </AuthProvider>
       </BrowserRouter>
-    </ThemeProvider>
+    </BrandingProvider>
   );
 }

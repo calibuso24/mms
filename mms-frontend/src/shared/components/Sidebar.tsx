@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useBranding } from '../contexts/branding.js';
 import {
   Drawer,
   Box,
@@ -208,6 +209,7 @@ export const MainSidebar: React.FC<MainSidebarProps> = ({
 }) => {
   const { mainNavigation, loading } = useNavigation();
   const [expandedTopLevelGroupId, setExpandedTopLevelGroupId] = useState<number | null>(null);
+  const { branding } = useBranding();
 
   const topLevelGroups = useMemo(
     () => mainNavigation.filter((item) => item.parent_navigation_id === null && item.navigation_type === 'GROUP'),
@@ -221,9 +223,29 @@ export const MainSidebar: React.FC<MainSidebarProps> = ({
   const sidebarContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Box sx={{ p: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-          Material Management System
-        </Typography>
+        {(() => {
+          const display = branding?.sidebar?.display ?? 'logo-and-text';
+          if (display === 'logo-only' || display === 'logo-and-text') {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {branding?.companyLogo ? (
+                  <Box component="img" src={branding.companyLogo} alt={branding.companyName ?? 'Logo'} sx={{ height: 36 }} />
+                ) : null}
+                {display === 'logo-and-text' ? (
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+                    {branding?.companyName ?? 'Materials Management System'}
+                  </Typography>
+                ) : null}
+              </Box>
+            );
+          }
+
+          return (
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
+              {branding?.companyName ?? 'Materials Management System'}
+            </Typography>
+          );
+        })()}
       </Box>
 
       <List sx={{ flex: 1, overflow: 'auto', py: 1 }}>

@@ -31,6 +31,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
 import { systemSettingsApi } from '../../api/client.js';
+import BrandingEditor from './BrandingEditor.js';
+import { useBranding } from '../../contexts/branding.js';
 import {
   SystemSettingCategorySummary,
   SystemSettingItem,
@@ -150,6 +152,7 @@ export function SettingsAccordion({
   onToggle,
   onDirtyChange,
 }: SettingsAccordionProps) {
+  const { reload } = useBranding();
   const [settings, setSettings] = useState<SystemSettingItem[]>([]);
   const [drafts, setDrafts] = useState<Record<number, unknown>>({});
   const [initialDrafts, setInitialDrafts] = useState<Record<number, unknown>>({});
@@ -231,6 +234,15 @@ export function SettingsAccordion({
       setDrafts(nextDrafts);
       setInitialDrafts(nextDrafts);
       setSuccess('Settings saved successfully');
+      try {
+        // If this is the branding category, reload persisted branding from server
+        // so the global theme matches saved values.
+        if (category.category_code === 'branding') {
+          await reload();
+        }
+      } catch (e) {
+        // ignore reload errors
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to save settings');
     } finally {
@@ -381,42 +393,58 @@ export function SettingsAccordion({
 
               <Divider sx={{ mb: 2 }} />
 
-              <Grid container spacing={2}>
-                {settings.map((setting) => (
-                  <Grid item xs={12} md={6} lg={4} key={setting.system_setting_id}>
-                    <Card variant="outlined" sx={{ height: '100%' }}>
-                      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start' }}>
-                          <Box>
-                            <Typography variant="subtitle1" fontWeight={600}>
-                              {setting.setting_name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {setting.setting_key} | {setting.setting_type}
-                            </Typography>
+              {category.category_code === 'branding' ? (
+                <Card variant="outlined">
+                  <CardContent>
+                    {settings[0] ? (
+                      <BrandingEditor
+                        setting={settings[0]}
+                        value={drafts[settings[0].system_setting_id]}
+                        onChange={(nextValue) => setDrafts((current) => ({ ...current, [settings[0].system_setting_id]: nextValue }))}
+                      />
+                    ) : (
+                      <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>No branding setting found.</Box>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Grid container spacing={2}>
+                  {settings.map((setting) => (
+                    <Grid item xs={12} md={6} lg={4} key={setting.system_setting_id}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start' }}>
+                            <Box>
+                              <Typography variant="subtitle1" fontWeight={600}>
+                                {setting.setting_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {setting.setting_key} | {setting.setting_type}
+                              </Typography>
+                            </Box>
+                            {canEdit && (
+                              <IconButton size="small" color="error" aria-label={`Delete ${setting.setting_name}`} onClick={() => setDeleteTarget(setting)}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            )}
                           </Box>
-                          {canEdit && (
-                            <IconButton size="small" color="error" aria-label={`Delete ${setting.setting_name}`} onClick={() => setDeleteTarget(setting)}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          )}
-                        </Box>
 
-                        <SettingsField
-                          setting={setting}
-                          value={drafts[setting.system_setting_id]}
-                          onChange={(nextValue) => setDrafts((current) => ({ ...current, [setting.system_setting_id]: nextValue }))}
-                          disabled={!canSave || saving || !setting.is_editable}
-                        />
+                          <SettingsField
+                            setting={setting}
+                            value={drafts[setting.system_setting_id]}
+                            onChange={(nextValue) => setDrafts((current) => ({ ...current, [setting.system_setting_id]: nextValue }))}
+                            disabled={!canSave || saving || !setting.is_editable}
+                          />
 
-                        <Typography variant="caption" color="text.secondary">
-                          Default: {setting.default_value ?? 'Not configured'}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+                          <Typography variant="caption" color="text.secondary">
+                            Default: {setting.default_value ?? 'Not configured'}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
 
               {settings.length === 0 && (
                 <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
