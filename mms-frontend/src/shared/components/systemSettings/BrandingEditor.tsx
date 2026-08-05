@@ -109,6 +109,12 @@ export function BrandingEditor({ setting, value, onChange }: BrandingEditorProps
             <Stack>
               <Typography variant="body2" fontWeight={600}>Background Image</Typography>
               <Stack direction="row" spacing={1} alignItems="center">
+                <Avatar
+                  src={payload.login?.backgroundImage ?? undefined}
+                  alt="Background"
+                  variant="square"
+                  sx={{ width: 80, height: 56, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}
+                />
                 <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('login.backgroundImage', e.target.files?.[0] ?? null)} /></Button>
                 <Button variant="outlined" color="inherit" onClick={() => setField('login.backgroundImage', null)}>Remove</Button>
               </Stack>
@@ -118,6 +124,12 @@ export function BrandingEditor({ setting, value, onChange }: BrandingEditorProps
             <Stack>
               <Typography variant="body2" fontWeight={600}>Banner Image</Typography>
               <Stack direction="row" spacing={1} alignItems="center">
+                <Avatar
+                  src={payload.login?.bannerImage ?? payload.companyLogo ?? undefined}
+                  alt="Banner"
+                  variant="square"
+                  sx={{ width: 120, height: 56, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider' }}
+                />
                 <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('login.bannerImage', e.target.files?.[0] ?? null)} /></Button>
                 <Button variant="outlined" color="inherit" onClick={() => setField('login.bannerImage', null)}>Remove</Button>
               </Stack>
