@@ -21,8 +21,9 @@ export class BrandController {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
 
-      const brands = await this.brandService.listBrands(limit, offset);
+      const brands = await this.brandService.listBrands(limit, offset, search);
       res.json(brands);
     } catch (error) {
       next(error);

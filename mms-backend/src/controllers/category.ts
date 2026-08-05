@@ -21,8 +21,9 @@ export class CategoryController {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
 
-      const categories = await this.categoryService.listCategories(limit, offset);
+      const categories = await this.categoryService.listCategories(limit, offset, search);
       res.json(categories);
     } catch (error) {
       next(error);

@@ -26,10 +26,18 @@ export class SubCategoryRepository {
     return result.rows[0] || null;
   }
 
-  async findByCategory(categoryId: number, limit?: number, offset?: number): Promise<SubCategory[]> {
-    let query = `SELECT * FROM sub_category WHERE category_id = $1 AND is_deleted = false ORDER BY sub_category_name ASC`;
+  async findByCategory(categoryId: number, limit?: number, offset?: number, search?: string): Promise<SubCategory[]> {
+    let query = `SELECT * FROM sub_category WHERE category_id = $1 AND is_deleted = false`;
     const params: any[] = [categoryId];
     let paramIndex = 2;
+
+    if (search && search.trim().length > 0) {
+      query += ` AND (sub_category_code ILIKE $${paramIndex} OR sub_category_name ILIKE $${paramIndex})`;
+      params.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
+
+    query += ' ORDER BY sub_category_name ASC';
 
     if (limit) {
       query += ` LIMIT $${paramIndex}`;
@@ -45,15 +53,25 @@ export class SubCategoryRepository {
     return result.rows;
   }
 
-  async findAll(limit?: number, offset?: number): Promise<SubCategory[]> {
-    let query = 'SELECT * FROM sub_category WHERE is_deleted = false ORDER BY sub_category_name ASC';
+  async findAll(limit?: number, offset?: number, search?: string): Promise<SubCategory[]> {
+    let query = 'SELECT * FROM sub_category WHERE is_deleted = false';
     const params: any[] = [];
+    let paramIndex = 1;
+
+    if (search && search.trim().length > 0) {
+      query += ` AND (sub_category_code ILIKE $${paramIndex} OR sub_category_name ILIKE $${paramIndex})`;
+      params.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
+
+    query += ' ORDER BY sub_category_name ASC';
 
     if (limit) {
-      query += ' LIMIT $1';
+      query += ` LIMIT $${paramIndex}`;
       params.push(limit);
+      paramIndex++;
       if (offset) {
-        query += ' OFFSET $2';
+        query += ` OFFSET $${paramIndex}`;
         params.push(offset);
       }
     }

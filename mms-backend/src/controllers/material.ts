@@ -21,6 +21,9 @@ export class MaterialController {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const withTotal =
+        req.query.with_total === '1' ||
+        req.query.with_total === 'true';
       const search = req.query.search as string | undefined;
       const category_id = req.query.category_id
         ? parseInt(req.query.category_id as string)
@@ -31,6 +34,9 @@ export class MaterialController {
       const status_id = req.query.status_id
         ? parseInt(req.query.status_id as string)
         : undefined;
+      const material_type_id = req.query.material_type_id
+        ? parseInt(req.query.material_type_id as string)
+        : undefined;
       const uom_id = req.query.uom_id
         ? parseInt(req.query.uom_id as string)
         : undefined;
@@ -38,15 +44,27 @@ export class MaterialController {
         ? parseInt(req.query.brand_id as string)
         : undefined;
 
-      const materials = await this.materialService.listMaterials(limit, offset, {
+      const filters = {
         search,
         category_id,
         sub_category_id,
         status_id,
+        material_type_id,
         uom_id,
         brand_id,
-      });
+      };
 
+      if (withTotal) {
+        const paged = await this.materialService.listMaterialsPaged(
+          limit,
+          offset,
+          filters
+        );
+        res.json(paged);
+        return;
+      }
+
+      const materials = await this.materialService.listMaterials(limit, offset, filters);
       res.json(materials);
     } catch (error) {
       next(error);
@@ -56,29 +74,27 @@ export class MaterialController {
   async createMaterial(req: Request, res: Response, next: NextFunction) {
     try {
       const {
-        product_code,
         product_name,
-        source_description,
         category_id,
         sub_category_id,
         stock_uom_id,
+        material_type_id,
         status_id,
         brand_id,
         notes,
         material_specification,
       } = req.body;
 
-      if (!product_code || !product_name) {
-        throw new ValidationError('Product code and name are required');
+      if (!product_name) {
+        throw new ValidationError('Product name is required');
       }
 
       const material = await this.materialService.createMaterial({
-        product_code,
         product_name,
-        source_description,
         category_id,
         sub_category_id,
         stock_uom_id,
+        material_type_id,
         status_id,
         brand_id,
         notes,

@@ -12,8 +12,8 @@ export class UnitOfMeasureService {
     return uom;
   }
 
-  async listUnitsOfMeasure(limit?: number, offset?: number) {
-    return this.uomRepository.findAll(limit, offset);
+  async listUnitsOfMeasure(limit?: number, offset?: number, search?: string) {
+    return this.uomRepository.findAll(limit, offset, search);
   }
 
   async createUnitOfMeasure(data: {

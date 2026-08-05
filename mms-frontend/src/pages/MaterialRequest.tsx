@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Autocomplete,
   Alert,
   Box,
   Breadcrumbs,
@@ -65,7 +66,7 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
-  source_description?: string | null;
+  full_description?: string | null;
   brand_name?: string | null;
   specification_name?: string | null;
   stock_uom_id?: number | null;
@@ -215,6 +216,7 @@ export default function MaterialRequestPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [filters, setFilters] = useState({ project_id: '', status_id: '' });
   const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [projectQuery, setProjectQuery] = useState('');
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [uoms, setUoms] = useState<UomItem[]>([]);
@@ -245,6 +247,17 @@ export default function MaterialRequestPage() {
   useEffect(() => {
     void loadItems();
   }, [canView, page, rowsPerPage, search, sortBy, sortDir, filters.project_id, filters.status_id]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void projectApi
+        .list(100, 0, projectQuery)
+        .then((data) => setProjects(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [projectQuery]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -529,7 +542,7 @@ export default function MaterialRequestPage() {
     const nextRow = { ...newRow };
     if (material) {
       nextRow.description = material.product_name || '';
-      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.specification = material.specification_name || material.full_description || '';
       nextRow.brand = material.brand_name || '';
       if (material.stock_uom_id && !nextRow.uom_id) {
         nextRow.uom_id = String(material.stock_uom_id);
@@ -603,12 +616,18 @@ export default function MaterialRequestPage() {
               />
             </Grid>
             <Grid item xs={12} md={3}>
-              <FormControl fullWidth size="small">
-                <Select displayEmpty value={filters.project_id} onChange={(event) => { setFilters((current) => ({ ...current, project_id: event.target.value })); setPage(0); }}>
-                  <MenuItem value="">All Projects</MenuItem>
-                  {projects.map((project) => <MenuItem key={project.party_id} value={project.party_id.toString()}>{project.party_code} - {project.party_name}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                size="small"
+                options={projects}
+                value={projects.find((project) => String(project.party_id) === String(filters.project_id)) || null}
+                onChange={(_, value) => {
+                  setFilters((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }));
+                  setPage(0);
+                }}
+                onInputChange={(_, value) => setProjectQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Project" />}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
@@ -680,12 +699,14 @@ export default function MaterialRequestPage() {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.25 }}>
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <Select value={form.project_id} displayEmpty onChange={(event) => setForm((current) => ({ ...current, project_id: event.target.value }))}>
-                  <MenuItem value="">Select Project</MenuItem>
-                  {projects.map((project) => <MenuItem key={project.party_id} value={project.party_id.toString()}>{project.party_code} - {project.party_name}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={projects}
+                value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
+                onInputChange={(_, value) => setProjectQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Project" />}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <FormControl fullWidth>

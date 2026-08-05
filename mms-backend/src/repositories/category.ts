@@ -26,15 +26,25 @@ export class CategoryRepository {
     return result.rows[0] || null;
   }
 
-  async findAll(limit?: number, offset?: number): Promise<Category[]> {
-    let query = 'SELECT * FROM category WHERE is_deleted = false ORDER BY category_name ASC';
+  async findAll(limit?: number, offset?: number, search?: string): Promise<Category[]> {
+    let query = 'SELECT * FROM category WHERE is_deleted = false';
     const params: any[] = [];
+    let paramIndex = 1;
+
+    if (search && search.trim().length > 0) {
+      query += ` AND (category_code ILIKE $${paramIndex} OR category_name ILIKE $${paramIndex})`;
+      params.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
+
+    query += ' ORDER BY category_name ASC';
 
     if (limit) {
-      query += ' LIMIT $1';
+      query += ` LIMIT $${paramIndex}`;
       params.push(limit);
+      paramIndex++;
       if (offset) {
-        query += ' OFFSET $2';
+        query += ` OFFSET $${paramIndex}`;
         params.push(offset);
       }
     }

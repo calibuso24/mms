@@ -12,8 +12,8 @@ export class BrandService {
     return brand;
   }
 
-  async listBrands(limit?: number, offset?: number) {
-    return this.brandRepository.findAll(limit, offset);
+  async listBrands(limit?: number, offset?: number, search?: string) {
+    return this.brandRepository.findAll(limit, offset, search);
   }
 
   async createBrand(data: { brand_name: string }) {

@@ -4,6 +4,7 @@ import { BrandController } from '../controllers/brand.js';
 import { UnitOfMeasureController } from '../controllers/unitOfMeasure.js';
 import { SubCategoryController } from '../controllers/subCategory.js';
 import { MaterialController } from '../controllers/material.js';
+import { MaterialTypeController } from '../controllers/materialType.js';
 import { LookupController } from '../controllers/lookup.js';
 
 const router = Router();
@@ -14,6 +15,7 @@ const brandController = new BrandController();
 const uomController = new UnitOfMeasureController();
 const subCategoryController = new SubCategoryController();
 const materialController = new MaterialController();
+const materialTypeController = new MaterialTypeController();
 const lookupController = new LookupController();
 
 // Categories
@@ -97,6 +99,14 @@ router.put('/materials/:id', (req, res, next) =>
 );
 router.delete('/materials/:id', (req, res, next) =>
   materialController.deleteMaterial(req, res, next)
+);
+
+// Material types
+router.get('/material-types', (req, res, next) =>
+  materialTypeController.listMaterialTypes(req, res, next)
+);
+router.get('/material-types/:id', (req, res, next) =>
+  materialTypeController.getMaterialType(req, res, next)
 );
 
 export default router;

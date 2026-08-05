@@ -21,8 +21,9 @@ export class UnitOfMeasureController {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
 
-      const uoms = await this.uomService.listUnitsOfMeasure(limit, offset);
+      const uoms = await this.uomService.listUnitsOfMeasure(limit, offset, search);
       res.json(uoms);
     } catch (error) {
       next(error);

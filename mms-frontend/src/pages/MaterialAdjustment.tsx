@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
+  Autocomplete,
   Breadcrumbs,
   Button,
   Card,
@@ -69,7 +70,7 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
-  source_description?: string | null;
+  full_description?: string | null;
   brand_name?: string | null;
   specification_name?: string | null;
   stock_uom_id?: number | null;
@@ -183,6 +184,7 @@ export default function MaterialAdjustmentPage() {
 
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
+  const [projectQuery, setProjectQuery] = useState('');
   const [reasons, setReasons] = useState<LookupItem[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [uoms, setUoms] = useState<UomItem[]>([]);
@@ -215,6 +217,16 @@ export default function MaterialAdjustmentPage() {
     void loadItems();
   }, [canView, page, rowsPerPage, search, sortBy, sortDir, filters.project_id, filters.status_id, filters.reason_id]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void projectApi
+        .list(100, 0, projectQuery)
+        .then((data) => setProjects(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [projectQuery]);
   const loadPermissions = async () => {
     if (!account?.account_id) {
       setPermissions([]);
@@ -500,7 +512,7 @@ export default function MaterialAdjustmentPage() {
     const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
     if (material) {
       nextRow.description = material.product_name || '';
-      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.specification = material.specification_name || material.full_description || '';
       nextRow.brand = material.brand_name || '';
       if (material.stock_uom_id && !nextRow.uom_id) {
         nextRow.uom_id = String(material.stock_uom_id);
@@ -554,21 +566,18 @@ export default function MaterialAdjustmentPage() {
               </Grid>
 
               <Grid item xs={12} md={3} lg={3}>
-                <FormControl fullWidth size="small">
-                  <Select
-                    displayEmpty
-                    value={filters.project_id}
-                    onChange={(event) => {
-                      setFilters((current) => ({ ...current, project_id: event.target.value }));
-                      setPage(0);
-                    }}
-                  >
-                    <MenuItem value="">All Projects</MenuItem>
-                    {projects.map((row) => (
-                      <MenuItem key={row.party_id} value={row.party_id.toString()}>{row.party_code} - {row.party_name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  size="small"
+                  options={projects}
+                  value={projects.find((project) => String(project.party_id) === String(filters.project_id)) || null}
+                  onChange={(_, value) => {
+                    setFilters((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }));
+                    setPage(0);
+                  }}
+                  onInputChange={(_, value) => setProjectQuery(value)}
+                  getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                  renderInput={(params) => <TextField {...params} label="Project" />}
+                />
               </Grid>
 
               <Grid item xs={12} md={2} lg={2}>
@@ -678,13 +687,14 @@ export default function MaterialAdjustmentPage() {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
             <Grid item xs={12} md={6} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Project</Typography>
-                <Select value={form.project_id} onChange={(event) => setForm((current) => ({ ...current, project_id: event.target.value }))}>
-                  <MenuItem value="">Select project</MenuItem>
-                  {projects.map((row) => <MenuItem key={row.party_id} value={row.party_id.toString()}>{row.party_code} - {row.party_name}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={projects}
+                value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
+                onInputChange={(_, value) => setProjectQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Project" />}
+              />
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
               <TextField fullWidth size="small" type="datetime-local" label="Requested At" value={form.requested_at} onChange={(event) => setForm((current) => ({ ...current, requested_at: event.target.value }))} InputLabelProps={{ shrink: true }} />

@@ -24,11 +24,13 @@ export class SubCategoryController {
         : undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
 
       const subCategories = await this.subCategoryService.listSubCategories(
         categoryId,
         limit,
-        offset
+        offset,
+        search
       );
       res.json(subCategories);
     } catch (error) {

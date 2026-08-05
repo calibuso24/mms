@@ -24,15 +24,25 @@ export class BrandRepository {
     return result.rows[0] || null;
   }
 
-  async findAll(limit?: number, offset?: number): Promise<Brand[]> {
-    let query = 'SELECT * FROM brand WHERE is_deleted = false ORDER BY brand_name ASC';
+  async findAll(limit?: number, offset?: number, search?: string): Promise<Brand[]> {
+    let query = 'SELECT * FROM brand WHERE is_deleted = false';
     const params: any[] = [];
+    let paramIndex = 1;
+
+    if (search && search.trim().length > 0) {
+      query += ` AND brand_name ILIKE $${paramIndex}`;
+      params.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
+
+    query += ' ORDER BY brand_name ASC';
 
     if (limit) {
-      query += ' LIMIT $1';
+      query += ` LIMIT $${paramIndex}`;
       params.push(limit);
+      paramIndex++;
       if (offset) {
-        query += ' OFFSET $2';
+        query += ` OFFSET $${paramIndex}`;
         params.push(offset);
       }
     }

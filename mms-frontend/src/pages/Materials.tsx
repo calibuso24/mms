@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -21,23 +22,29 @@ import {
   TableHead,
   TableRow,
   TableContainer,
+  TablePagination,
   Chip,
   Card,
   CardContent,
+  IconButton,
+  Stack,
+  Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
-import { materialApi, categoryApi, subCategoryApi, brandApi, uomApi, lookupApi } from '../shared/api/client.js';
+import { materialApi, materialTypeApi, categoryApi, subCategoryApi, brandApi, uomApi, lookupApi } from '../shared/api/client.js';
 
 interface Material {
   material_id: string;
   product_code: string;
   product_name: string;
+  full_description?: string;
   category_name: string;
   sub_category_name: string;
+  material_type_name?: string;
   uom_name: string;
   status_name: string;
 }
@@ -45,10 +52,10 @@ interface Material {
 interface FormData {
   product_code: string;
   product_name: string;
-  source_description: string;
   category_id: string;
   sub_category_id: string;
   stock_uom_id: string;
+  material_type_id: string;
   brand_id: string;
   status_id: string;
   notes: string;
@@ -78,11 +85,20 @@ export default function MaterialsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [subCategories, setSubCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
+  const [materialTypes, setMaterialTypes] = useState<any[]>([]);
   const [uoms, setUoms] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [optionTypes, setOptionTypes] = useState<any[]>([]);
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const [subCategoryQuery, setSubCategoryQuery] = useState('');
+  const [brandQuery, setBrandQuery] = useState('');
+  const [materialTypeQuery, setMaterialTypeQuery] = useState('');
+  const [uomQuery, setUomQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [total, setTotal] = useState(0);
   
   const [basicSearch, setBasicSearch] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -100,10 +116,10 @@ export default function MaterialsPage() {
   const [formData, setFormData] = useState<FormData>({
     product_code: '',
     product_name: '',
-    source_description: '',
     category_id: '',
     sub_category_id: '',
     stock_uom_id: '',
+    material_type_id: '',
     brand_id: '',
     status_id: '',
     notes: '',
@@ -133,6 +149,10 @@ export default function MaterialsPage() {
 
   useEffect(() => {
     loadMaterials();
+  }, [basicSearch, showAdvancedFilters, advancedFilters, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
   }, [basicSearch, showAdvancedFilters, advancedFilters]);
 
   useEffect(() => {
@@ -143,17 +163,58 @@ export default function MaterialsPage() {
     }
   }, [advancedFilters.category_id]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void categoryApi.list(100, 0, categoryQuery).then(setCategories).catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [categoryQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void brandApi.list(100, 0, brandQuery).then(setBrands).catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [brandQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void materialTypeApi.list(100, 0, materialTypeQuery).then(setMaterialTypes).catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [materialTypeQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void uomApi.list(100, 0, uomQuery).then(setUoms).catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [uomQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!formData.category_id) return;
+      void subCategoryApi
+        .list(parseInt(formData.category_id, 10), 100, 0, subCategoryQuery)
+        .then(setSubCategories)
+        .catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [formData.category_id, subCategoryQuery]);
+
   const loadInitialData = async () => {
     try {
-      const [categoriesData, brandsData, uomsData, statusesData, optionTypesData] = await Promise.all([
+      const [categoriesData, brandsData, materialTypesData, uomsData, statusesData, optionTypesData] = await Promise.all([
         categoryApi.list(100),
         brandApi.list(100),
+        materialTypeApi.list(100),
         uomApi.list(100),
         lookupApi.listByType('material_status', 100),
         lookupApi.listByType('material_option_type', 100),
       ]);
       setCategories(categoriesData);
       setBrands(brandsData);
+      setMaterialTypes(materialTypesData);
       setUoms(uomsData);
       setStatuses(statusesData);
       setOptionTypes(optionTypesData);
@@ -184,8 +245,9 @@ export default function MaterialsPage() {
         filters.uom_id = parseInt(advancedFilters.uom_id);
       }
 
-      const data = await materialApi.list(100, 0, filters);
-      setMaterials(data);
+      const data = await materialApi.listPaged(rowsPerPage, page * rowsPerPage, filters);
+      setMaterials(Array.isArray(data?.items) ? data.items : []);
+      setTotal(Number(data?.total || 0));
     } catch (err: any) {
       setError(err.message || 'Failed to load materials');
     } finally {
@@ -242,13 +304,15 @@ export default function MaterialsPage() {
     setError('');
     try {
       const submitData: any = {
-        ...formData,
+        product_name: formData.product_name,
         category_id: parseInt(formData.category_id),
         stock_uom_id: parseInt(formData.stock_uom_id),
-        status_id: parseInt(formData.status_id),
       };
       if (formData.sub_category_id) {
         submitData.sub_category_id = parseInt(formData.sub_category_id);
+      }
+      if (formData.material_type_id) {
+        submitData.material_type_id = parseInt(formData.material_type_id);
       }
       if (formData.brand_id) {
         submitData.brand_id = parseInt(formData.brand_id);
@@ -286,10 +350,10 @@ export default function MaterialsPage() {
       setFormData({
         product_code: material.product_code,
         product_name: material.product_name,
-        source_description: material.source_description || '',
         category_id: material.category_id,
         sub_category_id: material.sub_category_id || '',
         stock_uom_id: material.stock_uom_id,
+        material_type_id: material.material_type_id || '',
         brand_id: material.brand_id || '',
         status_id: material.status_id,
         notes: material.notes || '',
@@ -334,13 +398,15 @@ export default function MaterialsPage() {
     try {
       const submitData: any = {
         product_name: formData.product_name,
-        source_description: formData.source_description,
         category_id: parseInt(formData.category_id),
         stock_uom_id: parseInt(formData.stock_uom_id),
         status_id: parseInt(formData.status_id),
       };
       if (formData.sub_category_id) {
         submitData.sub_category_id = parseInt(formData.sub_category_id);
+      }
+      if (formData.material_type_id) {
+        submitData.material_type_id = parseInt(formData.material_type_id);
       }
       if (formData.brand_id) {
         submitData.brand_id = parseInt(formData.brand_id);
@@ -391,10 +457,10 @@ export default function MaterialsPage() {
     setFormData({
       product_code: '',
       product_name: '',
-      source_description: '',
       category_id: '',
       sub_category_id: '',
       stock_uom_id: '',
+      material_type_id: '',
       brand_id: '',
       status_id: '',
       notes: '',
@@ -469,36 +535,34 @@ export default function MaterialsPage() {
 
         {showAdvancedFilters && (
           <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-            <Select
-              value={advancedFilters.category_id}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, category_id: e.target.value, sub_category_id: '' })}
+            <Autocomplete
               size="small"
-              displayEmpty
-              renderValue={(value) => value ? categories.find(c => c.category_id === value)?.category_name || 'Category' : 'Category'}
-            >
-              <MenuItem value="">All Categories</MenuItem>
-              {categories.map((cat) => (
-                <MenuItem key={cat.category_id} value={cat.category_id}>
-                  {cat.category_name}
-                </MenuItem>
-              ))}
-            </Select>
+              options={categories}
+              value={categories.find((c) => String(c.category_id) === String(advancedFilters.category_id)) || null}
+              onChange={(_, value) =>
+                setAdvancedFilters({
+                  ...advancedFilters,
+                  category_id: value ? String(value.category_id) : '',
+                  sub_category_id: '',
+                })
+              }
+              onInputChange={(_, value) => setCategoryQuery(value)}
+              getOptionLabel={(option) => option?.category_name || ''}
+              renderInput={(params) => <TextField {...params} placeholder="Category" />}
+            />
 
-            <Select
-              value={advancedFilters.sub_category_id}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, sub_category_id: e.target.value })}
+            <Autocomplete
               size="small"
-              displayEmpty
-              renderValue={(value) => value ? subCategories.find(s => s.sub_category_id === value)?.sub_category_name || 'Sub Category' : 'Sub Category'}
-            >
-              <MenuItem value="">All Sub Categories</MenuItem>
-              {advancedFilters.category_id &&
-                subCategories.map((subCat) => (
-                  <MenuItem key={subCat.sub_category_id} value={subCat.sub_category_id}>
-                    {subCat.sub_category_name}
-                  </MenuItem>
-                ))}
-            </Select>
+              options={subCategories}
+              value={subCategories.find((s) => String(s.sub_category_id) === String(advancedFilters.sub_category_id)) || null}
+              onChange={(_, value) =>
+                setAdvancedFilters({ ...advancedFilters, sub_category_id: value ? String(value.sub_category_id) : '' })
+              }
+              onInputChange={(_, value) => setSubCategoryQuery(value)}
+              getOptionLabel={(option) => option?.sub_category_name || ''}
+              renderInput={(params) => <TextField {...params} placeholder="Sub Category" />}
+              disabled={!advancedFilters.category_id}
+            />
 
             <Select
               value={advancedFilters.status_id}
@@ -515,20 +579,15 @@ export default function MaterialsPage() {
               ))}
             </Select>
 
-            <Select
-              value={advancedFilters.uom_id}
-              onChange={(e) => setAdvancedFilters({ ...advancedFilters, uom_id: e.target.value })}
+            <Autocomplete
               size="small"
-              displayEmpty
-              renderValue={(value) => value ? uoms.find(u => u.uom_id === value)?.uom_name || 'UOM' : 'UOM'}
-            >
-              <MenuItem value="">All UOMs</MenuItem>
-              {uoms.map((uom) => (
-                <MenuItem key={uom.uom_id} value={uom.uom_id}>
-                  {uom.uom_name}
-                </MenuItem>
-              ))}
-            </Select>
+              options={uoms}
+              value={uoms.find((u) => String(u.uom_id) === String(advancedFilters.uom_id)) || null}
+              onChange={(_, value) => setAdvancedFilters({ ...advancedFilters, uom_id: value ? String(value.uom_id) : '' })}
+              onInputChange={(_, value) => setUomQuery(value)}
+              getOptionLabel={(option) => option?.uom_name || ''}
+              renderInput={(params) => <TextField {...params} placeholder="UOM" />}
+            />
           </Box>
         )}
       </Paper>
@@ -551,6 +610,7 @@ export default function MaterialsPage() {
               <TableRow sx={{ backgroundColor: '#F5F7FA' }}>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Product Code</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Product Name</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Full Description</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Category</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Sub Category</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Unit</TableCell>
@@ -563,6 +623,7 @@ export default function MaterialsPage() {
                 <TableRow key={material.material_id} sx={{ '&:hover': { backgroundColor: '#F5F7FA' } }}>
                   <TableCell>{material.product_code}</TableCell>
                   <TableCell>{material.product_name}</TableCell>
+                  <TableCell>{material.full_description || '-'}</TableCell>
                   <TableCell>{material.category_name}</TableCell>
                   <TableCell>{material.sub_category_name || '-'}</TableCell>
                   <TableCell>{material.uom_name}</TableCell>
@@ -570,27 +631,44 @@ export default function MaterialsPage() {
                     <Chip label={material.status_name} size="small" color="primary" variant="outlined" />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => handleEditMaterial(material.material_id)}
-                      sx={{ mr: 1 }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      startIcon={<DeleteIcon />}
-                      color="error"
-                      onClick={() => handleDeleteMaterial(material.material_id)}
-                    >
-                      Delete
-                    </Button>
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title="Edit">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditMaterial(material.material_id)}
+                          aria-label="Edit material"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteMaterial(material.material_id)}
+                          aria-label="Delete material"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={(_, nextPage) => setPage(nextPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+          />
         </TableContainer>
       )}
 
@@ -614,8 +692,8 @@ export default function MaterialsPage() {
                 name="product_code"
                 value={formData.product_code}
                 onChange={handleFormChange}
-                required
-                disabled={!!editingMaterialId}
+                disabled
+                helperText={editingMaterialId ? 'Generated product code' : 'Product code will be generated after save'}
                 size="small"
               />
               <TextField
@@ -629,93 +707,79 @@ export default function MaterialsPage() {
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Select
-                value={formData.category_id}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                displayEmpty
-                required
+              <Autocomplete
                 size="small"
-                renderValue={(value) => value ? categories.find(c => c.category_id === value)?.category_name || 'Select' : 'Category *'}
-              >
-                <MenuItem value="">Select a category</MenuItem>
-                {categories.map((cat) => (
-                  <MenuItem key={cat.category_id} value={cat.category_id}>
-                    {cat.category_name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <Select
-                value={formData.sub_category_id}
-                onChange={(e) => setFormData({ ...formData, sub_category_id: e.target.value })}
-                displayEmpty
+                options={categories}
+                value={categories.find((c) => String(c.category_id) === String(formData.category_id)) || null}
+                onChange={(_, value) => handleCategoryChange(value ? String(value.category_id) : '')}
+                onInputChange={(_, value) => setCategoryQuery(value)}
+                getOptionLabel={(option) => option?.category_name || ''}
+                renderInput={(params) => <TextField {...params} label="Category" required />}
+              />
+              <Autocomplete
                 size="small"
-                renderValue={(value) => value ? subCategories.find(s => s.sub_category_id === value)?.sub_category_name || 'Select' : 'Sub Category'}
-              >
-                <MenuItem value="">Select a sub-category</MenuItem>
-                {subCategories.map((subCat) => (
-                  <MenuItem key={subCat.sub_category_id} value={subCat.sub_category_id}>
-                    {subCat.sub_category_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Box>
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Select
-                value={formData.stock_uom_id}
-                onChange={(e) => setFormData({ ...formData, stock_uom_id: e.target.value })}
-                displayEmpty
-                required
-                size="small"
-                renderValue={(value) => value ? uoms.find(u => u.uom_id === value)?.uom_name || 'Select' : 'UOM *'}
-              >
-                <MenuItem value="">Select a UOM</MenuItem>
-                {uoms.map((uom) => (
-                  <MenuItem key={uom.uom_id} value={uom.uom_id}>
-                    {uom.uom_name} ({uom.abbreviation})
-                  </MenuItem>
-                ))}
-              </Select>
-              <Select
-                value={formData.brand_id}
-                onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
-                displayEmpty
-                size="small"
-                renderValue={(value) => value ? brands.find(b => b.brand_id === value)?.brand_name || 'Select' : 'Brand'}
-              >
-                <MenuItem value="">Select a brand</MenuItem>
-                {brands.map((brand) => (
-                  <MenuItem key={brand.brand_id} value={brand.brand_id}>
-                    {brand.brand_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Box>
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Select
-                value={formData.status_id}
-                onChange={(e) => setFormData({ ...formData, status_id: e.target.value })}
-                displayEmpty
-                required
-                size="small"
-                renderValue={(value) => value ? statuses.find(s => s.look_up_id === value)?.name || 'Select' : 'Status *'}
-              >
-                <MenuItem value="">Select a status</MenuItem>
-                {statuses.map((status) => (
-                  <MenuItem key={status.look_up_id} value={status.look_up_id}>
-                    {status.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <TextField
-                label="Source Description"
-                name="source_description"
-                value={formData.source_description}
-                onChange={handleFormChange}
-                size="small"
+                options={subCategories}
+                value={subCategories.find((s) => String(s.sub_category_id) === String(formData.sub_category_id)) || null}
+                onChange={(_, value) => setFormData({ ...formData, sub_category_id: value ? String(value.sub_category_id) : '' })}
+                onInputChange={(_, value) => setSubCategoryQuery(value)}
+                getOptionLabel={(option) => option?.sub_category_name || ''}
+                renderInput={(params) => <TextField {...params} label="Sub Category" />}
+                disabled={!formData.category_id}
               />
             </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <Autocomplete
+                size="small"
+                options={uoms}
+                value={uoms.find((u) => String(u.uom_id) === String(formData.stock_uom_id)) || null}
+                onChange={(_, value) => setFormData({ ...formData, stock_uom_id: value ? String(value.uom_id) : '' })}
+                onInputChange={(_, value) => setUomQuery(value)}
+                getOptionLabel={(option) => option?.uom_name ? `${option.uom_name}${option.abbreviation ? ` (${option.abbreviation})` : ''}` : ''}
+                renderInput={(params) => <TextField {...params} label="UOM" required />}
+              />
+              <Autocomplete
+                size="small"
+                options={materialTypes}
+                value={materialTypes.find((mt) => String(mt.material_type_id) === String(formData.material_type_id)) || null}
+                onChange={(_, value) => setFormData({ ...formData, material_type_id: value ? String(value.material_type_id) : '' })}
+                onInputChange={(_, value) => setMaterialTypeQuery(value)}
+                getOptionLabel={(option) => option?.material_type_name || ''}
+                renderInput={(params) => <TextField {...params} label="Material Type" />}
+              />
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <Autocomplete
+                size="small"
+                options={brands}
+                value={brands.find((b) => String(b.brand_id) === String(formData.brand_id)) || null}
+                onChange={(_, value) => setFormData({ ...formData, brand_id: value ? String(value.brand_id) : '' })}
+                onInputChange={(_, value) => setBrandQuery(value)}
+                getOptionLabel={(option) => option?.brand_name || ''}
+                renderInput={(params) => <TextField {...params} label="Brand" />}
+              />
+            </Box>
+
+            {editingMaterialId && (
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <Select
+                  value={formData.status_id}
+                  onChange={(e) => setFormData({ ...formData, status_id: e.target.value })}
+                  displayEmpty
+                  required
+                  size="small"
+                  renderValue={(value) => value ? statuses.find(s => s.look_up_id === value)?.name || 'Select' : 'Status *'}
+                >
+                  <MenuItem value="">Select a status</MenuItem>
+                  {statuses.map((status) => (
+                    <MenuItem key={status.look_up_id} value={status.look_up_id}>
+                      {status.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Box>
+            )}
 
             <TextField
               label="Notes"

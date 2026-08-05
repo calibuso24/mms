@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Breadcrumbs,
   Button,
@@ -215,6 +216,8 @@ export default function SupplierDeliveryPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
   const [suppliers, setSuppliers] = useState<PartyItem[]>([]);
   const [projects, setProjects] = useState<PartyItem[]>([]);
+  const [supplierQuery, setSupplierQuery] = useState('');
+  const [projectQuery, setProjectQuery] = useState('');
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
 
@@ -254,6 +257,28 @@ export default function SupplierDeliveryPage() {
     }
     void loadPurchaseOrderItems(Number(form.purchase_order_id));
   }, [form.purchase_order_id]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void supplierApi
+        .list(100, 0, supplierQuery)
+        .then((data) => setSuppliers(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [supplierQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void projectApi
+        .list(100, 0, projectQuery)
+        .then((data) => setProjects(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [projectQuery]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -680,21 +705,18 @@ export default function SupplierDeliveryPage() {
               </Grid>
 
               <Grid item xs={12} md={2} lg={2}>
-                <FormControl fullWidth size="small">
-                  <Select
-                    displayEmpty
-                    value={filters.supplier_id}
-                    onChange={(event) => {
-                      setFilters((current) => ({ ...current, supplier_id: event.target.value }));
-                      setPage(0);
-                    }}
-                  >
-                    <MenuItem value="">All Suppliers</MenuItem>
-                    {suppliers.map((row) => (
-                      <MenuItem key={row.party_id} value={row.party_id.toString()}>{row.party_code} - {row.party_name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  size="small"
+                  options={suppliers}
+                  value={suppliers.find((supplier) => String(supplier.party_id) === String(filters.supplier_id)) || null}
+                  onChange={(_, value) => {
+                    setFilters((current) => ({ ...current, supplier_id: value ? String(value.party_id) : '' }));
+                    setPage(0);
+                  }}
+                  onInputChange={(_, value) => setSupplierQuery(value)}
+                  getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                  renderInput={(params) => <TextField {...params} label="Supplier" />}
+                />
               </Grid>
 
               <Grid item xs={12} md={2} lg={2}>
@@ -864,37 +886,25 @@ export default function SupplierDeliveryPage() {
             </Grid>
 
             <Grid item xs={12} md={6} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Supplier</Typography>
-                <Select
-                  value={form.supplier_id}
-                  onChange={(event) => setForm((current) => ({ ...current, supplier_id: event.target.value }))}
-                >
-                  <MenuItem value="">Select supplier</MenuItem>
-                  {suppliers.map((supplier) => (
-                    <MenuItem key={supplier.party_id} value={supplier.party_id.toString()}>
-                      {supplier.party_code} - {supplier.party_name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={suppliers}
+                value={suppliers.find((supplier) => String(supplier.party_id) === String(form.supplier_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, supplier_id: value ? String(value.party_id) : '' }))}
+                onInputChange={(_, value) => setSupplierQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Supplier" />}
+              />
             </Grid>
 
             <Grid item xs={12} md={6} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Project</Typography>
-                <Select
-                  value={form.project_id}
-                  onChange={(event) => setForm((current) => ({ ...current, project_id: event.target.value }))}
-                >
-                  <MenuItem value="">Select project</MenuItem>
-                  {projects.map((project) => (
-                    <MenuItem key={project.party_id} value={project.party_id.toString()}>
-                      {project.party_code} - {project.party_name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={projects}
+                value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
+                onInputChange={(_, value) => setProjectQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Project" />}
+              />
             </Grid>
 
             <Grid item xs={12} md={6} lg={4}>

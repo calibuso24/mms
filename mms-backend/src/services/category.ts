@@ -12,8 +12,8 @@ export class CategoryService {
     return category;
   }
 
-  async listCategories(limit?: number, offset?: number) {
-    return this.categoryRepository.findAll(limit, offset);
+  async listCategories(limit?: number, offset?: number, search?: string) {
+    return this.categoryRepository.findAll(limit, offset, search);
   }
 
   async createCategory(data: {

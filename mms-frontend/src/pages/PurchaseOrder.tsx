@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Autocomplete,
   Alert,
   Box,
   Breadcrumbs,
@@ -76,7 +77,7 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
-  source_description?: string | null;
+  full_description?: string | null;
   brand_name?: string | null;
   specification_name?: string | null;
   stock_uom_id?: number | null;
@@ -262,6 +263,8 @@ export default function PurchaseOrderPage() {
   const [filters, setFilters] = useState({ project_id: '', supplier_party_id: '', status_id: '', order_type_id: '' });
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
+  const [projectQuery, setProjectQuery] = useState('');
+  const [supplierQuery, setSupplierQuery] = useState('');
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
   const [orderTypes, setOrderTypes] = useState<LookupItem[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
@@ -294,6 +297,28 @@ export default function PurchaseOrderPage() {
   useEffect(() => {
     void loadItems();
   }, [canView, page, rowsPerPage, search, sortBy, sortDir, filters.project_id, filters.supplier_party_id, filters.status_id, filters.order_type_id]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void projectApi
+        .list(100, 0, projectQuery)
+        .then((data) => setProjects(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [projectQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void supplierApi
+        .list(100, 0, supplierQuery)
+        .then((data) => setSuppliers(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [supplierQuery]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -670,7 +695,7 @@ export default function PurchaseOrderPage() {
     const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
     if (material) {
       nextRow.description = material.product_name || '';
-      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.specification = material.specification_name || material.full_description || '';
       nextRow.brand = material.brand_name || '';
       if (material.stock_uom_id && !nextRow.uom_id) {
         nextRow.uom_id = String(material.stock_uom_id);
@@ -741,44 +766,32 @@ export default function PurchaseOrderPage() {
               />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField
-                select
-                fullWidth
+              <Autocomplete
                 size="small"
-                label="Project"
-                value={filters.project_id}
-                onChange={(event) => {
-                  setFilters((current) => ({ ...current, project_id: event.target.value }));
+                options={projects}
+                value={projects.find((project) => String(project.party_id) === String(filters.project_id)) || null}
+                onChange={(_, value) => {
+                  setFilters((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }));
                   setPage(0);
                 }}
-              >
-                <MenuItem value="">All</MenuItem>
-                {projects.map((project) => (
-                  <MenuItem key={project.party_id} value={project.party_id}>
-                    {project.party_code} - {project.party_name}
-                  </MenuItem>
-                ))}
-              </TextField>
+                onInputChange={(_, value) => setProjectQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Project" />}
+              />
             </Grid>
             <Grid item xs={12} md={2}>
-              <TextField
-                select
-                fullWidth
+              <Autocomplete
                 size="small"
-                label="Supplier"
-                value={filters.supplier_party_id}
-                onChange={(event) => {
-                  setFilters((current) => ({ ...current, supplier_party_id: event.target.value }));
+                options={suppliers}
+                value={suppliers.find((supplier) => String(supplier.party_id) === String(filters.supplier_party_id)) || null}
+                onChange={(_, value) => {
+                  setFilters((current) => ({ ...current, supplier_party_id: value ? String(value.party_id) : '' }));
                   setPage(0);
                 }}
-              >
-                <MenuItem value="">All</MenuItem>
-                {suppliers.map((supplier) => (
-                  <MenuItem key={supplier.party_id} value={supplier.party_id}>
-                    {supplier.party_code} - {supplier.party_name}
-                  </MenuItem>
-                ))}
-              </TextField>
+                onInputChange={(_, value) => setSupplierQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Supplier" />}
+              />
             </Grid>
             <Grid item xs={12} md={2}>
               <TextField
@@ -954,14 +967,14 @@ export default function PurchaseOrderPage() {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
             <Grid item xs={12} md={4}>
-              <TextField select fullWidth label="Project" value={form.project_id} onChange={(event) => setForm((current) => ({ ...current, project_id: event.target.value }))}>
-                <MenuItem value="">Select project</MenuItem>
-                {projects.map((project) => (
-                  <MenuItem key={project.party_id} value={project.party_id}>
-                    {project.party_code} - {project.party_name}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={projects}
+                value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
+                onInputChange={(_, value) => setProjectQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Project" />}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField select fullWidth label="Material Request" value={form.material_request_id} onChange={(event) => setForm((current) => ({ ...current, material_request_id: event.target.value }))}>
@@ -981,14 +994,14 @@ export default function PurchaseOrderPage() {
               </Stack>
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField select fullWidth label="Supplier" value={form.supplier_party_id} onChange={(event) => setForm((current) => ({ ...current, supplier_party_id: event.target.value }))}>
-                <MenuItem value="">Select supplier</MenuItem>
-                {suppliers.map((supplier) => (
-                  <MenuItem key={supplier.party_id} value={supplier.party_id}>
-                    {supplier.party_code} - {supplier.party_name}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                options={suppliers}
+                value={suppliers.find((supplier) => String(supplier.party_id) === String(form.supplier_party_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, supplier_party_id: value ? String(value.party_id) : '' }))}
+                onInputChange={(_, value) => setSupplierQuery(value)}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Supplier" />}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField

@@ -71,7 +71,7 @@ interface MaterialItem {
   material_id: number;
   product_code: string;
   product_name: string;
-  source_description?: string | null;
+  full_description?: string | null;
   brand_name?: string | null;
   specification_name?: string | null;
   stock_uom_id?: number | null;
@@ -580,7 +580,7 @@ export default function StockTransferPage() {
     const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
     if (material) {
       nextRow.description = material.product_name || '';
-      nextRow.specification = material.specification_name || material.source_description || '';
+      nextRow.specification = material.specification_name || material.full_description || '';
       nextRow.brand = material.brand_name || '';
       if (material.stock_uom_id && !nextRow.uom_id) {
         nextRow.uom_id = String(material.stock_uom_id);

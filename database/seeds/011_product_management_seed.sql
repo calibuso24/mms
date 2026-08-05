@@ -141,20 +141,16 @@ ON CONFLICT (material_id) DO NOTHING;
 INSERT INTO material_brand (
     material_id,
     brand_id,
-    brand_product_code,
-    brand_product_name,
     status_id
 )
 SELECT
     m.material_id,
     b.brand_id,
-    source.brand_product_code,
-    source.brand_product_name,
     status_lookup.look_up_id
 FROM (
     VALUES
-        ('MAT-000010', 'Armaflex', 'ARMAFLEX-INS-3.5-0.75-2M', 'Armaflex Rubber Insulation 3-1/2 in x 3/4 in x 2 m')
-) AS source(product_code, brand_name, brand_product_code, brand_product_name)
+        ('MAT-000010', 'Armaflex')
+) AS source(product_code, brand_name)
 JOIN material m ON m.product_code = source.product_code
 JOIN brand b ON b.brand_name = source.brand_name
 JOIN look_up status_lookup ON status_lookup.look_up_type = 'material_brand_status' AND status_lookup.name = 'Active'

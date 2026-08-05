@@ -34,19 +34,31 @@ export class MaterialService {
   async listMaterials(
     limit?: number,
     offset?: number,
-    filters?: { search?: string; category_id?: number; sub_category_id?: number; status_id?: number; uom_id?: number; brand_id?: number }
+    filters?: { search?: string; category_id?: number; sub_category_id?: number; status_id?: number; material_type_id?: number; uom_id?: number; brand_id?: number }
   ) {
     return this.materialRepository.findAll(limit, offset, filters);
   }
 
+  async listMaterialsPaged(
+    limit = 25,
+    offset = 0,
+    filters?: { search?: string; category_id?: number; sub_category_id?: number; status_id?: number; material_type_id?: number; uom_id?: number; brand_id?: number }
+  ) {
+    const [items, total] = await Promise.all([
+      this.materialRepository.findAll(limit, offset, filters),
+      this.materialRepository.countAll(filters),
+    ]);
+
+    return { items, total };
+  }
+
   async createMaterial(data: {
-    product_code: string;
     product_name: string;
-    source_description?: string;
     category_id: number;
     sub_category_id?: number;
     stock_uom_id: number;
-    status_id: number;
+    material_type_id?: number;
+    status_id?: number;
     notes?: string;
     brand_id?: number;
     material_specification?: {
@@ -77,30 +89,41 @@ export class MaterialService {
       throw new NotFoundError('Unit of measure not found');
     }
 
-    // Verify status exists in look_up table
-    const statusResult = await pool.query(
-      'SELECT * FROM look_up WHERE look_up_id = $1 AND is_deleted = false',
-      [data.status_id]
-    );
-    if (statusResult.rows.length === 0) {
-      throw new NotFoundError('Status not found');
+    if (data.material_type_id) {
+      const materialTypeResult = await pool.query(
+        'SELECT material_type_id FROM material_type WHERE material_type_id = $1 AND is_deleted = false',
+        [data.material_type_id]
+      );
+      if (materialTypeResult.rows.length === 0) {
+        throw new NotFoundError('Material type not found');
+      }
     }
 
-    // Check for duplicate product code
-    const existing = await this.materialRepository.findByCode(data.product_code);
-    if (existing) {
-      throw new ValidationError('Product code already exists');
+    // Resolve status. Create defaults to Active; provided status_id is ignored to enforce the requirement.
+    const activeStatusResult = await pool.query(
+      `SELECT look_up_id
+       FROM look_up
+       WHERE look_up_type = 'material_status'
+         AND code = 'active'
+         AND is_deleted = false
+       LIMIT 1`
+    );
+    if (activeStatusResult.rows.length === 0) {
+      throw new NotFoundError('Default material status Active not found');
     }
+    const activeStatusId = Number(activeStatusResult.rows[0].look_up_id);
+
+    const generatedProductCode = await this.generateProductCode(data.category_id, data.sub_category_id);
 
     // Create material
     const material = await this.materialRepository.create({
-      product_code: data.product_code,
+      product_code: generatedProductCode,
       product_name: data.product_name,
-      source_description: data.source_description,
       category_id: data.category_id,
       sub_category_id: data.sub_category_id,
       stock_uom_id: data.stock_uom_id,
-      status_id: data.status_id,
+      material_type_id: data.material_type_id,
+      status_id: activeStatusId,
       notes: data.notes,
     });
 
@@ -125,10 +148,10 @@ export class MaterialService {
     id: number,
     data: {
       product_name?: string;
-      source_description?: string;
       category_id?: number;
       sub_category_id?: number;
       stock_uom_id?: number;
+      material_type_id?: number;
       status_id?: number;
       notes?: string;
       brand_id?: number;
@@ -189,13 +212,23 @@ export class MaterialService {
       }
     }
 
+    if (data.material_type_id) {
+      const materialTypeResult = await pool.query(
+        'SELECT material_type_id FROM material_type WHERE material_type_id = $1 AND is_deleted = false',
+        [data.material_type_id]
+      );
+      if (materialTypeResult.rows.length === 0) {
+        throw new NotFoundError('Material type not found');
+      }
+    }
+
     // Prepare data for material update (exclude specification and option fields)
     const materialUpdateData: any = {};
     if (data.product_name !== undefined) materialUpdateData.product_name = data.product_name;
-    if (data.source_description !== undefined) materialUpdateData.source_description = data.source_description;
     if (data.category_id !== undefined) materialUpdateData.category_id = data.category_id;
     if (data.sub_category_id !== undefined) materialUpdateData.sub_category_id = data.sub_category_id;
     if (data.stock_uom_id !== undefined) materialUpdateData.stock_uom_id = data.stock_uom_id;
+    if (data.material_type_id !== undefined) materialUpdateData.material_type_id = data.material_type_id;
     if (data.status_id !== undefined) materialUpdateData.status_id = data.status_id;
     if (data.notes !== undefined) materialUpdateData.notes = data.notes;
 
@@ -250,5 +283,47 @@ export class MaterialService {
     }
 
     await this.materialRepository.softDelete(id);
+  }
+
+  private async generateProductCode(categoryId: number, subCategoryId?: number): Promise<string> {
+    const MAX_ATTEMPTS = 5;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock($1)', [categoryId]);
+
+        const { category_code, sub_category_code } = await this.materialRepository.getCategoryCodes(categoryId, subCategoryId);
+        if (!category_code) {
+          throw new ValidationError('Unable to generate product code for invalid category context');
+        }
+
+        const nextSequence = (await this.materialRepository.getNextProductCodeSequence(category_code, sub_category_code, client)) + 1;
+        const candidate = `${category_code}${sub_category_code}${String(nextSequence).padStart(5, '0')}`;
+
+        const exists = await client.query(
+          `SELECT 1
+           FROM material
+           WHERE product_code = $1
+           LIMIT 1`,
+          [candidate]
+        );
+        if (exists.rows.length > 0) {
+          await client.query('ROLLBACK');
+          continue;
+        }
+
+        await client.query('COMMIT');
+        return candidate;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    throw new ValidationError('Unable to generate unique product code. Please retry.');
   }
 }

@@ -14,11 +14,11 @@ export class SubCategoryService {
     return subCategory;
   }
 
-  async listSubCategories(categoryId?: number, limit?: number, offset?: number) {
+  async listSubCategories(categoryId?: number, limit?: number, offset?: number, search?: string) {
     if (categoryId) {
-      return this.subCategoryRepository.findByCategory(categoryId, limit, offset);
+      return this.subCategoryRepository.findByCategory(categoryId, limit, offset, search);
     }
-    return this.subCategoryRepository.findAll(limit, offset);
+    return this.subCategoryRepository.findAll(limit, offset, search);
   }
 
   async createSubCategory(data: {

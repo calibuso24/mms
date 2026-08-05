@@ -172,10 +172,11 @@ export const accountApi = {
 
 // Category API
 export const categoryApi = {
-  list: (limit?: number, offset?: number) => {
+  list: (limit?: number, offset?: number, search?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
     return ApiClient.get(`/categories?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/categories/${id}`),
@@ -186,10 +187,11 @@ export const categoryApi = {
 
 // Brand API
 export const brandApi = {
-  list: (limit?: number, offset?: number) => {
+  list: (limit?: number, offset?: number, search?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
     return ApiClient.get(`/brands?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/brands/${id}`),
@@ -200,10 +202,11 @@ export const brandApi = {
 
 // Unit of Measure API
 export const uomApi = {
-  list: (limit?: number, offset?: number) => {
+  list: (limit?: number, offset?: number, search?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
     return ApiClient.get(`/uom?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/uom/${id}`),
@@ -214,11 +217,12 @@ export const uomApi = {
 
 // Sub-Category API
 export const subCategoryApi = {
-  list: (categoryId?: number, limit?: number, offset?: number) => {
+  list: (categoryId?: number, limit?: number, offset?: number, search?: string) => {
     const params = new URLSearchParams();
     if (categoryId) params.append('category_id', categoryId.toString());
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
     return ApiClient.get(`/subcategories?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/subcategories/${id}`),
@@ -237,6 +241,21 @@ export const materialApi = {
     if (filters?.category_id) params.append('category_id', filters.category_id.toString());
     if (filters?.sub_category_id) params.append('sub_category_id', filters.sub_category_id.toString());
     if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.material_type_id) params.append('material_type_id', filters.material_type_id.toString());
+    if (filters?.uom_id) params.append('uom_id', filters.uom_id.toString());
+    if (filters?.brand_id) params.append('brand_id', filters.brand_id.toString());
+    return ApiClient.get(`/materials?${params.toString()}`);
+  },
+  listPaged: (limit?: number, offset?: number, filters?: any) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset !== undefined) params.append('offset', offset.toString());
+    params.append('with_total', '1');
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.category_id) params.append('category_id', filters.category_id.toString());
+    if (filters?.sub_category_id) params.append('sub_category_id', filters.sub_category_id.toString());
+    if (filters?.status_id) params.append('status_id', filters.status_id.toString());
+    if (filters?.material_type_id) params.append('material_type_id', filters.material_type_id.toString());
     if (filters?.uom_id) params.append('uom_id', filters.uom_id.toString());
     if (filters?.brand_id) params.append('brand_id', filters.brand_id.toString());
     return ApiClient.get(`/materials?${params.toString()}`);
@@ -245,6 +264,18 @@ export const materialApi = {
   create: (data: any) => ApiClient.post('/materials', data),
   update: (id: number, data: any) => ApiClient.put(`/materials/${id}`, data),
   delete: (id: number) => ApiClient.delete(`/materials/${id}`),
+};
+
+// Material Type API
+export const materialTypeApi = {
+  list: (limit?: number, offset?: number, search?: string) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset) params.append('offset', offset.toString());
+    if (search) params.append('search', search);
+    return ApiClient.get(`/material-types?${params.toString()}`);
+  },
+  get: (id: number) => ApiClient.get(`/material-types/${id}`),
 };
 
 // Material Control API

@@ -4,15 +4,6 @@ export class MaterialValidator {
   static validateCreateMaterial(data: any) {
     const errors: string[] = [];
 
-    // Product code validation
-    if (!data.product_code || typeof data.product_code !== 'string') {
-      errors.push('Product code is required and must be a string');
-    } else if (data.product_code.trim().length < 2) {
-      errors.push('Product code must be at least 2 characters');
-    } else if (data.product_code.trim().length > 50) {
-      errors.push('Product code must not exceed 50 characters');
-    }
-
     // Product name validation
     if (!data.product_name || typeof data.product_name !== 'string') {
       errors.push('Product name is required and must be a string');
@@ -36,13 +27,6 @@ export class MaterialValidator {
       errors.push('UOM ID must be a positive integer');
     }
 
-    // Status validation
-    if (!data.status_id) {
-      errors.push('Status is required');
-    } else if (!Number.isInteger(data.status_id) || data.status_id <= 0) {
-      errors.push('Status ID must be a positive integer');
-    }
-
     // Optional field validations
     if (data.sub_category_id !== undefined && data.sub_category_id !== null) {
       if (!Number.isInteger(data.sub_category_id) || data.sub_category_id <= 0) {
@@ -56,11 +40,9 @@ export class MaterialValidator {
       }
     }
 
-    if (data.source_description !== undefined && data.source_description !== null) {
-      if (typeof data.source_description !== 'string') {
-        errors.push('Source description must be a string');
-      } else if (data.source_description.length > 500) {
-        errors.push('Source description must not exceed 500 characters');
+    if (data.material_type_id !== undefined && data.material_type_id !== null) {
+      if (!Number.isInteger(data.material_type_id) || data.material_type_id <= 0) {
+        errors.push('Material type ID must be a positive integer');
       }
     }
 
@@ -117,6 +99,13 @@ export class MaterialValidator {
       }
     }
 
+    // Material type validation (if provided)
+    if (data.material_type_id !== undefined && data.material_type_id !== null) {
+      if (!Number.isInteger(data.material_type_id) || data.material_type_id <= 0) {
+        errors.push('Material type ID must be a positive integer');
+      }
+    }
+
     // Status validation (if provided)
     if (data.status_id !== undefined) {
       if (!Number.isInteger(data.status_id) || data.status_id <= 0) {
@@ -128,15 +117,6 @@ export class MaterialValidator {
     if (data.brand_id !== undefined && data.brand_id !== null) {
       if (!Number.isInteger(data.brand_id) || data.brand_id <= 0) {
         errors.push('Brand ID must be a positive integer');
-      }
-    }
-
-    // Source description validation (if provided)
-    if (data.source_description !== undefined && data.source_description !== null) {
-      if (typeof data.source_description !== 'string') {
-        errors.push('Source description must be a string');
-      } else if (data.source_description.length > 500) {
-        errors.push('Source description must not exceed 500 characters');
       }
     }
 

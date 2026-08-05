@@ -392,19 +392,15 @@ export class ProductSeeder {
           `INSERT INTO material_brand (
             material_id,
             brand_id,
-            brand_product_code,
-            brand_product_name,
             status_id,
             is_deleted,
             log_date_created,
             log_created_by_account_id,
             log_module_created
           )
-          VALUES ($1, $2, $3, $4, $5, FALSE, NOW(), $6, 'seed_mms')
+          VALUES ($1, $2, $3, FALSE, NOW(), $4, 'seed_mms')
           ON CONFLICT (material_id, brand_id)
           DO UPDATE SET
-            brand_product_code = EXCLUDED.brand_product_code,
-            brand_product_name = EXCLUDED.brand_product_name,
             status_id = EXCLUDED.status_id,
             is_deleted = FALSE,
             log_date_updated = NOW(),
@@ -414,8 +410,6 @@ export class ProductSeeder {
           [
             materialId,
             brandId,
-            `${code}-${brandName.toUpperCase().replace(/\s+/g, '')}`,
-            `${brandName} ${materialNameBase}`,
             materialBrandStatusId,
             context.actorAccountId,
           ]
