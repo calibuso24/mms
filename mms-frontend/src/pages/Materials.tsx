@@ -546,7 +546,11 @@ export default function MaterialsPage() {
                   sub_category_id: '',
                 })
               }
-              onInputChange={(_, value) => setCategoryQuery(value)}
+              onInputChange={(_, value, reason) => {
+                if (reason === 'input' || reason === 'clear') {
+                  setCategoryQuery(value);
+                }
+              }}
               getOptionLabel={(option) => option?.category_name || ''}
               renderInput={(params) => <TextField {...params} placeholder="Category" />}
             />
@@ -558,7 +562,11 @@ export default function MaterialsPage() {
               onChange={(_, value) =>
                 setAdvancedFilters({ ...advancedFilters, sub_category_id: value ? String(value.sub_category_id) : '' })
               }
-              onInputChange={(_, value) => setSubCategoryQuery(value)}
+              onInputChange={(_, value, reason) => {
+                if (reason === 'input' || reason === 'clear') {
+                  setSubCategoryQuery(value);
+                }
+              }}
               getOptionLabel={(option) => option?.sub_category_name || ''}
               renderInput={(params) => <TextField {...params} placeholder="Sub Category" />}
               disabled={!advancedFilters.category_id}
@@ -584,7 +592,11 @@ export default function MaterialsPage() {
               options={uoms}
               value={uoms.find((u) => String(u.uom_id) === String(advancedFilters.uom_id)) || null}
               onChange={(_, value) => setAdvancedFilters({ ...advancedFilters, uom_id: value ? String(value.uom_id) : '' })}
-              onInputChange={(_, value) => setUomQuery(value)}
+              onInputChange={(_, value, reason) => {
+                if (reason === 'input' || reason === 'clear') {
+                  setUomQuery(value);
+                }
+              }}
               getOptionLabel={(option) => option?.uom_name || ''}
               renderInput={(params) => <TextField {...params} placeholder="UOM" />}
             />
@@ -712,7 +724,11 @@ export default function MaterialsPage() {
                 options={categories}
                 value={categories.find((c) => String(c.category_id) === String(formData.category_id)) || null}
                 onChange={(_, value) => handleCategoryChange(value ? String(value.category_id) : '')}
-                onInputChange={(_, value) => setCategoryQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setCategoryQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => option?.category_name || ''}
                 renderInput={(params) => <TextField {...params} label="Category" required />}
               />
@@ -721,7 +737,11 @@ export default function MaterialsPage() {
                 options={subCategories}
                 value={subCategories.find((s) => String(s.sub_category_id) === String(formData.sub_category_id)) || null}
                 onChange={(_, value) => setFormData({ ...formData, sub_category_id: value ? String(value.sub_category_id) : '' })}
-                onInputChange={(_, value) => setSubCategoryQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setSubCategoryQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => option?.sub_category_name || ''}
                 renderInput={(params) => <TextField {...params} label="Sub Category" />}
                 disabled={!formData.category_id}
@@ -734,7 +754,11 @@ export default function MaterialsPage() {
                 options={uoms}
                 value={uoms.find((u) => String(u.uom_id) === String(formData.stock_uom_id)) || null}
                 onChange={(_, value) => setFormData({ ...formData, stock_uom_id: value ? String(value.uom_id) : '' })}
-                onInputChange={(_, value) => setUomQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setUomQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => option?.uom_name ? `${option.uom_name}${option.abbreviation ? ` (${option.abbreviation})` : ''}` : ''}
                 renderInput={(params) => <TextField {...params} label="UOM" required />}
               />
@@ -743,7 +767,11 @@ export default function MaterialsPage() {
                 options={materialTypes}
                 value={materialTypes.find((mt) => String(mt.material_type_id) === String(formData.material_type_id)) || null}
                 onChange={(_, value) => setFormData({ ...formData, material_type_id: value ? String(value.material_type_id) : '' })}
-                onInputChange={(_, value) => setMaterialTypeQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setMaterialTypeQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => option?.material_type_name || ''}
                 renderInput={(params) => <TextField {...params} label="Material Type" />}
               />
@@ -755,7 +783,11 @@ export default function MaterialsPage() {
                 options={brands}
                 value={brands.find((b) => String(b.brand_id) === String(formData.brand_id)) || null}
                 onChange={(_, value) => setFormData({ ...formData, brand_id: value ? String(value.brand_id) : '' })}
-                onInputChange={(_, value) => setBrandQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setBrandQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => option?.brand_name || ''}
                 renderInput={(params) => <TextField {...params} label="Brand" />}
               />

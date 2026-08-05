@@ -679,7 +679,11 @@ export default function MaterialControlPage() {
                   setFilters((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }));
                   setPage(0);
                 }}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />
@@ -848,7 +852,11 @@ export default function MaterialControlPage() {
                 options={projects}
                 value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
                 onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />
@@ -922,7 +930,11 @@ export default function MaterialControlPage() {
                         options={detailMaterials}
                         value={detailMaterials.find((material) => String(material.material_id) === String(detailForm.material_id)) || null}
                         onChange={(_, value) => setDetailForm((current) => ({ ...current, material_id: value ? String(value.material_id) : '' }))}
-                        onInputChange={(_, value) => setDetailMaterialQuery(value)}
+                        onInputChange={(_, value, reason) => {
+                          if (reason === 'input' || reason === 'clear') {
+                            setDetailMaterialQuery(value);
+                          }
+                        }}
                         getOptionLabel={(option) => `${option.product_code} - ${option.product_name}`}
                         renderInput={(params) => <TextField {...params} label="Material" />}
                       />

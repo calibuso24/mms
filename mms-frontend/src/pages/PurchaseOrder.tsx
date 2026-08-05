@@ -774,7 +774,11 @@ export default function PurchaseOrderPage() {
                   setFilters((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }));
                   setPage(0);
                 }}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />
@@ -788,7 +792,11 @@ export default function PurchaseOrderPage() {
                   setFilters((current) => ({ ...current, supplier_party_id: value ? String(value.party_id) : '' }));
                   setPage(0);
                 }}
-                onInputChange={(_, value) => setSupplierQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setSupplierQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Supplier" />}
               />
@@ -971,7 +979,11 @@ export default function PurchaseOrderPage() {
                 options={projects}
                 value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
                 onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />
@@ -998,7 +1010,11 @@ export default function PurchaseOrderPage() {
                 options={suppliers}
                 value={suppliers.find((supplier) => String(supplier.party_id) === String(form.supplier_party_id)) || null}
                 onChange={(_, value) => setForm((current) => ({ ...current, supplier_party_id: value ? String(value.party_id) : '' }))}
-                onInputChange={(_, value) => setSupplierQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setSupplierQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Supplier" />}
               />

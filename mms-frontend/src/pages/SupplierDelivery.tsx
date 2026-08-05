@@ -713,7 +713,11 @@ export default function SupplierDeliveryPage() {
                     setFilters((current) => ({ ...current, supplier_id: value ? String(value.party_id) : '' }));
                     setPage(0);
                   }}
-                  onInputChange={(_, value) => setSupplierQuery(value)}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === 'input' || reason === 'clear') {
+                      setSupplierQuery(value);
+                    }
+                  }}
                   getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                   renderInput={(params) => <TextField {...params} label="Supplier" />}
                 />
@@ -890,7 +894,11 @@ export default function SupplierDeliveryPage() {
                 options={suppliers}
                 value={suppliers.find((supplier) => String(supplier.party_id) === String(form.supplier_id)) || null}
                 onChange={(_, value) => setForm((current) => ({ ...current, supplier_id: value ? String(value.party_id) : '' }))}
-                onInputChange={(_, value) => setSupplierQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setSupplierQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Supplier" />}
               />
@@ -901,7 +909,11 @@ export default function SupplierDeliveryPage() {
                 options={projects}
                 value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
                 onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />

@@ -624,7 +624,11 @@ export default function MaterialRequestPage() {
                   setFilters((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }));
                   setPage(0);
                 }}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />
@@ -703,7 +707,11 @@ export default function MaterialRequestPage() {
                 options={projects}
                 value={projects.find((project) => String(project.party_id) === String(form.project_id)) || null}
                 onChange={(_, value) => setForm((current) => ({ ...current, project_id: value ? String(value.party_id) : '' }))}
-                onInputChange={(_, value) => setProjectQuery(value)}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setProjectQuery(value);
+                  }
+                }}
                 getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
                 renderInput={(params) => <TextField {...params} label="Project" />}
               />
