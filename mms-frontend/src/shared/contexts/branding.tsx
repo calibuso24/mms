@@ -149,8 +149,14 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       try {
         settings = await systemSettingsApi.getPublicBranding();
       } catch (publicErr) {
-        // Fallback to authenticated endpoint
-        settings = await systemSettingsApi.listCategorySettings('branding');
+        // If we have an auth token, attempt authenticated fetch as a fallback (admin UI).
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          settings = await systemSettingsApi.listCategorySettings('branding');
+        } else {
+          // No token and public fetch failed — bail out to avoid 401 noise.
+          settings = [];
+        }
       }
       const setting = Array.isArray(settings) ? settings.find((s: any) => s.setting_key === 'branding') : null;
       const value = setting?.setting_value ?? setting?.default_value ?? null;

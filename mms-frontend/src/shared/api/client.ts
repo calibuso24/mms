@@ -59,6 +59,25 @@ export class ApiClient {
     return response.json();
   }
 
+  // Perform a GET request without Authorization header (useful for public endpoints)
+  static async getPublic(endpoint: string): Promise<any> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const requestOptions: RequestInit = {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    };
+
+    const response = await fetch(url, requestOptions);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Network error' }));
+      const errorMessage = error.error?.message || error.message || 'An error occurred';
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
+
   static get(endpoint: string): Promise<any> {
     return this.request(endpoint, { method: 'GET' });
   }
@@ -542,7 +561,7 @@ export const systemSettingsApi = {
   listCategorySettings: (categoryCode: string) =>
     ApiClient.get(`/system-settings/categories/${categoryCode}/settings`),
   // Public branding endpoint - no auth required
-  getPublicBranding: () => ApiClient.get('/system-settings/public/branding'),
+  getPublicBranding: () => ApiClient.getPublic('/system-settings/public/branding'),
   createCategory: (data: any) => ApiClient.post('/system-settings/categories', data),
   updateCategory: (categoryId: number, data: any) =>
     ApiClient.put(`/system-settings/categories/${categoryId}`, data),
