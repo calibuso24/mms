@@ -469,7 +469,7 @@ export default function MaterialRequestPage() {
   const detailColumns = useMemo<GridColDef<RequestItemForm>[]>(() => {
     const materialOptions = materials.map((material) => ({
       value: material.material_id.toString(),
-      label: `${material.product_code} - ${material.product_name}`,
+      label: `${material.product_code} - ${material.full_description || material.product_name}`,
     }));
     const uomOptions = uoms.map((uom) => ({ value: uom.uom_id.toString(), label: uom.abbreviation }));
 

@@ -497,7 +497,7 @@ export default function StockTransferPage() {
 
   const detailColumns = useMemo<GridColDef<ItemForm>[]>(() => {
     const poItemOptions = poItems.map((row) => ({ value: row.purchase_order_item_id.toString(), label: `#${row.purchase_order_item_id}` }));
-    const materialOptions = materials.map((row) => ({ value: row.material_id.toString(), label: `${row.product_code} - ${row.product_name}` }));
+    const materialOptions = materials.map((row) => ({ value: row.material_id.toString(), label: `${row.product_code} - ${row.full_description || row.product_name}` }));
     const uomOptions = uoms.map((row) => ({ value: row.uom_id.toString(), label: row.abbreviation }));
 
     return [
