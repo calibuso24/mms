@@ -35,8 +35,15 @@ export default function LoginPage() {
   const bgStyle: Record<string, any> = {};
   if (branding?.login?.backgroundImage) {
     bgStyle.backgroundImage = `url(${branding.login.backgroundImage})`;
-    bgStyle.backgroundSize = 'cover';
-    bgStyle.backgroundPosition = 'center';
+    const fit = (branding?.login?.backgroundFit ?? 'cover').toString();
+    if (fit === 'stretch') {
+      bgStyle.backgroundSize = '100% 100%';
+    } else if (fit === 'auto') {
+      bgStyle.backgroundSize = 'auto';
+    } else {
+      bgStyle.backgroundSize = fit;
+    }
+    bgStyle.backgroundPosition = branding?.login?.backgroundPosition ?? 'center';
   } else {
     bgStyle.backgroundColor = '#F5F7FA';
     bgStyle.backgroundImage = 'linear-gradient(135deg, rgba(15, 59, 104, 0.05) 0%, rgba(0, 120, 212, 0.05) 100%)';
@@ -200,9 +207,11 @@ export default function LoginPage() {
 
   if (layout === 'full-background') {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', ...bgStyle }}>
-        <Container maxWidth="sm">
-          {renderFormCard({ backgroundColor: 'rgba(255,255,255,0.9)', border: 'none' })}
+      <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', ...bgStyle }}>
+        {/* overlay */}
+        <Box sx={{ position: 'absolute', inset: 0, backgroundColor: overlayColor, opacity: Math.max(0, Math.min(100, overlayOpacity)) / 100, zIndex: 1 }} />
+        <Container maxWidth="sm" sx={{ position: 'relative', zIndex: 2 }}>
+          {renderFormCard({ backgroundColor: cardBg, border: 'none' })}
         </Container>
       </Box>
     );

@@ -169,6 +169,27 @@ export function BrandingEditor({ setting, value, onChange }: BrandingEditorProps
             </TextField>
           </Grid>
           <Grid item xs={12} md={8}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <TextField select fullWidth label="Background Fit" value={payload.login?.backgroundFit ?? 'cover'} onChange={(e) => setField('login.backgroundFit', e.target.value)}>
+                  {['cover','contain','stretch','auto'].map((v) => (<MenuItem key={v} value={v}>{v}</MenuItem>))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField fullWidth label="Background Position" value={payload.login?.backgroundPosition ?? 'center'} onChange={(e) => setField('login.backgroundPosition', e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField type="color" fullWidth label="Overlay Color" value={payload.login?.overlayColor ?? '#000000'} onChange={(e) => setField('login.overlayColor', e.target.value)} />
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <TextField type="number" fullWidth label="Overlay Opacity (%)" inputProps={{ min: 0, max: 100 }} value={payload.login?.overlayOpacity ?? 35} onChange={(e) => setField('login.overlayOpacity', Number(e.target.value))} />
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <TextField type="number" fullWidth label="Card Opacity (%)" inputProps={{ min: 0, max: 100 }} value={payload.login?.cardOpacity ?? 90} onChange={(e) => setField('login.cardOpacity', Number(e.target.value))} />
+              </Grid>
+            </Grid>
+          </Grid>
+          <Grid item xs={12} md={8}>
             <TextField fullWidth label="Welcome Message" value={payload.dashboard?.welcomeMessage ?? ''} onChange={(e) => setField('dashboard.welcomeMessage', e.target.value)} />
           </Grid>
           <Grid item xs={12} md={6}>
