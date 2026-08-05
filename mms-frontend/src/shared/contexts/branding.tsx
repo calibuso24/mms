@@ -144,7 +144,14 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
   const load = async () => {
     try {
-      const settings = await systemSettingsApi.listCategorySettings('branding');
+      // Try public branding endpoint first (works when unauthenticated)
+      let settings: any;
+      try {
+        settings = await systemSettingsApi.getPublicBranding();
+      } catch (publicErr) {
+        // Fallback to authenticated endpoint
+        settings = await systemSettingsApi.listCategorySettings('branding');
+      }
       const setting = Array.isArray(settings) ? settings.find((s: any) => s.setting_key === 'branding') : null;
       const value = setting?.setting_value ?? setting?.default_value ?? null;
       let parsed = null;

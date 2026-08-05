@@ -541,6 +541,8 @@ export const systemSettingsApi = {
   getCategory: (categoryCode: string) => ApiClient.get(`/system-settings/categories/${categoryCode}`),
   listCategorySettings: (categoryCode: string) =>
     ApiClient.get(`/system-settings/categories/${categoryCode}/settings`),
+  // Public branding endpoint - no auth required
+  getPublicBranding: () => ApiClient.get('/system-settings/public/branding'),
   createCategory: (data: any) => ApiClient.post('/system-settings/categories', data),
   updateCategory: (categoryId: number, data: any) =>
     ApiClient.put(`/system-settings/categories/${categoryId}`, data),

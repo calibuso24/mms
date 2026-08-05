@@ -48,6 +48,16 @@ export class SystemSettingsController {
     }
   }
 
+  // Public - used by unauthenticated pages (login) to fetch branding
+  async getPublicBranding(req: Request, res: Response, next: NextFunction) {
+    try {
+      const settings = await this.systemSettingsService.getCategorySettings('branding');
+      res.json(settings);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createCategory(req: Request, res: Response, next: NextFunction) {
     try {
       const dto: SystemSettingCategoryCreateDto = req.body;

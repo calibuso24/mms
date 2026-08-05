@@ -15,6 +15,9 @@ router.get('/categories/:categoryCode/settings', requirePermission('System Setti
   controller.getCategorySettings(req, res, next)
 );
 
+// Public branding endpoint (no auth) to allow the login page to load branding before authentication
+router.get('/public/branding', (req, res, next) => controller.getPublicBranding(req, res, next));
+
 router.post('/categories', requirePermission('System Settings', 'EDIT'), (req, res, next) =>
   controller.createCategory(req, res, next)
 );
