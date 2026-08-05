@@ -551,7 +551,7 @@ export default function MaterialsPage() {
                   setCategoryQuery(value);
                 }
               }}
-              getOptionLabel={(option) => option?.category_name || ''}
+              getOptionLabel={(option) => option?.category_code ? `${option.category_code} - ${option.category_name}` : (option?.category_name || '')}
               renderInput={(params) => <TextField {...params} placeholder="Category" />}
             />
 
@@ -567,7 +567,7 @@ export default function MaterialsPage() {
                   setSubCategoryQuery(value);
                 }
               }}
-              getOptionLabel={(option) => option?.sub_category_name || ''}
+              getOptionLabel={(option) => option?.sub_category_code ? `${option.sub_category_code} - ${option.sub_category_name}` : (option?.sub_category_name || '')}
               renderInput={(params) => <TextField {...params} placeholder="Sub Category" />}
               disabled={!advancedFilters.category_id}
             />
@@ -729,7 +729,7 @@ export default function MaterialsPage() {
                     setCategoryQuery(value);
                   }
                 }}
-                getOptionLabel={(option) => option?.category_name || ''}
+                getOptionLabel={(option) => option?.category_code ? `${option.category_code} - ${option.category_name}` : (option?.category_name || '')}
                 renderInput={(params) => <TextField {...params} label="Category" required />}
               />
               <Autocomplete
@@ -742,7 +742,7 @@ export default function MaterialsPage() {
                     setSubCategoryQuery(value);
                   }
                 }}
-                getOptionLabel={(option) => option?.sub_category_name || ''}
+                getOptionLabel={(option) => option?.sub_category_code ? `${option.sub_category_code} - ${option.sub_category_name}` : (option?.sub_category_name || '')}
                 renderInput={(params) => <TextField {...params} label="Sub Category" />}
                 disabled={!formData.category_id}
               />
