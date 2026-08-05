@@ -935,7 +935,7 @@ export default function MaterialControlPage() {
                             setDetailMaterialQuery(value);
                           }
                         }}
-                        getOptionLabel={(option) => `${option.product_code} - ${option.product_name}`}
+                        getOptionLabel={(option) => `${option.product_code} - ${option.full_description || option.product_name}`}
                         renderInput={(params) => <TextField {...params} label="Material" />}
                       />
                     </Grid>

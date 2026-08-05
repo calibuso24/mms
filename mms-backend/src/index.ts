@@ -46,7 +46,11 @@ app.use('/api/roles', authMiddleware, roleRoutes);
 app.use('/api/navigation', authMiddleware, navigationRoutes);
 app.use('/api/reports', authMiddleware, reportRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
-app.use('/api/system-settings', authMiddleware, systemSettingsRoutes);
+// Mount system settings without the global auth middleware so individual routes
+// (including the public branding endpoint) can opt-in to authentication via
+// route-level middleware. This allows unauthenticated pages (like login) to
+// fetch branding without receiving a 401 from a global middleware.
+app.use('/api/system-settings', systemSettingsRoutes);
 app.use('/api/material-controls', authMiddleware, materialControlRoutes);
 app.use('/api/material-requests', authMiddleware, materialRequestRoutes);
 app.use('/api/purchase-orders', authMiddleware, purchaseOrderRoutes);

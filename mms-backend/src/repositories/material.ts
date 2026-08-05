@@ -27,24 +27,6 @@ export interface MaterialWithDetails extends Material {
   full_description?: string;
 }
 
-const FULL_DESCRIPTION_SQL = `NULLIF(
-  TRIM(BOTH ' -' FROM CONCAT_WS(' - ',
-    NULLIF(m.product_name, ''),
-    NULLIF(ms.primary_size, ''),
-    NULLIF(ms.secondary_size, ''),
-    NULLIF(ms.alternate_size, ''),
-    NULLIF(ms.thickness_or_gauge, ''),
-    NULLIF(ms.width, ''),
-    NULLIF(ms.length, ''),
-    NULLIF(ms.schedule, ''),
-    NULLIF(ms.pressure_or_load_rating, ''),
-    NULLIF(ms.standard, ''),
-    NULLIF(ms.pack_size, ''),
-    NULLIF(ms.additional_specification, '')
-  )),
-  ''
-)`;
-
 export class MaterialRepository {
   async findById(id: number): Promise<MaterialWithDetails | null> {
     const result = await pool.query(
@@ -66,7 +48,7 @@ export class MaterialRepository {
         ms.standard,
         ms.pack_size,
         ms.additional_specification,
-        ${FULL_DESCRIPTION_SQL} AS full_description,
+        m.full_description,
         u.uom_name,
         u.abbreviation as uom_abbreviation,
         l.name as status_name,
@@ -115,7 +97,7 @@ export class MaterialRepository {
         sc.sub_category_code,
         sc.sub_category_name,
         mt.material_type_name,
-        ${FULL_DESCRIPTION_SQL} AS full_description,
+        m.full_description,
         u.uom_name,
         u.abbreviation as uom_abbreviation,
         l.name as status_name,
@@ -171,7 +153,7 @@ export class MaterialRepository {
         sc.sub_category_code,
       sc.sub_category_name,
         mt.material_type_name,
-        ${FULL_DESCRIPTION_SQL} AS full_description,
+        m.full_description,
       u.uom_name,
       u.abbreviation as uom_abbreviation,
         l.name as status_name,
