@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Autocomplete,
   Alert,
   Box,
   Breadcrumbs,
@@ -172,7 +173,7 @@ const emptyForm = (): FormState => ({
   source_id: '',
   destination_id: '',
   purchase_order_id: '',
-  transfer_date: new Date().toISOString().slice(0, 16),
+  transfer_date: new Date().toISOString().slice(0, 10),
   reference_code: '',
   notes: '',
   items: [emptyItem()],
@@ -335,7 +336,7 @@ export default function StockTransferPage() {
         source_id: detail.source_id.toString(),
         destination_id: detail.destination_id.toString(),
         purchase_order_id: detail.purchase_order_id ? detail.purchase_order_id.toString() : '',
-        transfer_date: detail.transfer_date ? detail.transfer_date.slice(0, 16) : '',
+        transfer_date: detail.transfer_date ? detail.transfer_date.slice(0, 10) : '',
         reference_code: detail.reference_code || '',
         notes: detail.notes || '',
         items: detail.items.length > 0
@@ -428,7 +429,7 @@ export default function StockTransferPage() {
         source_id: Number(form.source_id),
         destination_id: Number(form.destination_id),
         purchase_order_id: form.purchase_order_id ? Number(form.purchase_order_id) : null,
-        transfer_date: form.transfer_date ? new Date(form.transfer_date).toISOString() : null,
+        transfer_date: form.transfer_date || null,
         reference_code: form.reference_code.trim() || null,
         notes: form.notes.trim() || null,
         items: form.items
@@ -763,22 +764,24 @@ export default function StockTransferPage() {
               </FormControl>
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Source</Typography>
-                <Select value={form.source_id} onChange={(event) => setForm((current) => ({ ...current, source_id: event.target.value }))}>
-                  <MenuItem value="">Select source</MenuItem>
-                  {parties.map((row) => <MenuItem key={row.party_id} value={row.party_id.toString()}>{row.party_code} - {row.party_name}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                size="small"
+                options={parties}
+                value={parties.find((party) => String(party.party_id) === String(form.source_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, source_id: value ? String(value.party_id) : '' }))}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Source" />}
+              />
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Destination</Typography>
-                <Select value={form.destination_id} onChange={(event) => setForm((current) => ({ ...current, destination_id: event.target.value }))}>
-                  <MenuItem value="">Select destination</MenuItem>
-                  {parties.map((row) => <MenuItem key={row.party_id} value={row.party_id.toString()}>{row.party_code} - {row.party_name}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                size="small"
+                options={parties}
+                value={parties.find((party) => String(party.party_id) === String(form.destination_id)) || null}
+                onChange={(_, value) => setForm((current) => ({ ...current, destination_id: value ? String(value.party_id) : '' }))}
+                getOptionLabel={(option) => `${option.party_code} - ${option.party_name}`}
+                renderInput={(params) => <TextField {...params} label="Destination" />}
+              />
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
               <FormControl fullWidth size="small">
@@ -790,7 +793,7 @@ export default function StockTransferPage() {
               </FormControl>
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
-              <TextField fullWidth size="small" type="datetime-local" label="Transfer Date" value={form.transfer_date} onChange={(event) => setForm((current) => ({ ...current, transfer_date: event.target.value }))} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth size="small" type="date" label="Transfer Date" value={form.transfer_date} onChange={(event) => setForm((current) => ({ ...current, transfer_date: event.target.value }))} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
               <TextField fullWidth size="small" label="Reference Code" value={form.reference_code} onChange={(event) => setForm((current) => ({ ...current, reference_code: event.target.value }))} />

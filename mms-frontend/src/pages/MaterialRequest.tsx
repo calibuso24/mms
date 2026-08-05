@@ -326,9 +326,9 @@ export default function MaterialRequestPage() {
       setForm({
         project_id: detail.project_id.toString(),
         status_id: detail.status_id.toString(),
-        requested_at: detail.requested_at ? detail.requested_at.slice(0, 16) : '',
-        date_prepared: detail.date_prepared ? detail.date_prepared.slice(0, 16) : '',
-        date_received: detail.date_received ? detail.date_received.slice(0, 16) : '',
+        requested_at: detail.requested_at ? detail.requested_at.slice(0, 10) : '',
+        date_prepared: detail.date_prepared ? detail.date_prepared.slice(0, 10) : '',
+        date_received: detail.date_received ? detail.date_received.slice(0, 10) : '',
         stock_checked: detail.stock_checked,
         ceo_approval_required: detail.ceo_approval_required,
         notes: detail.notes || '',
@@ -409,9 +409,9 @@ export default function MaterialRequestPage() {
       const payload = {
         project_id: Number(form.project_id),
         status_id: form.status_id ? Number(form.status_id) : undefined,
-        requested_at: form.requested_at ? new Date(form.requested_at).toISOString() : null,
-        date_prepared: form.date_prepared ? new Date(form.date_prepared).toISOString() : null,
-        date_received: form.date_received ? new Date(form.date_received).toISOString() : null,
+        requested_at: form.requested_at || null,
+        date_prepared: form.date_prepared || null,
+        date_received: form.date_received || null,
         stock_checked: form.stock_checked,
         ceo_approval_required: form.ceo_approval_required,
         notes: form.notes.trim() || null,
@@ -725,13 +725,13 @@ export default function MaterialRequestPage() {
               </FormControl>
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField fullWidth label="Requested At" type="datetime-local" value={form.requested_at} onChange={(event) => setForm((current) => ({ ...current, requested_at: event.target.value }))} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth label="Requested At" type="date" value={form.requested_at} onChange={(event) => setForm((current) => ({ ...current, requested_at: event.target.value }))} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField fullWidth label="Date Prepared" type="datetime-local" value={form.date_prepared} onChange={(event) => setForm((current) => ({ ...current, date_prepared: event.target.value }))} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth label="Date Prepared" type="date" value={form.date_prepared} onChange={(event) => setForm((current) => ({ ...current, date_prepared: event.target.value }))} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} md={3}>
-              <TextField fullWidth label="Date Received" type="datetime-local" value={form.date_received} onChange={(event) => setForm((current) => ({ ...current, date_received: event.target.value }))} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth label="Date Received" type="date" value={form.date_received} onChange={(event) => setForm((current) => ({ ...current, date_received: event.target.value }))} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} md={3}><FormControlLabel control={<Checkbox checked={form.stock_checked} onChange={(event) => setForm((current) => ({ ...current, stock_checked: event.target.checked }))} />} label="Stock Checked" /></Grid>
             <Grid item xs={12} md={3}><FormControlLabel control={<Checkbox checked={form.ceo_approval_required} onChange={(event) => setForm((current) => ({ ...current, ceo_approval_required: event.target.checked }))} />} label="CEO Approval Required" /></Grid>

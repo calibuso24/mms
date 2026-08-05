@@ -152,7 +152,7 @@ const emptyItem = (): ItemForm => ({
 
 const emptyForm = (): FormState => ({
   project_id: '',
-  requested_at: new Date().toISOString().slice(0, 16),
+  requested_at: new Date().toISOString().slice(0, 10),
   adjustment_reason_id: '',
   notes: '',
   items: [emptyItem()],
@@ -296,7 +296,7 @@ export default function MaterialAdjustmentPage() {
       const detail: MaterialAdjustmentDetail = await materialAdjustmentApi.get(item.material_adjustment_id);
       setForm({
         project_id: detail.project_id.toString(),
-        requested_at: detail.requested_at ? detail.requested_at.slice(0, 16) : '',
+        requested_at: detail.requested_at ? detail.requested_at.slice(0, 10) : '',
         adjustment_reason_id: detail.adjustment_reason_id ? detail.adjustment_reason_id.toString() : '',
         notes: detail.notes || '',
         items: detail.items.length > 0
@@ -376,7 +376,7 @@ export default function MaterialAdjustmentPage() {
     try {
       const payload = {
         project_id: Number(form.project_id),
-        requested_at: form.requested_at ? new Date(form.requested_at).toISOString() : null,
+        requested_at: form.requested_at || null,
         adjustment_reason_id: form.adjustment_reason_id ? Number(form.adjustment_reason_id) : null,
         notes: form.notes.trim() || null,
         items: form.items
@@ -705,7 +705,7 @@ export default function MaterialAdjustmentPage() {
               />
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
-              <TextField fullWidth size="small" type="datetime-local" label="Requested At" value={form.requested_at} onChange={(event) => setForm((current) => ({ ...current, requested_at: event.target.value }))} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth size="small" type="date" label="Requested At" value={form.requested_at} onChange={(event) => setForm((current) => ({ ...current, requested_at: event.target.value }))} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
               <FormControl fullWidth size="small">

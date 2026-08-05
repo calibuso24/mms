@@ -197,7 +197,7 @@ const emptyForm = (): FormState => ({
   project_id: '',
   material_request_id: '',
   supplier_party_id: '',
-  prepared_at: new Date().toISOString().slice(0, 16),
+  prepared_at: new Date().toISOString().slice(0, 10),
   expected_delivery_date: '',
   order_type_id: '',
   total_amount: '',
@@ -223,16 +223,6 @@ function formatNumber(value: string | null | undefined): string {
   if (value === null || value === undefined || value === '') return '-';
   const parsed = Number(value);
   return Number.isNaN(parsed) ? value : parsed.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-function toDateTimeLocal(value: string | null | undefined): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value.length >= 16 ? value.slice(0, 16) : value;
-  }
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function toDateLocal(value: string | null | undefined): string {
@@ -400,7 +390,7 @@ export default function PurchaseOrderPage() {
         project_id: String(detail.project_id),
         material_request_id: detail.material_request_id ? String(detail.material_request_id) : '',
         supplier_party_id: String(detail.supplier_party_id),
-        prepared_at: toDateTimeLocal(detail.prepared_at),
+        prepared_at: toDateLocal(detail.prepared_at),
         expected_delivery_date: toDateLocal(detail.expected_delivery_date),
         order_type_id: String(detail.order_type_id),
         total_amount: detail.total_amount ?? '',
@@ -1036,7 +1026,7 @@ export default function PurchaseOrderPage() {
               </TextField>
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField fullWidth type="datetime-local" label="Prepared At" value={form.prepared_at} onChange={(event) => setForm((current) => ({ ...current, prepared_at: event.target.value }))} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth type="date" label="Prepared At" value={form.prepared_at} onChange={(event) => setForm((current) => ({ ...current, prepared_at: event.target.value }))} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField fullWidth type="date" label="Expected Delivery" value={form.expected_delivery_date} onChange={(event) => setForm((current) => ({ ...current, expected_delivery_date: event.target.value }))} InputLabelProps={{ shrink: true }} />

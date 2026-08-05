@@ -170,7 +170,7 @@ const emptyForm = (): FormState => ({
   purchase_order_id: '',
   supplier_id: '',
   project_id: '',
-  delivery_date: new Date().toISOString().slice(0, 16),
+  delivery_date: new Date().toISOString().slice(0, 10),
   reference_code: '',
   notes: '',
   delivery_advice_ids: '',
@@ -360,7 +360,7 @@ export default function SupplierDeliveryPage() {
         purchase_order_id: detail.purchase_order_id.toString(),
         supplier_id: detail.supplier_id.toString(),
         project_id: detail.project_id.toString(),
-        delivery_date: detail.delivery_date ? detail.delivery_date.slice(0, 16) : '',
+        delivery_date: detail.delivery_date ? detail.delivery_date.slice(0, 10) : '',
         reference_code: detail.reference_code || '',
         notes: detail.notes || '',
         delivery_advice_ids: detail.advices.map((advice) => advice.delivery_advice_id).join(', '),
@@ -503,7 +503,7 @@ export default function SupplierDeliveryPage() {
         purchase_order_id: Number(form.purchase_order_id),
         supplier_id: Number(form.supplier_id),
         project_id: Number(form.project_id),
-        delivery_date: form.delivery_date ? new Date(form.delivery_date).toISOString() : null,
+        delivery_date: form.delivery_date || null,
         reference_code: form.reference_code.trim() || null,
         notes: form.notes.trim() || null,
         delivery_advice_ids: parseDeliveryAdviceIds(form.delivery_advice_ids),
@@ -924,7 +924,7 @@ export default function SupplierDeliveryPage() {
                 fullWidth
                 size="small"
                 label="Delivery Date"
-                type="datetime-local"
+                type="date"
                 value={form.delivery_date}
                 onChange={(event) => setForm((current) => ({ ...current, delivery_date: event.target.value }))}
                 InputLabelProps={{ shrink: true }}

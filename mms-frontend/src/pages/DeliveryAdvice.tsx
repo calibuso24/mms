@@ -134,7 +134,7 @@ const emptyItem = (): AdviceItemForm => ({
 const emptyForm = (): FormState => ({
   purchase_order_id: '',
   reference_code: '',
-  issued_at: new Date().toISOString().slice(0, 16),
+  issued_at: new Date().toISOString().slice(0, 10),
   received_at: '',
   notes: '',
   items: [emptyItem()],
@@ -276,8 +276,8 @@ export default function DeliveryAdvicePage() {
       setForm({
         purchase_order_id: detail.purchase_order_id.toString(),
         reference_code: detail.reference_code,
-        issued_at: detail.issued_at ? detail.issued_at.slice(0, 16) : '',
-        received_at: detail.received_at ? detail.received_at.slice(0, 16) : '',
+        issued_at: detail.issued_at ? detail.issued_at.slice(0, 10) : '',
+        received_at: detail.received_at ? detail.received_at.slice(0, 10) : '',
         notes: detail.notes || '',
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
@@ -354,8 +354,8 @@ export default function DeliveryAdvicePage() {
       const payload = {
         purchase_order_id: Number(form.purchase_order_id),
         reference_code: form.reference_code.trim(),
-        issued_at: form.issued_at ? new Date(form.issued_at).toISOString() : null,
-        received_at: form.received_at ? new Date(form.received_at).toISOString() : null,
+        issued_at: form.issued_at || null,
+        received_at: form.received_at || null,
         notes: form.notes.trim() || null,
         items: form.items
           .filter((item) => item.purchase_order_item_id && item.advised_quantity)
@@ -694,7 +694,7 @@ export default function DeliveryAdvicePage() {
                 fullWidth
                 size="small"
                 label="Issued At"
-                type="datetime-local"
+                type="date"
                 value={form.issued_at}
                 onChange={(event) => setForm((current) => ({ ...current, issued_at: event.target.value }))}
                 InputLabelProps={{ shrink: true }}
@@ -706,7 +706,7 @@ export default function DeliveryAdvicePage() {
                 fullWidth
                 size="small"
                 label="Received At"
-                type="datetime-local"
+                type="date"
                 value={form.received_at}
                 onChange={(event) => setForm((current) => ({ ...current, received_at: event.target.value }))}
                 InputLabelProps={{ shrink: true }}

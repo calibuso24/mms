@@ -1,11 +1,12 @@
 import { Dispatch, SetStateAction, useMemo } from 'react';
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+import { Autocomplete, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import {
   DataGrid,
   GridActionsCellItem,
   GridColDef,
+  GridRenderEditCellParams,
   GridRowId,
   GridValidRowModel,
   useGridApiRef,
@@ -37,6 +38,62 @@ export interface EditableLineItemsGridProps<R extends GridValidRowModel> {
 function formatSummaryNumber(value?: number): string {
   if (value === undefined || Number.isNaN(value)) return '0';
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+interface SingleSelectOption {
+  value: string;
+  label: string;
+}
+
+function normalizeSingleSelectOptions(valueOptions: unknown): SingleSelectOption[] {
+  if (!Array.isArray(valueOptions)) return [];
+
+  return valueOptions.map((option) => {
+    if (option && typeof option === 'object' && 'value' in option) {
+      const candidate = option as { value: unknown; label?: unknown };
+      const value = String(candidate.value ?? '');
+      const label = String(candidate.label ?? candidate.value ?? '');
+      return { value, label };
+    }
+
+    const value = String(option ?? '');
+    return { value, label: value };
+  });
+}
+
+function SingleSelectAutocompleteEditCell(params: GridRenderEditCellParams) {
+  const options = normalizeSingleSelectOptions(params.colDef.valueOptions);
+  const selected = options.find((option) => option.value === String(params.value ?? '')) || null;
+
+  return (
+    <Autocomplete
+      size="small"
+      options={options}
+      value={selected}
+      isOptionEqualToValue={(option, value) => option.value === value.value}
+      getOptionLabel={(option) => option.label}
+      onChange={async (_, option) => {
+        await params.api.setEditCellValue({
+          id: params.id,
+          field: params.field,
+          value: option ? option.value : '',
+        });
+        params.api.stopCellEditMode({ id: params.id, field: params.field });
+      }}
+      renderInput={(inputParams) => (
+        <TextField
+          {...inputParams}
+          autoFocus
+          variant="standard"
+          placeholder={params.colDef.headerName}
+        />
+      )}
+      sx={{ width: '100%' }}
+      disableClearable={false}
+      autoHighlight
+      openOnFocus
+    />
+  );
 }
 
 export default function EditableLineItemsGrid<R extends GridValidRowModel>({
@@ -85,8 +142,21 @@ export default function EditableLineItemsGrid<R extends GridValidRowModel>({
   }, [rows, errorMap, getRowId]);
 
   const resolvedColumns = useMemo(() => {
+    const columnsWithAutocomplete = columns.map((column) => {
+      if (column.type === 'singleSelect' && !column.renderEditCell) {
+        return {
+          ...column,
+          renderEditCell: (params: GridRenderEditCellParams) => (
+            <SingleSelectAutocompleteEditCell {...params} />
+          ),
+        };
+      }
+
+      return column;
+    });
+
     return [
-      ...columns,
+      ...columnsWithAutocomplete,
       {
         field: '__actions__',
         type: 'actions',
