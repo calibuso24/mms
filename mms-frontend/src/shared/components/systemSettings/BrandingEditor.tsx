@@ -71,9 +71,18 @@ export function BrandingEditor({ setting, value, onChange }: BrandingEditorProps
             <TextField fullWidth label="Browser Title" value={payload.browserTitle ?? ''} onChange={(e) => setField('browserTitle', e.target.value)} />
           </Grid>
 
-          <Grid item xs={12} md={3}>
-            <Stack spacing={1}>
-              <Typography variant="body2" fontWeight={600}>Company Logo</Typography>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="System Title"
+              value={payload.systemTitle ?? ''}
+              onChange={(e) => {
+                setField('systemTitle', e.target.value);
+                // keep header.systemTitle in sync for components that read nested value
+                setField('header.systemTitle', e.target.value);
+              }}
+            />
+          </Grid>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Avatar src={payload.companyLogo ?? undefined} alt={payload.companyName ?? 'Logo'} sx={{ width: 64, height: 64 }} />
                 <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('companyLogo', e.target.files?.[0] ?? null)} /></Button>

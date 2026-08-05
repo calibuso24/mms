@@ -114,7 +114,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 fontWeight: 600,
               }}
             >
-              {branding?.header?.systemTitle ?? pageTitle}
+              {branding?.systemTitle ?? branding?.header?.systemTitle ?? pageTitle}
             </Typography>
           </Box>
         </Box>
