@@ -157,7 +157,20 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       let parsed = null;
       if (value) {
         try {
-          parsed = typeof value === 'string' ? JSON.parse(value) : value;
+          if (typeof value === 'string') {
+            // Try parsing once; if result is still a string (double-encoded), parse again.
+            let p = JSON.parse(value);
+            if (typeof p === 'string') {
+              try {
+                p = JSON.parse(p);
+              } catch {
+                // ignore second-parse errors
+              }
+            }
+            parsed = p;
+          } else {
+            parsed = value;
+          }
         } catch {
           parsed = null;
         }

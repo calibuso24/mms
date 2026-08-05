@@ -108,13 +108,19 @@ export function BrandingEditor({ setting, value, onChange }: BrandingEditorProps
           <Grid item xs={12} md={3}>
             <Stack>
               <Typography variant="body2" fontWeight={600}>Background Image</Typography>
-              <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('login.backgroundImage', e.target.files?.[0] ?? null)} /></Button>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('login.backgroundImage', e.target.files?.[0] ?? null)} /></Button>
+                <Button variant="outlined" color="inherit" onClick={() => setField('login.backgroundImage', null)}>Remove</Button>
+              </Stack>
             </Stack>
           </Grid>
           <Grid item xs={12} md={3}>
             <Stack>
               <Typography variant="body2" fontWeight={600}>Banner Image</Typography>
-              <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('login.bannerImage', e.target.files?.[0] ?? null)} /></Button>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button variant="outlined" component="label">Upload<input hidden type="file" accept="image/*" onChange={(e) => handleFile('login.bannerImage', e.target.files?.[0] ?? null)} /></Button>
+                <Button variant="outlined" color="inherit" onClick={() => setField('login.bannerImage', null)}>Remove</Button>
+              </Stack>
             </Stack>
           </Grid>
           <Grid item xs={12} md={3}>

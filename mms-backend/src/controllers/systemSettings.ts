@@ -52,7 +52,30 @@ export class SystemSettingsController {
   async getPublicBranding(req: Request, res: Response, next: NextFunction) {
     try {
       const settings = await this.systemSettingsService.getCategorySettings('branding');
-      res.json(settings);
+      // Ensure the branding setting_value is returned as parsed JSON to avoid
+      // double-stringification issues on the client (data-URLs can cause parsing edge-cases).
+      const normalized = settings.map((s) => {
+        if (s.setting_key === 'branding' && typeof s.setting_value === 'string') {
+          try {
+            let parsed: any = JSON.parse(s.setting_value);
+            // If the parsed result is still a string (double-encoded), try parsing again
+            if (typeof parsed === 'string') {
+              try {
+                parsed = JSON.parse(parsed);
+              } catch {
+                // keep parsed as string
+              }
+            }
+            return { ...s, setting_value: parsed };
+          } catch {
+            // If parsing fails, return as-is so clients can decide.
+            return s;
+          }
+        }
+        return s;
+      });
+
+      res.json(normalized);
     } catch (error) {
       next(error);
     }
