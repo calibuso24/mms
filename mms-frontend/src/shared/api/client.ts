@@ -304,6 +304,8 @@ export const materialTypeApi = {
     return ApiClient.get(`/material-types?${params.toString()}`);
   },
   get: (id: number) => ApiClient.get(`/material-types/${id}`),
+  create: (data: any) => ApiClient.post('/material-types', data),
+  update: (id: number, data: any) => ApiClient.put(`/material-types/${id}`, data),
 };
 
 // Material Control API

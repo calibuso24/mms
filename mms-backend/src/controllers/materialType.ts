@@ -31,4 +31,38 @@ export class MaterialTypeController {
       next(error);
     }
   }
+
+  async createMaterialType(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { material_type_code, material_type_name, description } = req.body;
+
+      if (!material_type_name) {
+        throw new ValidationError('Material type name is required');
+      }
+
+      const materialType = await this.materialTypeService.createMaterialType({
+        material_type_code,
+        material_type_name,
+        description,
+      });
+
+      res.status(201).json(materialType);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMaterialType(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        throw new ValidationError('Material type ID is required');
+      }
+
+      const materialType = await this.materialTypeService.updateMaterialType(parseInt(id, 10), req.body);
+      res.json(materialType);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

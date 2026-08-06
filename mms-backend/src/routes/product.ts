@@ -124,8 +124,14 @@ router.delete('/materials/:materialId/options/:optionId', (req, res, next) =>
 router.get('/material-types', (req, res, next) =>
   materialTypeController.listMaterialTypes(req, res, next)
 );
+router.post('/material-types', (req, res, next) =>
+  materialTypeController.createMaterialType(req, res, next)
+);
 router.get('/material-types/:id', (req, res, next) =>
   materialTypeController.getMaterialType(req, res, next)
+);
+router.put('/material-types/:id', (req, res, next) =>
+  materialTypeController.updateMaterialType(req, res, next)
 );
 
 export default router;

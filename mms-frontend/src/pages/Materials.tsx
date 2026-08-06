@@ -38,6 +38,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import { materialApi, materialTypeApi, categoryApi, subCategoryApi, brandApi, uomApi, lookupApi, materialOptionApi } from '../shared/api/client.js';
 import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
+import LookupAutocomplete from '../shared/components/LookupAutocomplete.js';
 
 interface Material {
   material_id: string;
@@ -1082,84 +1083,117 @@ export default function MaterialsPage() {
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Autocomplete
-                size="small"
+              <LookupAutocomplete
+                label="Category"
+                mode="category"
+                required
                 options={categories}
                 value={categories.find((c) => String(c.category_id) === String(formData.category_id)) || null}
-                onChange={(_, value) => handleCategoryChange(value ? String(value.category_id) : '')}
-                onInputChange={(_, value, reason) => {
-                  if (reason === 'input' || reason === 'clear') {
-                    setCategoryQuery(value);
-                  }
+                getOptionId={(option: any) => Number(option.category_id)}
+                getOptionLabel={(option: any) => option?.category_code ? `${option.category_code} - ${option.category_name}` : (option?.category_name || '')}
+                onChange={(value: any) => handleCategoryChange(value ? String(value.category_id) : '')}
+                onSearchChange={(value) => setCategoryQuery(value)}
+                onCreate={(payload) => categoryApi.create(payload)}
+                onUpdate={(id, payload) => categoryApi.update(id, payload)}
+                onOptionsChange={(nextOptions) => setCategories(nextOptions)}
+                onSavedSelect={(saved: any) => {
+                  handleCategoryChange(String(saved.category_id));
                 }}
-                getOptionLabel={(option) => option?.category_code ? `${option.category_code} - ${option.category_name}` : (option?.category_name || '')}
-                renderInput={(params) => <TextField {...params} label="Category" required />}
               />
-              <Autocomplete
-                size="small"
+              <LookupAutocomplete
+                label="Sub Category"
+                mode="subCategory"
                 options={subCategories}
                 value={subCategories.find((s) => String(s.sub_category_id) === String(formData.sub_category_id)) || null}
-                onChange={(_, value) => setFormData({ ...formData, sub_category_id: value ? String(value.sub_category_id) : '' })}
-                onInputChange={(_, value, reason) => {
-                  if (reason === 'input' || reason === 'clear') {
-                    setSubCategoryQuery(value);
+                categoryOptions={categories}
+                defaultCategoryId={formData.category_id}
+                getOptionId={(option: any) => Number(option.sub_category_id)}
+                getOptionLabel={(option: any) => option?.sub_category_code ? `${option.sub_category_code} - ${option.sub_category_name}` : (option?.sub_category_name || '')}
+                onChange={(value: any) => setFormData({ ...formData, sub_category_id: value ? String(value.sub_category_id) : '' })}
+                onSearchChange={(value) => setSubCategoryQuery(value)}
+                onCreate={(payload) => subCategoryApi.create(payload)}
+                onUpdate={(id, payload) => subCategoryApi.update(id, payload)}
+                onOptionsChange={(nextOptions) => setSubCategories(nextOptions)}
+                onSavedSelect={(saved: any) => {
+                  const nextCategoryId = String(saved.category_id || '');
+                  if (nextCategoryId && nextCategoryId !== formData.category_id) {
+                    setFormData((current) => ({
+                      ...current,
+                      category_id: nextCategoryId,
+                      sub_category_id: String(saved.sub_category_id),
+                    }));
+                    loadSubCategories(nextCategoryId);
+                    return;
                   }
+
+                  setFormData((current) => ({
+                    ...current,
+                    sub_category_id: String(saved.sub_category_id),
+                  }));
                 }}
-                getOptionLabel={(option) => option?.sub_category_code ? `${option.sub_category_code} - ${option.sub_category_name}` : (option?.sub_category_name || '')}
-                renderInput={(params) => <TextField {...params} label="Sub Category" />}
-                disabled={!formData.category_id}
               />
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Autocomplete
-                size="small"
+              <LookupAutocomplete
+                label="UOM"
+                mode="uom"
+                required
                 options={uoms}
                 value={uoms.find((u) => String(u.uom_id) === String(formData.stock_uom_id)) || null}
-                onChange={(_, value) => setFormData({ ...formData, stock_uom_id: value ? String(value.uom_id) : '' })}
-                onInputChange={(_, value, reason) => {
-                  if (reason === 'input' || reason === 'clear') {
-                    setUomQuery(value);
-                  }
-                }}
-                getOptionLabel={(option) => option?.uom_name ? `${option.uom_name}${option.abbreviation ? ` (${option.abbreviation})` : ''}` : ''}
-                renderInput={(params) => <TextField {...params} label="UOM" required />}
+                getOptionId={(option: any) => Number(option.uom_id)}
+                getOptionLabel={(option: any) => option?.uom_name ? `${option.uom_name}${option.abbreviation ? ` (${option.abbreviation})` : ''}` : ''}
+                onChange={(value: any) => setFormData({ ...formData, stock_uom_id: value ? String(value.uom_id) : '' })}
+                onSearchChange={(value) => setUomQuery(value)}
+                onCreate={(payload) => uomApi.create(payload)}
+                onUpdate={(id, payload) => uomApi.update(id, payload)}
+                onOptionsChange={(nextOptions) => setUoms(nextOptions)}
+                onSavedSelect={(saved: any) => setFormData((current) => ({ ...current, stock_uom_id: String(saved.uom_id) }))}
               />
-              <Autocomplete
-                size="small"
+              <LookupAutocomplete
+                label="Material Type"
+                mode="materialType"
                 options={materialTypes}
                 value={materialTypes.find((mt) => String(mt.material_type_id) === String(formData.material_type_id)) || null}
-                onChange={(_, value) => setFormData({ ...formData, material_type_id: value ? String(value.material_type_id) : '' })}
-                onInputChange={(_, value, reason) => {
-                  if (reason === 'input' || reason === 'clear') {
-                    setMaterialTypeQuery(value);
-                  }
-                }}
-                getOptionLabel={(option) => option?.material_type_name || ''}
-                renderInput={(params) => <TextField {...params} label="Material Type" />}
+                getOptionId={(option: any) => Number(option.material_type_id)}
+                getOptionLabel={(option: any) => option?.material_type_name || ''}
+                onChange={(value: any) => setFormData({ ...formData, material_type_id: value ? String(value.material_type_id) : '' })}
+                onSearchChange={(value) => setMaterialTypeQuery(value)}
+                onCreate={(payload) => materialTypeApi.create(payload)}
+                onUpdate={(id, payload) => materialTypeApi.update(id, payload)}
+                onOptionsChange={(nextOptions) => setMaterialTypes(nextOptions)}
+                onSavedSelect={(saved: any) => setFormData((current) => ({ ...current, material_type_id: String(saved.material_type_id) }))}
               />
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Autocomplete
+              <LookupAutocomplete
+                label="Brands"
+                mode="brand"
                 multiple
-                size="small"
                 options={brands}
                 value={brands.filter((b) => formData.brand_ids.includes(String(b.brand_id)))}
-                onChange={(_, value) =>
-                  setFormData({
-                    ...formData,
-                    brand_ids: (value || []).map((item) => String(item.brand_id)),
-                  })
+                getOptionId={(option: any) => Number(option.brand_id)}
+                getOptionLabel={(option: any) => option?.brand_name || ''}
+                onChange={(value: any) =>
+                  setFormData((current) => ({
+                    ...current,
+                    brand_ids: Array.isArray(value) ? value.map((item: any) => String(item.brand_id)) : [],
+                  }))
                 }
-                onInputChange={(_, value, reason) => {
-                  if (reason === 'input' || reason === 'clear') {
-                    setBrandQuery(value);
-                  }
+                onSearchChange={(value) => setBrandQuery(value)}
+                onCreate={(payload) => brandApi.create(payload)}
+                onUpdate={(id, payload) => brandApi.update(id, payload)}
+                onOptionsChange={(nextOptions) => setBrands(nextOptions)}
+                onSavedSelect={(saved: any) => {
+                  const savedId = String(saved.brand_id);
+                  setFormData((current) => ({
+                    ...current,
+                    brand_ids: current.brand_ids.includes(savedId)
+                      ? current.brand_ids
+                      : [...current.brand_ids, savedId],
+                  }));
                 }}
-                getOptionLabel={(option) => option?.brand_name || ''}
-                isOptionEqualToValue={(option, value) => String(option.brand_id) === String(value.brand_id)}
-                renderInput={(params) => <TextField {...params} label="Brands" />}
               />
             </Box>
 
