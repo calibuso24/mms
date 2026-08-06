@@ -34,9 +34,19 @@ export class MaterialValidator {
       }
     }
 
-    if (data.brand_id !== undefined && data.brand_id !== null) {
-      if (!Number.isInteger(data.brand_id) || data.brand_id <= 0) {
-        errors.push('Brand ID must be a positive integer');
+    if (data.brand_ids !== undefined && data.brand_ids !== null) {
+      if (!Array.isArray(data.brand_ids)) {
+        errors.push('Brand IDs must be an array');
+      } else {
+        const invalid = data.brand_ids.some((id: unknown) => !Number.isInteger(id) || Number(id) <= 0);
+        if (invalid) {
+          errors.push('Each brand ID must be a positive integer');
+        }
+
+        const uniqueCount = new Set(data.brand_ids.map((id: number) => Number(id))).size;
+        if (uniqueCount !== data.brand_ids.length) {
+          errors.push('Brand IDs must not contain duplicates');
+        }
       }
     }
 
@@ -114,9 +124,19 @@ export class MaterialValidator {
     }
 
     // Brand validation (if provided)
-    if (data.brand_id !== undefined && data.brand_id !== null) {
-      if (!Number.isInteger(data.brand_id) || data.brand_id <= 0) {
-        errors.push('Brand ID must be a positive integer');
+    if (data.brand_ids !== undefined && data.brand_ids !== null) {
+      if (!Array.isArray(data.brand_ids)) {
+        errors.push('Brand IDs must be an array');
+      } else {
+        const invalid = data.brand_ids.some((id: unknown) => !Number.isInteger(id) || Number(id) <= 0);
+        if (invalid) {
+          errors.push('Each brand ID must be a positive integer');
+        }
+
+        const uniqueCount = new Set(data.brand_ids.map((id: number) => Number(id))).size;
+        if (uniqueCount !== data.brand_ids.length) {
+          errors.push('Brand IDs must not contain duplicates');
+        }
       }
     }
 

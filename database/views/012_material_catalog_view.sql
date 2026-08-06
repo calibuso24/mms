@@ -30,13 +30,16 @@ JOIN category c ON c.category_id = m.category_id
 LEFT JOIN sub_category sc ON sc.sub_category_id = m.sub_category_id
 JOIN unit_of_measure u ON u.uom_id = m.stock_uom_id
 JOIN look_up status_lookup ON status_lookup.look_up_id = m.status_id
-LEFT JOIN material_specification specification ON specification.material_id = m.material_id
+LEFT JOIN material_specification specification
+    ON specification.material_id = m.material_id
+   AND specification.is_deleted = FALSE
 LEFT JOIN LATERAL (
     SELECT STRING_AGG(b.brand_name, ', ' ORDER BY b.brand_name) AS brands
     FROM material_brand mb
     JOIN brand b ON b.brand_id = mb.brand_id
     WHERE mb.material_id = m.material_id
       AND mb.is_deleted = FALSE
+      AND b.is_deleted = FALSE
 ) AS brand_summary ON TRUE
 LEFT JOIN LATERAL (
     SELECT STRING_AGG(option_record.option_name, ', ' ORDER BY option_record.option_name) AS fulfillment_options

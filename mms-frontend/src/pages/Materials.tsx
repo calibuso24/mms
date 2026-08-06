@@ -56,7 +56,7 @@ interface FormData {
   sub_category_id: string;
   stock_uom_id: string;
   material_type_id: string;
-  brand_id: string;
+  brand_ids: string[];
   status_id: string;
   notes: string;
   material_specification: {
@@ -120,7 +120,7 @@ export default function MaterialsPage() {
     sub_category_id: '',
     stock_uom_id: '',
     material_type_id: '',
-    brand_id: '',
+    brand_ids: [],
     status_id: '',
     notes: '',
     material_specification: {
@@ -314,9 +314,7 @@ export default function MaterialsPage() {
       if (formData.material_type_id) {
         submitData.material_type_id = parseInt(formData.material_type_id);
       }
-      if (formData.brand_id) {
-        submitData.brand_id = parseInt(formData.brand_id);
-      }
+      submitData.brand_ids = formData.brand_ids.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0);
 
       if (Object.values(formData.material_specification).some(v => v)) {
         submitData.material_specification = formData.material_specification;
@@ -354,7 +352,9 @@ export default function MaterialsPage() {
         sub_category_id: material.sub_category_id || '',
         stock_uom_id: material.stock_uom_id,
         material_type_id: material.material_type_id || '',
-        brand_id: material.brand_id || '',
+        brand_ids: Array.isArray(material.brand_ids)
+          ? material.brand_ids.map((id: number | string) => String(id))
+          : (material.brand_id ? [String(material.brand_id)] : []),
         status_id: material.status_id,
         notes: material.notes || '',
         material_specification: material.material_specification || {
@@ -408,9 +408,7 @@ export default function MaterialsPage() {
       if (formData.material_type_id) {
         submitData.material_type_id = parseInt(formData.material_type_id);
       }
-      if (formData.brand_id) {
-        submitData.brand_id = parseInt(formData.brand_id);
-      }
+      submitData.brand_ids = formData.brand_ids.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0);
       if (formData.notes) {
         submitData.notes = formData.notes;
       }
@@ -461,7 +459,7 @@ export default function MaterialsPage() {
       sub_category_id: '',
       stock_uom_id: '',
       material_type_id: '',
-      brand_id: '',
+      brand_ids: [],
       status_id: '',
       notes: '',
       material_specification: {
@@ -779,17 +777,24 @@ export default function MaterialsPage() {
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
               <Autocomplete
+                multiple
                 size="small"
                 options={brands}
-                value={brands.find((b) => String(b.brand_id) === String(formData.brand_id)) || null}
-                onChange={(_, value) => setFormData({ ...formData, brand_id: value ? String(value.brand_id) : '' })}
+                value={brands.filter((b) => formData.brand_ids.includes(String(b.brand_id)))}
+                onChange={(_, value) =>
+                  setFormData({
+                    ...formData,
+                    brand_ids: (value || []).map((item) => String(item.brand_id)),
+                  })
+                }
                 onInputChange={(_, value, reason) => {
                   if (reason === 'input' || reason === 'clear') {
                     setBrandQuery(value);
                   }
                 }}
                 getOptionLabel={(option) => option?.brand_name || ''}
-                renderInput={(params) => <TextField {...params} label="Brand" />}
+                isOptionEqualToValue={(option, value) => String(option.brand_id) === String(value.brand_id)}
+                renderInput={(params) => <TextField {...params} label="Brands" />}
               />
             </Box>
 

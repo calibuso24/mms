@@ -60,7 +60,7 @@ export class MaterialService {
     material_type_id?: number;
     status_id?: number;
     notes?: string;
-    brand_id?: number;
+    brand_ids?: number[];
     material_specification?: {
       primary_size?: string;
       secondary_size?: string;
@@ -127,21 +127,27 @@ export class MaterialService {
       notes: data.notes,
     });
 
-    // Create material specification if provided
-    if (data.material_specification) {
-      try {
+    try {
+      // Create material specification if provided
+      if (data.material_specification) {
         await this.specificationRepository.create({
-          material_id: parseInt(material.material_id as string),
+          material_id: parseInt(material.material_id as string, 10),
           ...data.material_specification,
         });
-      } catch (error) {
-        // If specification creation fails, soft delete the material
-        await this.materialRepository.softDelete(parseInt(material.material_id as string));
-        throw error;
       }
+
+      if (data.brand_ids !== undefined) {
+        const normalizedBrandIds = this.normalizeBrandIds(data.brand_ids);
+        await this.assertBrandsExist(normalizedBrandIds);
+        await this.syncMaterialBrands(parseInt(material.material_id as string, 10), normalizedBrandIds);
+      }
+    } catch (error) {
+      // Keep existing compensation behavior on create failures.
+      await this.materialRepository.softDelete(parseInt(material.material_id as string, 10));
+      throw error;
     }
 
-    return material;
+    return this.getMaterial(parseInt(material.material_id as string, 10));
   }
 
   async updateMaterial(
@@ -154,7 +160,7 @@ export class MaterialService {
       material_type_id?: number;
       status_id?: number;
       notes?: string;
-      brand_id?: number;
+      brand_ids?: number[];
       material_specification?: {
         primary_size?: string;
         secondary_size?: string;
@@ -222,6 +228,11 @@ export class MaterialService {
       }
     }
 
+    if (data.brand_ids !== undefined) {
+      const normalizedBrandIds = this.normalizeBrandIds(data.brand_ids);
+      await this.assertBrandsExist(normalizedBrandIds);
+    }
+
     // Prepare data for material update (exclude specification and option fields)
     const materialUpdateData: any = {};
     if (data.product_name !== undefined) materialUpdateData.product_name = data.product_name;
@@ -271,6 +282,12 @@ export class MaterialService {
           notes: data.material_option.notes,
         });
       }
+    }
+
+    if (data.brand_ids !== undefined) {
+      const normalizedBrandIds = this.normalizeBrandIds(data.brand_ids);
+      await this.syncMaterialBrands(id, normalizedBrandIds);
+      return this.getMaterial(id);
     }
 
     return material;
@@ -325,5 +342,87 @@ export class MaterialService {
     }
 
     throw new ValidationError('Unable to generate unique product code. Please retry.');
+  }
+
+  private normalizeBrandIds(brandIds: number[]): number[] {
+    return Array.from(
+      new Set(
+        (brandIds || [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    );
+  }
+
+  private async assertBrandsExist(brandIds: number[]): Promise<void> {
+    if (brandIds.length === 0) {
+      return;
+    }
+
+    const result = await pool.query<{ brand_id: number }>(
+      `SELECT brand_id
+       FROM brand
+       WHERE brand_id = ANY($1::bigint[])
+         AND is_deleted = false`,
+      [brandIds]
+    );
+
+    const found = new Set(result.rows.map((row) => Number(row.brand_id)));
+    const missing = brandIds.filter((id) => !found.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundError(`Brand not found: ${missing.join(', ')}`);
+    }
+  }
+
+  private async syncMaterialBrands(materialId: number, brandIds: number[]): Promise<void> {
+    if (brandIds.length === 0) {
+      await pool.query(
+        `UPDATE material_brand
+         SET is_deleted = true,
+             log_date_deleted = NOW(),
+             log_module_updated = 'material'
+         WHERE material_id = $1
+           AND is_deleted = false`,
+        [materialId]
+      );
+      return;
+    }
+
+    await pool.query(
+      `UPDATE material_brand
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_module_updated = 'material'
+       WHERE material_id = $1
+         AND is_deleted = false
+         AND NOT (brand_id = ANY($2::bigint[]))`,
+      [materialId, brandIds]
+    );
+
+    await pool.query(
+      `INSERT INTO material_brand (
+        material_id,
+        brand_id,
+        is_deleted,
+        log_date_created,
+        log_module_created,
+        log_module_updated
+      )
+      SELECT
+        $1,
+        bid.brand_id,
+        false,
+        NOW(),
+        'material',
+        'material'
+      FROM UNNEST($2::bigint[]) AS bid(brand_id)
+      ON CONFLICT (material_id, brand_id)
+      DO UPDATE SET
+        is_deleted = false,
+        log_date_deleted = NULL,
+        log_date_updated = NOW(),
+        log_module_updated = 'material'`,
+      [materialId, brandIds]
+    );
   }
 }

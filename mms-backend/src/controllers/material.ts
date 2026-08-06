@@ -80,7 +80,7 @@ export class MaterialController {
         stock_uom_id,
         material_type_id,
         status_id,
-        brand_id,
+        brand_ids,
         notes,
         material_specification,
       } = req.body;
@@ -96,7 +96,7 @@ export class MaterialController {
         stock_uom_id,
         material_type_id,
         status_id,
-        brand_id,
+        brand_ids,
         notes,
         material_specification,
       });

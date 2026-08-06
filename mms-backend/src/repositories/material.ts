@@ -14,6 +14,8 @@ export interface Material {
 }
 
 export interface MaterialWithDetails extends Material {
+  brand_ids?: number[];
+  brands?: Array<{ brand_id: number; brand_name: string }>;
   category_code?: string;
   category_name?: string;
   sub_category_code?: string;
@@ -52,6 +54,8 @@ export class MaterialRepository {
         u.uom_name,
         u.abbreviation as uom_abbreviation,
         l.name as status_name,
+        mb.brand_ids,
+        mb.brands,
         mb.brand_name,
         TRIM(BOTH ' -' FROM CONCAT_WS(' - ',
           NULLIF(ms.primary_size, ''),
@@ -74,13 +78,14 @@ export class MaterialRepository {
        LEFT JOIN unit_of_measure u ON m.stock_uom_id = u.uom_id
        LEFT JOIN look_up l ON m.status_id = l.look_up_id
        LEFT JOIN LATERAL (
-         SELECT b.brand_name
+         SELECT
+           ARRAY_AGG(b.brand_id ORDER BY b.brand_name) AS brand_ids,
+           JSON_AGG(JSON_BUILD_OBJECT('brand_id', b.brand_id, 'brand_name', b.brand_name) ORDER BY b.brand_name) AS brands,
+           STRING_AGG(b.brand_name, ', ' ORDER BY b.brand_name) AS brand_name
          FROM material_brand mb
          JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
          WHERE mb.material_id = m.material_id
            AND mb.is_deleted = false
-         ORDER BY b.brand_name ASC
-         LIMIT 1
        ) mb ON true
        WHERE m.material_id = $1 AND m.is_deleted = false`,
       [id]
@@ -101,6 +106,8 @@ export class MaterialRepository {
         u.uom_name,
         u.abbreviation as uom_abbreviation,
         l.name as status_name,
+        mb.brand_ids,
+        mb.brands,
         mb.brand_name,
         TRIM(BOTH ' -' FROM CONCAT_WS(' - ',
           NULLIF(ms.primary_size, ''),
@@ -123,13 +130,14 @@ export class MaterialRepository {
        LEFT JOIN unit_of_measure u ON m.stock_uom_id = u.uom_id
        LEFT JOIN look_up l ON m.status_id = l.look_up_id
        LEFT JOIN LATERAL (
-         SELECT b.brand_name
+         SELECT
+           ARRAY_AGG(b.brand_id ORDER BY b.brand_name) AS brand_ids,
+           JSON_AGG(JSON_BUILD_OBJECT('brand_id', b.brand_id, 'brand_name', b.brand_name) ORDER BY b.brand_name) AS brands,
+           STRING_AGG(b.brand_name, ', ' ORDER BY b.brand_name) AS brand_name
          FROM material_brand mb
          JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
          WHERE mb.material_id = m.material_id
            AND mb.is_deleted = false
-         ORDER BY b.brand_name ASC
-         LIMIT 1
        ) mb ON true
        WHERE m.product_code = $1 AND m.is_deleted = false`,
       [code]
@@ -157,6 +165,8 @@ export class MaterialRepository {
       u.uom_name,
       u.abbreviation as uom_abbreviation,
         l.name as status_name,
+        mb.brand_ids,
+        mb.brands,
         mb.brand_name,
         TRIM(BOTH ' -' FROM CONCAT_WS(' - ',
           NULLIF(ms.primary_size, ''),
@@ -179,13 +189,14 @@ export class MaterialRepository {
      LEFT JOIN unit_of_measure u ON m.stock_uom_id = u.uom_id
      LEFT JOIN look_up l ON m.status_id = l.look_up_id
        LEFT JOIN LATERAL (
-         SELECT b.brand_name
+         SELECT
+           ARRAY_AGG(b.brand_id ORDER BY b.brand_name) AS brand_ids,
+           JSON_AGG(JSON_BUILD_OBJECT('brand_id', b.brand_id, 'brand_name', b.brand_name) ORDER BY b.brand_name) AS brands,
+           STRING_AGG(b.brand_name, ', ' ORDER BY b.brand_name) AS brand_name
          FROM material_brand mb
          JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
          WHERE mb.material_id = m.material_id
            AND mb.is_deleted = false
-         ORDER BY b.brand_name ASC
-         LIMIT 1
        ) mb ON true
      WHERE m.is_deleted = false`;
 
