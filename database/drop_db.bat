@@ -13,7 +13,10 @@ REM Example:
 REM set "PGPASSWORD=MyPassword123"
 set "PGPASSWORD="
 
-set "PSQL_EXE=C:\Program Files\PostgreSQL\18\bin\psql.exe"
+if exist "C:\Program Files\PostgreSQL\18\bin\psql.exe" set "PSQL_EXE=C:\Program Files\PostgreSQL\18\bin\psql.exe"
+if exist "C:\Program Files\PostgreSQL\16\bin\psql.exe" set "PSQL_EXE=C:\Program Files\PostgreSQL\16\bin\psql.exe"
+if exist "C:\Program Files\PostgreSQL\15\bin\psql.exe" set "PSQL_EXE=C:\Program Files\PostgreSQL\15\bin\psql.exe"
+if exist "C:\Program Files\PostgreSQL\14\bin\psql.exe" set "PSQL_EXE=C:\Program Files\PostgreSQL\14\bin\psql.exe"
 
 REM Database to drop
 set "TARGET_DB=mms"

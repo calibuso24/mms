@@ -18,7 +18,7 @@ DROP DATABASE IF EXISTS sugarcrm;
 BACKUP 
 ---------------------------------
 open cmd as administrator
-cd C:\Program Files\PostgreSQL\18\bin
+cd C:\Program Files\PostgreSQL\16\bin
 
 pg_dump -Fc -Upostgres icpwi > icpwi.bak
 pg_dump -Fc -h 192.168.1.222 icpwi > icpwi.bak
