@@ -4,6 +4,7 @@ import { BrandController } from '../controllers/brand.js';
 import { UnitOfMeasureController } from '../controllers/unitOfMeasure.js';
 import { SubCategoryController } from '../controllers/subCategory.js';
 import { MaterialController } from '../controllers/material.js';
+import { MaterialOptionController } from '../controllers/materialOption.js';
 import { MaterialTypeController } from '../controllers/materialType.js';
 import { LookupController } from '../controllers/lookup.js';
 
@@ -15,6 +16,7 @@ const brandController = new BrandController();
 const uomController = new UnitOfMeasureController();
 const subCategoryController = new SubCategoryController();
 const materialController = new MaterialController();
+const materialOptionController = new MaterialOptionController();
 const materialTypeController = new MaterialTypeController();
 const lookupController = new LookupController();
 
@@ -99,6 +101,23 @@ router.put('/materials/:id', (req, res, next) =>
 );
 router.delete('/materials/:id', (req, res, next) =>
   materialController.deleteMaterial(req, res, next)
+);
+
+// Material options (master-detail BOM)
+router.get('/materials/:materialId/options', (req, res, next) =>
+  materialOptionController.listByMaterial(req, res, next)
+);
+router.get('/materials/:materialId/options/:optionId', (req, res, next) =>
+  materialOptionController.getById(req, res, next)
+);
+router.post('/materials/:materialId/options', (req, res, next) =>
+  materialOptionController.create(req, res, next)
+);
+router.put('/materials/:materialId/options/:optionId', (req, res, next) =>
+  materialOptionController.update(req, res, next)
+);
+router.delete('/materials/:materialId/options/:optionId', (req, res, next) =>
+  materialOptionController.delete(req, res, next)
 );
 
 // Material types

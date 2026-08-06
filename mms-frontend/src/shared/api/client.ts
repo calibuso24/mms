@@ -285,6 +285,15 @@ export const materialApi = {
   delete: (id: number) => ApiClient.delete(`/materials/${id}`),
 };
 
+// Material Option API
+export const materialOptionApi = {
+  listByMaterial: (materialId: number) => ApiClient.get(`/materials/${materialId}/options`),
+  getById: (materialId: number, optionId: number) => ApiClient.get(`/materials/${materialId}/options/${optionId}`),
+  create: (materialId: number, data: any) => ApiClient.post(`/materials/${materialId}/options`, data),
+  update: (materialId: number, optionId: number, data: any) => ApiClient.put(`/materials/${materialId}/options/${optionId}`, data),
+  delete: (materialId: number, optionId: number) => ApiClient.delete(`/materials/${materialId}/options/${optionId}`),
+};
+
 // Material Type API
 export const materialTypeApi = {
   list: (limit?: number, offset?: number, search?: string) => {

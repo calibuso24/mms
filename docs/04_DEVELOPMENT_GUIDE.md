@@ -79,6 +79,8 @@ Security model:
 | GET | /api/lookups/:type |
 | GET | /api/lookups/:type/:id |
 | GET/POST/PUT/DELETE | /api/materials and /api/materials/:id |
+| GET/POST | /api/materials/:materialId/options |
+| GET/PUT/DELETE | /api/materials/:materialId/options/:optionId |
 
 ### Material Control routes
 

@@ -55,8 +55,12 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
 2. Material form supports:
   - base material fields
   - optional material specification payload
-  - optional material option payload
-3. List filtering uses search + lookup-based filters.
+  - material option master/detail definitions (option header + component materials)
+3. Material option workflows support:
+  - create/update/delete option headers
+  - create/update/delete component rows under each option
+  - validation for duplicate components, positive quantities, and parent-as-component prevention
+4. List filtering uses search + lookup-based filters.
 
 ### 4. Project and supplier management flow
 

@@ -22,7 +22,7 @@ export class MaterialService {
 
     // Fetch related data
     const specification = await this.specificationRepository.findByMaterialId(id);
-    const options = await this.optionRepository.findByMaterialId(id);
+    const options = await this.optionRepository.findOptionsWithComponentsByMaterialId(id);
 
     return {
       ...material,

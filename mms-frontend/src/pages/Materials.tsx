@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Autocomplete,
   Box,
@@ -24,18 +24,19 @@ import {
   TableContainer,
   TablePagination,
   Chip,
-  Card,
   CardContent,
   IconButton,
   Stack,
   Tooltip,
 } from '@mui/material';
+import { GridColDef, GridRenderEditCellParams } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
-import { materialApi, materialTypeApi, categoryApi, subCategoryApi, brandApi, uomApi, lookupApi } from '../shared/api/client.js';
+import { materialApi, materialTypeApi, categoryApi, subCategoryApi, brandApi, uomApi, lookupApi, materialOptionApi } from '../shared/api/client.js';
+import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
 interface Material {
   material_id: string;
@@ -69,16 +70,47 @@ interface FormData {
     schedule: string;
     pressure_or_load_rating: string;
   };
-  material_option?: {
-    material_option_id?: number;
-    option_code?: string;
-    option_name?: string;
-    option_type_id?: string;
-    requires_approval?: boolean;
-    is_active?: boolean;
-    notes?: string;
-  };
 }
+
+interface MaterialOptionComponentFormRow {
+  row_id: string;
+  material_option_detail_id?: number;
+  component_material_id: string;
+  required_quantity: string;
+  uom_id: string;
+  notes: string;
+}
+
+interface MaterialOptionForm {
+  row_id: string;
+  material_option_id?: number;
+  option_code: string;
+  option_name: string;
+  option_type_id: string;
+  requires_approval: boolean;
+  is_active: boolean;
+  notes: string;
+  components: MaterialOptionComponentFormRow[];
+}
+
+const createComponentRow = (): MaterialOptionComponentFormRow => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  component_material_id: '',
+  required_quantity: '',
+  uom_id: '',
+  notes: '',
+});
+
+const createOptionRow = (): MaterialOptionForm => ({
+  row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  option_code: '',
+  option_name: '',
+  option_type_id: '',
+  requires_approval: true,
+  is_active: true,
+  notes: '',
+  components: [createComponentRow()],
+});
 
 export default function MaterialsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -89,6 +121,11 @@ export default function MaterialsPage() {
   const [uoms, setUoms] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [optionTypes, setOptionTypes] = useState<any[]>([]);
+  const [materialOptions, setMaterialOptions] = useState<MaterialOptionForm[]>([]);
+  const [selectedOptionRowId, setSelectedOptionRowId] = useState<string>('');
+  const [removedOptionIds, setRemovedOptionIds] = useState<number[]>([]);
+  const [componentMaterialQuery, setComponentMaterialQuery] = useState('');
+  const [componentMaterialOptions, setComponentMaterialOptions] = useState<any[]>([]);
   const [categoryQuery, setCategoryQuery] = useState('');
   const [subCategoryQuery, setSubCategoryQuery] = useState('');
   const [brandQuery, setBrandQuery] = useState('');
@@ -132,14 +169,6 @@ export default function MaterialsPage() {
       length: '',
       schedule: '',
       pressure_or_load_rating: '',
-    },
-    material_option: {
-      option_code: '',
-      option_name: '',
-      option_type_id: '',
-      requires_approval: true,
-      is_active: true,
-      notes: '',
     },
   });
 
@@ -201,6 +230,30 @@ export default function MaterialsPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [formData.category_id, subCategoryQuery]);
+
+  useEffect(() => {
+    if (!editingMaterialId) {
+      setComponentMaterialOptions([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const search = componentMaterialQuery.trim();
+      void materialApi
+        .list(50, 0, search ? { search } : undefined)
+        .then((result: any) => {
+          const options = Array.isArray(result?.items)
+            ? result.items
+            : Array.isArray(result)
+              ? result
+              : [];
+          setComponentMaterialOptions(options);
+        })
+        .catch(() => undefined);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [componentMaterialQuery, editingMaterialId]);
 
   const loadInitialData = async () => {
     try {
@@ -279,18 +332,9 @@ export default function MaterialsPage() {
           [specField]: value,
         },
       });
-    } else if (name.startsWith('option_')) {
-      const optionField = name.replace('option_', '');
-      const checkedValue = type === 'checkbox' ? checked : value;
-      setFormData({
-        ...formData,
-        material_option: {
-          ...formData.material_option,
-          [optionField]: checkedValue,
-        },
-      });
     } else {
-      setFormData({ ...formData, [name]: value });
+      const nextValue = type === 'checkbox' ? checked : value;
+      setFormData({ ...formData, [name]: nextValue });
     }
   };
 
@@ -320,17 +364,6 @@ export default function MaterialsPage() {
         submitData.material_specification = formData.material_specification;
       }
 
-      if (formData.material_option?.option_code) {
-        submitData.material_option = {
-          option_code: formData.material_option.option_code,
-          option_name: formData.material_option.option_name,
-          option_type_id: formData.material_option.option_type_id ? parseInt(formData.material_option.option_type_id) : undefined,
-          requires_approval: formData.material_option.requires_approval,
-          is_active: formData.material_option.is_active,
-          notes: formData.material_option.notes,
-        };
-      }
-
       await materialApi.create(submitData);
       resetForm();
       setShowDialog(false);
@@ -344,7 +377,12 @@ export default function MaterialsPage() {
     setEditingMaterialId(materialId);
     setShowDialog(true);
     try {
-      const material = await materialApi.get(parseInt(materialId));
+      const numericMaterialId = parseInt(materialId, 10);
+      const [material, options] = await Promise.all([
+        materialApi.get(numericMaterialId),
+        materialOptionApi.listByMaterial(numericMaterialId).catch(() => []),
+      ]);
+
       setFormData({
         product_code: material.product_code,
         product_name: material.product_name,
@@ -367,23 +405,55 @@ export default function MaterialsPage() {
           schedule: '',
           pressure_or_load_rating: '',
         },
-        material_option: material.material_options?.[0] ? {
-          material_option_id: material.material_options[0].material_option_id,
-          option_code: material.material_options[0].option_code,
-          option_name: material.material_options[0].option_name,
-          option_type_id: material.material_options[0].option_type_id?.toString() || '',
-          requires_approval: material.material_options[0].requires_approval ?? true,
-          is_active: material.material_options[0].is_active ?? true,
-          notes: material.material_options[0].notes || '',
-        } : {
-          option_code: '',
-          option_name: '',
-          option_type_id: '',
-          requires_approval: true,
-          is_active: true,
-          notes: '',
-        },
       });
+
+      const normalizedOptions: MaterialOptionForm[] = (Array.isArray(options) ? options : []).map((option: any) => ({
+        row_id: `option-${option.material_option_id}`,
+        material_option_id: option.material_option_id,
+        option_code: option.option_code || '',
+        option_name: option.option_name || '',
+        option_type_id: option.option_type_id ? String(option.option_type_id) : '',
+        requires_approval: option.requires_approval ?? true,
+        is_active: option.is_active ?? true,
+        notes: option.notes || '',
+        components: Array.isArray(option.components) && option.components.length > 0
+          ? option.components.map((component: any) => ({
+              row_id: `component-${component.material_option_detail_id || Math.random().toString(36).slice(2, 8)}`,
+              material_option_detail_id: component.material_option_detail_id,
+              component_material_id: String(component.component_material_id),
+              required_quantity: String(component.required_quantity ?? ''),
+              uom_id: String(component.uom_id ?? ''),
+              notes: component.notes || '',
+            }))
+          : [createComponentRow()],
+      }));
+
+      const seededComponentMaterials = (Array.isArray(options) ? options : []).flatMap((option: any) =>
+        Array.isArray(option.components)
+          ? option.components.map((component: any) => ({
+              material_id: component.component_material_id,
+              product_code: component.component_material_code,
+              product_name: component.component_material_name,
+              full_description: component.component_full_description,
+              stock_uom_id: component.component_stock_uom_id,
+            }))
+          : []
+      );
+      setComponentMaterialOptions((current) => {
+        const map = new Map<string, any>();
+        for (const item of [...seededComponentMaterials, ...current]) {
+          if (item?.material_id !== undefined && item?.material_id !== null) {
+            map.set(String(item.material_id), item);
+          }
+        }
+        return Array.from(map.values());
+      });
+
+      const resolvedOptions = normalizedOptions.length > 0 ? normalizedOptions : [createOptionRow()];
+      setMaterialOptions(resolvedOptions);
+      setSelectedOptionRowId(resolvedOptions[0].row_id);
+      setRemovedOptionIds([]);
+      setComponentMaterialQuery('');
       loadSubCategories(material.category_id);
     } catch (err: any) {
       setError(err.message || 'Failed to load material');
@@ -417,19 +487,10 @@ export default function MaterialsPage() {
         submitData.material_specification = formData.material_specification;
       }
 
-      if (formData.material_option?.material_option_id || formData.material_option?.option_code) {
-        submitData.material_option = {
-          material_option_id: formData.material_option.material_option_id,
-          option_code: formData.material_option.option_code,
-          option_name: formData.material_option.option_name,
-          option_type_id: formData.material_option.option_type_id ? parseInt(formData.material_option.option_type_id) : undefined,
-          requires_approval: formData.material_option.requires_approval,
-          is_active: formData.material_option.is_active,
-          notes: formData.material_option.notes,
-        };
-      }
+      const materialId = parseInt(editingMaterialId, 10);
+      await materialApi.update(materialId, submitData);
+      await syncMaterialOptions(materialId);
 
-      await materialApi.update(parseInt(editingMaterialId), submitData);
       resetForm();
       setEditingMaterialId(null);
       setShowDialog(false);
@@ -449,6 +510,275 @@ export default function MaterialsPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to delete material');
     }
+  };
+
+  const selectedOptionIndex = useMemo(
+    () => materialOptions.findIndex((option) => option.row_id === selectedOptionRowId),
+    [materialOptions, selectedOptionRowId]
+  );
+
+  const selectedOption = selectedOptionIndex >= 0 ? materialOptions[selectedOptionIndex] : null;
+
+  const setSelectedOptionPatch = (patch: Partial<MaterialOptionForm>) => {
+    if (selectedOptionIndex < 0) return;
+    setMaterialOptions((current) =>
+      current.map((option, index) => (index === selectedOptionIndex ? { ...option, ...patch } : option))
+    );
+  };
+
+  const setSelectedOptionComponents = (
+    updater:
+      | MaterialOptionComponentFormRow[]
+      | ((rows: MaterialOptionComponentFormRow[]) => MaterialOptionComponentFormRow[])
+  ) => {
+    if (selectedOptionIndex < 0) return;
+    setMaterialOptions((current) =>
+      current.map((option, index) => {
+        if (index !== selectedOptionIndex) return option;
+        const nextRows = typeof updater === 'function' ? updater(option.components) : updater;
+        return { ...option, components: nextRows };
+      })
+    );
+  };
+
+  const addMaterialOption = () => {
+    const next = createOptionRow();
+    setMaterialOptions((current) => [...current, next]);
+    setSelectedOptionRowId(next.row_id);
+  };
+
+  const removeSelectedMaterialOption = () => {
+    if (selectedOptionIndex < 0) return;
+    const option = materialOptions[selectedOptionIndex];
+    if (option.material_option_id) {
+      setRemovedOptionIds((current) => [...current, option.material_option_id as number]);
+    }
+
+    const nextOptions = materialOptions.filter((_, index) => index !== selectedOptionIndex);
+    if (nextOptions.length === 0) {
+      const empty = createOptionRow();
+      setMaterialOptions([empty]);
+      setSelectedOptionRowId(empty.row_id);
+      return;
+    }
+
+    setMaterialOptions(nextOptions);
+    setSelectedOptionRowId(nextOptions[Math.max(0, selectedOptionIndex - 1)].row_id);
+  };
+
+  const validateMaterialOptionBeforeSave = (option: MaterialOptionForm, parentMaterialId: number): string | null => {
+    if (!option.option_code.trim()) return 'Option code is required';
+    if (!option.option_name.trim()) return 'Option name is required';
+    if (!option.option_type_id) return 'Option type is required';
+    if (!option.components.length) return 'At least one component is required';
+
+    const seen = new Set<string>();
+    for (const component of option.components) {
+      if (!component.component_material_id) return 'Component material is required';
+      if (Number(component.component_material_id) === parentMaterialId) {
+        return 'Component material cannot be the same as parent material';
+      }
+      if (seen.has(component.component_material_id)) {
+        return 'Duplicate component materials are not allowed';
+      }
+      seen.add(component.component_material_id);
+
+      const qty = Number(component.required_quantity);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return 'Component quantity must be greater than zero';
+      }
+      if (!component.uom_id) {
+        return 'Component UOM is required';
+      }
+    }
+
+    return null;
+  };
+
+  const syncMaterialOptions = async (materialId: number) => {
+    for (const optionId of removedOptionIds) {
+      await materialOptionApi.delete(materialId, optionId);
+    }
+
+    for (const option of materialOptions) {
+      const hasMeaningfulData =
+        option.option_code.trim() ||
+        option.option_name.trim() ||
+        option.option_type_id ||
+        option.components.some((component) => component.component_material_id || component.required_quantity || component.uom_id || component.notes);
+
+      if (!hasMeaningfulData) {
+        continue;
+      }
+
+      const validationError = validateMaterialOptionBeforeSave(option, materialId);
+      if (validationError) {
+        throw new Error(`Material option ${option.option_code || option.option_name || 'draft'}: ${validationError}`);
+      }
+
+      const payload = {
+        option_code: option.option_code.trim(),
+        option_name: option.option_name.trim(),
+        option_type_id: parseInt(option.option_type_id, 10),
+        requires_approval: option.requires_approval,
+        is_active: option.is_active,
+        notes: option.notes || null,
+        components: option.components.map((component) => {
+          const detailId = Number(component.material_option_detail_id);
+          return {
+            ...(Number.isInteger(detailId) && detailId > 0
+              ? { material_option_detail_id: detailId }
+              : {}),
+            component_material_id: parseInt(component.component_material_id, 10),
+            required_quantity: Number(component.required_quantity),
+            uom_id: parseInt(component.uom_id, 10),
+            notes: component.notes || null,
+          };
+        }),
+      };
+
+      if (option.material_option_id) {
+        await materialOptionApi.update(materialId, option.material_option_id, payload);
+      } else {
+        await materialOptionApi.create(materialId, payload);
+      }
+    }
+  };
+
+  const componentMaterialChoices = useMemo(() => {
+    const editingIdNum = editingMaterialId ? Number(editingMaterialId) : null;
+    return componentMaterialOptions
+      .filter((material) => (editingIdNum ? Number(material.material_id) !== editingIdNum : true))
+      .map((material) => ({
+        value: String(material.material_id),
+        label: `${material.product_code} - ${material.product_name}${material.full_description ? ` - ${material.full_description}` : ''}`,
+        stock_uom_id: material.stock_uom_id ? String(material.stock_uom_id) : '',
+      }));
+  }, [componentMaterialOptions, editingMaterialId]);
+
+  const renderComponentMaterialEditCell = (params: GridRenderEditCellParams<MaterialOptionComponentFormRow>) => {
+    const selected = componentMaterialChoices.find((item) => item.value === String(params.value || '')) || null;
+
+    return (
+      <Autocomplete
+        size="small"
+        options={componentMaterialChoices}
+        value={selected}
+        isOptionEqualToValue={(option, value) => option.value === value.value}
+        getOptionLabel={(option) => option.label}
+        onInputChange={(_, value, reason) => {
+          if (reason === 'input' || reason === 'clear') {
+            setComponentMaterialQuery(value);
+          }
+        }}
+        onChange={async (_, option) => {
+          await params.api.setEditCellValue({
+            id: params.id,
+            field: params.field,
+            value: option ? option.value : '',
+          });
+
+          if (option?.stock_uom_id) {
+            await params.api.setEditCellValue({
+              id: params.id,
+              field: 'uom_id',
+              value: option.stock_uom_id,
+            });
+          }
+
+          params.api.stopCellEditMode({ id: params.id, field: params.field });
+        }}
+        renderInput={(inputParams) => (
+          <TextField
+            {...inputParams}
+            autoFocus
+            variant="standard"
+            placeholder="Search component material"
+          />
+        )}
+        sx={{ width: '100%' }}
+      />
+    );
+  };
+
+  const optionComponentColumns = useMemo<GridColDef<MaterialOptionComponentFormRow>[]>(() => {
+    const uomChoices = uoms.map((uom) => ({
+      value: String(uom.uom_id),
+      label: `${uom.uom_name}${uom.abbreviation ? ` (${uom.abbreviation})` : ''}`,
+    }));
+
+    return [
+      {
+        field: 'component_material_id',
+        headerName: 'Component Material',
+        minWidth: 360,
+        flex: 1.6,
+        editable: true,
+        renderCell: (params) => {
+          const match = componentMaterialChoices.find((item) => item.value === String(params.value || ''));
+          return <>{match?.label || ''}</>;
+        },
+        renderEditCell: renderComponentMaterialEditCell,
+      },
+      {
+        field: 'required_quantity',
+        headerName: 'Required Qty',
+        minWidth: 140,
+        flex: 0.6,
+        editable: true,
+      },
+      {
+        field: 'uom_id',
+        headerName: 'UOM',
+        minWidth: 180,
+        flex: 0.8,
+        editable: true,
+        type: 'singleSelect',
+        valueOptions: uomChoices,
+      },
+      {
+        field: 'notes',
+        headerName: 'Notes',
+        minWidth: 220,
+        flex: 1,
+        editable: true,
+      },
+    ];
+  }, [uoms, componentMaterialChoices]);
+
+  const validateOptionComponentRow = (
+    row: MaterialOptionComponentFormRow,
+    rows: MaterialOptionComponentFormRow[]
+  ): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const parentMaterialId = editingMaterialId ? Number(editingMaterialId) : null;
+
+    if (!row.component_material_id) {
+      errors.component_material_id = 'Component material is required';
+    }
+
+    if (parentMaterialId && Number(row.component_material_id) === parentMaterialId) {
+      errors.component_material_id = 'Parent material cannot be used as its own component';
+    }
+
+    const duplicateCount = rows.filter(
+      (candidate) =>
+        candidate.component_material_id && candidate.component_material_id === row.component_material_id
+    ).length;
+    if (row.component_material_id && duplicateCount > 1) {
+      errors.component_material_id = 'Duplicate component material is not allowed';
+    }
+
+    const qty = Number(row.required_quantity);
+    if (!row.required_quantity || Number.isNaN(qty) || qty <= 0) {
+      errors.required_quantity = 'Quantity must be greater than zero';
+    }
+
+    if (!row.uom_id) {
+      errors.uom_id = 'UOM is required';
+    }
+
+    return errors;
   };
 
   const resetForm = () => {
@@ -472,15 +802,12 @@ export default function MaterialsPage() {
         schedule: '',
         pressure_or_load_rating: '',
       },
-      material_option: {
-        option_code: '',
-        option_name: '',
-        option_type_id: '',
-        requires_approval: true,
-        is_active: true,
-        notes: '',
-      },
     });
+    setMaterialOptions([]);
+    setSelectedOptionRowId('');
+    setRemovedOptionIds([]);
+    setComponentMaterialQuery('');
+    setComponentMaterialOptions([]);
     setSubCategories([]);
     setExpandedSpecSection(false);
     setExpandedOptionSection(false);
@@ -490,6 +817,12 @@ export default function MaterialsPage() {
     resetForm();
     setShowDialog(false);
     setEditingMaterialId(null);
+  };
+
+  const handleOpenCreateDialog = () => {
+    resetForm();
+    setEditingMaterialId(null);
+    setShowDialog(true);
   };
 
   return (
@@ -503,7 +836,7 @@ export default function MaterialsPage() {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={() => setShowDialog(true)}
+          onClick={handleOpenCreateDialog}
         >
           Add Material
         </Button>
@@ -904,82 +1237,123 @@ export default function MaterialsPage() {
                   onClick={() => setExpandedOptionSection(!expandedOptionSection)}
                   sx={{ justifyContent: 'flex-start', fontWeight: 600, color: '#0b2748' }}
                 >
-                  {expandedOptionSection ? '▼' : '▶'} Material Option
+                  {expandedOptionSection ? '▼' : '▶'} Material Options
                 </Button>
 
                 {expandedOptionSection && (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pl: 2, pt: 1, borderLeft: '2px solid #E1DFDD' }}>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                      <TextField
-                        label="Option Code"
-                        name="option_code"
-                        value={formData.material_option?.option_code || ''}
-                        onChange={handleFormChange}
-                        disabled={!!formData.material_option?.material_option_id}
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Select
+                        value={selectedOptionRowId}
+                        onChange={(e) => setSelectedOptionRowId(String(e.target.value))}
                         size="small"
-                      />
-                      <TextField
-                        label="Option Name"
-                        name="option_name"
-                        value={formData.material_option?.option_name || ''}
-                        onChange={handleFormChange}
+                        sx={{ minWidth: 320 }}
+                      >
+                        {materialOptions.map((option, index) => (
+                          <MenuItem key={option.row_id} value={option.row_id}>
+                            {(option.option_code || `Option ${index + 1}`) + (option.option_name ? ` - ${option.option_name}` : '')}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      <Button variant="outlined" size="small" onClick={addMaterialOption}>
+                        Add Option
+                      </Button>
+                      <Button
+                        variant="outlined"
                         size="small"
-                      />
+                        color="error"
+                        onClick={removeSelectedMaterialOption}
+                        disabled={!selectedOption}
+                      >
+                        Remove Option
+                      </Button>
                     </Box>
 
-                    <Select
-                      value={formData.material_option?.option_type_id || ''}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        material_option: {
-                          ...formData.material_option,
-                          option_type_id: e.target.value,
-                        },
-                      })}
-                      displayEmpty
-                      size="small"
-                      renderValue={(value) => value ? optionTypes.find(o => o.look_up_id === value)?.name || 'Select' : 'Option Type'}
-                    >
-                      <MenuItem value="">Select type</MenuItem>
-                      {optionTypes.map((type) => (
-                        <MenuItem key={type.look_up_id} value={type.look_up_id}>
-                          {type.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            name="option_requires_approval"
-                            checked={formData.material_option?.requires_approval ?? true}
-                            onChange={handleFormChange}
+                    {selectedOption && (
+                      <>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                          <TextField
+                            label="Option Code"
+                            value={selectedOption.option_code}
+                            onChange={(e) => setSelectedOptionPatch({ option_code: e.target.value })}
+                            size="small"
                           />
-                        }
-                        label="Requires Approval"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            name="option_is_active"
-                            checked={formData.material_option?.is_active ?? true}
-                            onChange={handleFormChange}
+                          <TextField
+                            label="Option Name"
+                            value={selectedOption.option_name}
+                            onChange={(e) => setSelectedOptionPatch({ option_name: e.target.value })}
+                            size="small"
                           />
-                        }
-                        label="Is Active"
-                      />
-                    </Box>
+                        </Box>
 
-                    <TextField
-                      label="Option Notes"
-                      name="option_notes"
-                      value={formData.material_option?.notes || ''}
-                      onChange={handleFormChange}
-                      multiline
-                      rows={2}
-                      size="small"
-                    />
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                          <Select
+                            value={selectedOption.option_type_id}
+                            onChange={(e) => setSelectedOptionPatch({ option_type_id: String(e.target.value) })}
+                            displayEmpty
+                            size="small"
+                            renderValue={(value) => value ? optionTypes.find(o => String(o.look_up_id) === String(value))?.name || 'Select' : 'Option Type'}
+                          >
+                            <MenuItem value="">Select type</MenuItem>
+                            {optionTypes.map((type) => (
+                              <MenuItem key={type.look_up_id} value={type.look_up_id}>
+                                {type.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <TextField
+                            label="Option Notes"
+                            value={selectedOption.notes}
+                            onChange={(e) => setSelectedOptionPatch({ notes: e.target.value })}
+                            multiline
+                            rows={2}
+                            size="small"
+                          />
+                        </Box>
+
+                        <Box sx={{ display: 'flex', gap: 2 }}>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={selectedOption.requires_approval}
+                                onChange={(e) => setSelectedOptionPatch({ requires_approval: e.target.checked })}
+                              />
+                            }
+                            label="Requires Approval"
+                          />
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={selectedOption.is_active}
+                                onChange={(e) => setSelectedOptionPatch({ is_active: e.target.checked })}
+                              />
+                            }
+                            label="Is Active"
+                          />
+                        </Box>
+
+                        <EditableLineItemsGrid
+                          rows={selectedOption.components}
+                          setRows={setSelectedOptionComponents}
+                          columns={optionComponentColumns}
+                          createRow={createComponentRow}
+                          getRowId={(row) => row.row_id}
+                          processRowUpdate={(newRow) => newRow}
+                          validateRow={validateOptionComponentRow}
+                          shouldConfirmDelete={(row) => Boolean(row.material_option_detail_id)}
+                          getDeleteConfirmMessage={() => 'Delete this component row?'}
+                          addRowLabel="Add Component"
+                          focusField="component_material_id"
+                          totals={{
+                            totalItems: selectedOption.components.length,
+                            totalQuantity: selectedOption.components.reduce(
+                              (sum, row) => sum + (Number(row.required_quantity) || 0),
+                              0
+                            ),
+                          }}
+                        />
+                      </>
+                    )}
                   </Box>
                 )}
               </>

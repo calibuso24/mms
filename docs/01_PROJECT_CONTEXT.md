@@ -133,6 +133,7 @@ mms/
 - /api/reports
 - /api/system-settings
 - /api/categories, /api/brands, /api/uom, /api/subcategories, /api/lookups, /api/materials
+- /api/materials/:materialId/options and /api/materials/:materialId/options/:optionId
 - /api/material-controls
 - /api/material-requests
 - /api/purchase-orders
