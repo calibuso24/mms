@@ -42,7 +42,7 @@ WITH category_lookup AS (
     WHERE is_deleted = FALSE
 ), settings_seed AS (
     SELECT * FROM (VALUES
-        ('general', 'company_name', 'Company Name', 'text', 'MMS Construction Services', 'MMS Construction Services', TRUE, FALSE, 1, TRUE, TRUE, '{"placeholder":"Enter company name"}'::jsonb, '{}'::jsonb),
+        ('general', 'company_name', 'Company Name', 'text', 'Material Management System', 'Material Management System', TRUE, FALSE, 1, TRUE, TRUE, '{"placeholder":"Enter company name"}'::jsonb, '{}'::jsonb),
         ('general', 'company_logo_url', 'Company Logo', 'file', NULL, NULL, FALSE, FALSE, 2, TRUE, TRUE, '{"accept":"image/*"}'::jsonb, '{}'::jsonb),
         ('general', 'timezone', 'Timezone', 'select', 'Asia/Manila', 'Asia/Manila', TRUE, FALSE, 3, TRUE, TRUE, '[{"label":"Asia/Manila","value":"Asia/Manila"},{"label":"UTC","value":"UTC"}]'::jsonb, '{}'::jsonb),
         ('security', 'password_min_length', 'Password Minimum Length', 'number', '8', '8', TRUE, FALSE, 1, TRUE, TRUE, '{"min":6,"max":32}'::jsonb, '{"min":6,"max":32}'::jsonb),

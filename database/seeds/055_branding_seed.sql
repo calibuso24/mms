@@ -20,9 +20,9 @@ WITH category_lookup AS (
 ), branding AS (
     SELECT (
       jsonb_build_object(
-        'companyName', 'MMS Construction Services',
-        'systemTitle', 'MMS Operations',
-        'browserTitle', 'MMS',
+        'companyName', 'Material Management System',
+        'systemTitle', 'Material Management System',
+        'browserTitle', 'Material Management System',
         'companyLogo', null,
         'favicon', null,
         'login', jsonb_build_object(
