@@ -3,7 +3,7 @@ SELECT
     m.material_id,
     m.product_code,
     m.product_name,
-    m.source_description,
+    m.full_description,
     c.category_code,
     c.category_name,
     sc.sub_category_code,

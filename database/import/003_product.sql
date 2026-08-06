@@ -9,6 +9,7 @@ TRUNCATE unit_of_measure CASCADE;
 
 ALTER TABLE source.tblproduct
 ADD COLUMN IF NOT EXISTS brand_id BIGINT,
+ADD COLUMN IF NOT EXISTS material_brand_id BIGINT,
 ADD COLUMN IF NOT EXISTS material_type_id BIGINT,
 ADD COLUMN IF NOT EXISTS category_id BIGINT,
 ADD COLUMN IF NOT EXISTS sub_category_id BIGINT,
@@ -180,8 +181,7 @@ WHERE b.material_type_id IS NOT NULL
 
 ALTER TABLE source.tblunit ADD COLUMN IF NOT EXISTS uom_id BIGINT;
 
-UPDATE source.tblunit SET uom_id = nextval(pg_get_serial_sequence('public.unit_of_measure', 'uom_id'))
--- WHERE uom_id IS NULL
+UPDATE source.tblunit SET uom_id = unitid
 ;   
 
 UPDATE source.tblproduct a
@@ -271,6 +271,15 @@ SELECT DISTINCT
     'import_product' AS log_module_updated 
 FROM source.tblproduct a 
 WHERE a.material_id IS NOT NULL   
+AND a.brand_id IS NOT NULL
+;
+
+UPDATE source.tblproduct a
+SET material_brand_id = b.material_brand_id
+FROM public.material_brand b
+WHERE a.material_id = b.material_id
+AND a.brand_id = b.brand_id
+AND a.material_id IS NOT NULL
 AND a.brand_id IS NOT NULL
 ;
 
