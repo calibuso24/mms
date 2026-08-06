@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Autocomplete,
@@ -190,6 +191,13 @@ function formatNumber(value: string | number | null | undefined): string {
 }
 
 export default function SupplierDeliveryPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/inventory/supplier-delivery';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<SupplierDeliveryListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -221,7 +229,6 @@ export default function SupplierDeliveryPage() {
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -257,6 +264,24 @@ export default function SupplierDeliveryPage() {
     }
     void loadPurchaseOrderItems(Number(form.purchase_order_id));
   }, [form.purchase_order_id]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -349,13 +374,13 @@ export default function SupplierDeliveryPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: SupplierDeliveryListItem) => {
-    setEditingId(item.supplier_delivery_id);
+  async function openEditById(supplierDeliveryId: number) {
+    setEditingId(supplierDeliveryId);
     try {
-      const detail: SupplierDeliveryDetail = await supplierDeliveryApi.get(item.supplier_delivery_id);
+      const detail: SupplierDeliveryDetail = await supplierDeliveryApi.get(supplierDeliveryId);
       setForm({
         purchase_order_id: detail.purchase_order_id.toString(),
         supplier_id: detail.supplier_id.toString(),
@@ -380,10 +405,16 @@ export default function SupplierDeliveryPage() {
             }))
           : [emptyItem()],
       });
-      setDialogOpen(true);
+      if (location.pathname !== `${baseRoute}/${supplierDeliveryId}/edit`) {
+        navigate(`${baseRoute}/${supplierDeliveryId}/edit`);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load supplier delivery');
     }
+  }
+
+  const openEdit = async (item: SupplierDeliveryListItem) => {
+    await openEditById(item.supplier_delivery_id);
   };
 
   const openView = async (item: SupplierDeliveryListItem) => {
@@ -518,9 +549,9 @@ export default function SupplierDeliveryPage() {
         setSuccess('Supplier Delivery created');
       }
 
-      setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
+      navigate(baseRoute);
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save supplier delivery');
@@ -651,6 +682,7 @@ export default function SupplierDeliveryPage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
       <Stack spacing={2}>
         <Box>
           <Typography variant="h5" fontWeight={700}>Supplier Delivery</Typography>
@@ -867,8 +899,10 @@ export default function SupplierDeliveryPage() {
           )}
         </Paper>
       </Stack>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="lg">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Supplier Delivery' : 'Create Supplier Delivery'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
@@ -988,12 +1022,13 @@ export default function SupplierDeliveryPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => navigate(baseRoute)}>Cancel</Button>
           <Button variant="contained" onClick={submitForm} disabled={saving} startIcon={saving ? <CircularProgress size={16} /> : <LocalShippingIcon />}>
             {editingId ? 'Update' : 'Save'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
 
       <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Supplier Delivery Details</DialogTitle>

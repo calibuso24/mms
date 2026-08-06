@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Autocomplete,
   Alert,
@@ -186,6 +187,13 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function StockTransferPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/inventory/stock-transfer';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<StockTransferListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -212,7 +220,6 @@ export default function StockTransferPage() {
   const [poItems, setPoItems] = useState<PurchaseOrderDetailItem[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -247,6 +254,24 @@ export default function StockTransferPage() {
 
     void loadPurchaseOrderItems(Number(form.purchase_order_id));
   }, [form.purchase_order_id]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -324,13 +349,13 @@ export default function StockTransferPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: StockTransferListItem) => {
-    setEditingId(item.stock_transfer_id);
+  async function openEditById(stockTransferId: number) {
+    setEditingId(stockTransferId);
     try {
-      const detail: StockTransferDetail = await stockTransferApi.get(item.stock_transfer_id);
+      const detail: StockTransferDetail = await stockTransferApi.get(stockTransferId);
       setForm({
         transfer_type_id: detail.transfer_type_id.toString(),
         source_id: detail.source_id.toString(),
@@ -354,10 +379,16 @@ export default function StockTransferPage() {
             }))
           : [emptyItem()],
       });
-      setDialogOpen(true);
+      if (location.pathname !== `${baseRoute}/${stockTransferId}/edit`) {
+        navigate(`${baseRoute}/${stockTransferId}/edit`);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load stock transfer');
     }
+  }
+
+  const openEdit = async (item: StockTransferListItem) => {
+    await openEditById(item.stock_transfer_id);
   };
 
   const openView = async (item: StockTransferListItem) => {
@@ -451,9 +482,9 @@ export default function StockTransferPage() {
         setSuccess('Stock Transfer created');
       }
 
-      setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
+      navigate(baseRoute);
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save stock transfer');
@@ -593,6 +624,7 @@ export default function StockTransferPage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
       <Stack spacing={2}>
         <Box>
           <Typography variant="h5" fontWeight={700}>Stock Transfer</Typography>
@@ -749,8 +781,10 @@ export default function StockTransferPage() {
           )}
         </Paper>
       </Stack>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="lg">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Stock Transfer' : 'Create Stock Transfer'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
@@ -827,10 +861,11 @@ export default function StockTransferPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => navigate(baseRoute)}>Cancel</Button>
           <Button variant="contained" onClick={submitForm} disabled={saving}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
 
       <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Stock Transfer Details</DialogTitle>

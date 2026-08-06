@@ -7,6 +7,7 @@ export interface AddressCreateRequest {
   city?: string | null;
   province?: string | null;
   region?: string | null;
+  country_code?: string | null;
   postal_code?: string | null;
   is_primary?: boolean;
 }

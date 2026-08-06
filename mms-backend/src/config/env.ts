@@ -17,7 +17,7 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173',
   },
   reporting: {
     serviceUrl: process.env.REPORT_SERVICE_URL || null,

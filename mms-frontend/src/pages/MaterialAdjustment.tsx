@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -165,6 +166,13 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function MaterialAdjustmentPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/inventory/material-adjustment';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<MaterialAdjustmentListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -190,7 +198,6 @@ export default function MaterialAdjustmentPage() {
   const [uoms, setUoms] = useState<UomItem[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -227,6 +234,25 @@ export default function MaterialAdjustmentPage() {
 
     return () => clearTimeout(timer);
   }, [projectQuery]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
+
   const loadPermissions = async () => {
     if (!account?.account_id) {
       setPermissions([]);
@@ -287,13 +313,13 @@ export default function MaterialAdjustmentPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: MaterialAdjustmentListItem) => {
-    setEditingId(item.material_adjustment_id);
+  async function openEditById(materialAdjustmentId: number) {
+    setEditingId(materialAdjustmentId);
     try {
-      const detail: MaterialAdjustmentDetail = await materialAdjustmentApi.get(item.material_adjustment_id);
+      const detail: MaterialAdjustmentDetail = await materialAdjustmentApi.get(materialAdjustmentId);
       setForm({
         project_id: detail.project_id.toString(),
         requested_at: detail.requested_at ? detail.requested_at.slice(0, 10) : '',
@@ -315,10 +341,16 @@ export default function MaterialAdjustmentPage() {
             }))
           : [emptyItem()],
       });
-      setDialogOpen(true);
+      if (location.pathname !== `${baseRoute}/${materialAdjustmentId}/edit`) {
+        navigate(`${baseRoute}/${materialAdjustmentId}/edit`);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load material adjustment');
     }
+  }
+
+  const openEdit = async (item: MaterialAdjustmentListItem) => {
+    await openEditById(item.material_adjustment_id);
   };
 
   const openView = async (item: MaterialAdjustmentListItem) => {
@@ -399,9 +431,9 @@ export default function MaterialAdjustmentPage() {
         setSuccess('Material Adjustment created');
       }
 
-      setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
+      navigate(baseRoute);
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save material adjustment');
@@ -530,6 +562,7 @@ export default function MaterialAdjustmentPage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
       <Stack spacing={2}>
         <Box>
           <Typography variant="h5" fontWeight={700}>Material Adjustment</Typography>
@@ -685,8 +718,10 @@ export default function MaterialAdjustmentPage() {
           )}
         </Paper>
       </Stack>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="lg">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Material Adjustment' : 'Create Material Adjustment'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
@@ -745,10 +780,11 @@ export default function MaterialAdjustmentPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => navigate(baseRoute)}>Cancel</Button>
           <Button variant="contained" onClick={submitForm} disabled={saving}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
 
       <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Material Adjustment Details</DialogTitle>

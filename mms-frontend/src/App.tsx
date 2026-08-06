@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '@mui/material/styles';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Box, Container, Paper } from '@mui/material';
 import { BrandingProvider } from './shared/contexts/branding.js';
 import { AuthProvider, useAuth } from './shared/contexts/auth.js';
@@ -26,83 +26,72 @@ import ProfilePage from './pages/Profile.js';
 import { ProjectManagementPage, SupplierManagementPage } from './pages/PartyManagement.js';
 import ReportRunnerPage from './pages/ReportRunner.js';
 
-function DynamicPage({ route }: { route: string | null }) {
-  const { pageTitle } = useNavigation();
-  if (!route) {
-    return <DashboardPage />;
-  }
+function ReportRoutePage() {
+  const { reportCode = '' } = useParams();
+  return <ReportRunnerPage reportCode={reportCode} />;
+}
 
-  if (route?.includes('dashboard')) {
-    return <DashboardPage />;
-  }
-
-  if (route?.includes('product-management')) {
-    return <MaterialsPage />;
-  }
-
-  if (route?.includes('material-control')) {
-    return <MaterialControlPage />;
-  }
-
-  if (route?.includes('material-request')) {
-    return <MaterialRequestPage />;
-  }
-
-  if (route?.includes('purchase-order')) {
-    return <PurchaseOrderPage />;
-  }
-
-  if (route?.includes('delivery-advice')) {
-    return <DeliveryAdvicePage />;
-  }
-
-  if (route?.includes('supplier-delivery')) {
-    return <SupplierDeliveryPage />;
-  }
-
-  if (route?.includes('stock-transfer')) {
-    return <StockTransferPage />;
-  }
-
-  if (route?.includes('material-adjustment')) {
-    return <MaterialAdjustmentPage />;
-  }
-
-  if (route?.includes('manage-users')) {
-    return <ManageUsersPage />;
-  }
-
-  if (route?.includes('manage-roles')) {
-    return <ManageRolesPage />;
-  }
-
-  if (route?.includes('project-management')) {
-    return <ProjectManagementPage />;
-  }
-
-  if (route?.includes('supplier-management')) {
-    return <SupplierManagementPage />;
-  }
-
-  if (route?.includes('system-settings')) {
-    return <SystemSettingsPage />;
-  }
-
-  if (route?.includes('profile')) {
-    return <ProfilePage />;
-  }
-
-  if (route?.startsWith('/reports/')) {
-    const reportCode = route.split('/')[2] || '';
-    if (reportCode) {
-      return <ReportRunnerPage reportCode={reportCode} />;
-    }
-  }
-
+function UnderDevelopmentPage() {
   return (
     <Paper sx={{ p: 3 }}>
       <Box>This page is under development.</Box>
     </Paper>
+  );
+}
+
+function AppContentRoutes() {
+  return (
+    <Routes>
+      <Route path="dashboard" element={<DashboardPage />} />
+
+      <Route path="masterlist/product-management" element={<MaterialsPage />} />
+      <Route path="masterlist/product-management/new" element={<MaterialsPage />} />
+      <Route path="masterlist/product-management/:id/edit" element={<MaterialsPage />} />
+
+      <Route path="masterlist/project-management" element={<ProjectManagementPage />} />
+      <Route path="masterlist/project-management/new" element={<ProjectManagementPage />} />
+      <Route path="masterlist/project-management/:id/edit" element={<ProjectManagementPage />} />
+
+      <Route path="masterlist/supplier-management" element={<SupplierManagementPage />} />
+      <Route path="masterlist/supplier-management/new" element={<SupplierManagementPage />} />
+      <Route path="masterlist/supplier-management/:id/edit" element={<SupplierManagementPage />} />
+
+      <Route path="coordinating/material-control" element={<MaterialControlPage />} />
+      <Route path="coordinating/material-control/new" element={<MaterialControlPage />} />
+      <Route path="coordinating/material-control/:id/edit" element={<MaterialControlPage />} />
+
+      <Route path="coordinating/material-request" element={<MaterialRequestPage />} />
+      <Route path="coordinating/material-request/new" element={<MaterialRequestPage />} />
+      <Route path="coordinating/material-request/:id/edit" element={<MaterialRequestPage />} />
+
+      <Route path="purchasing/purchase-order" element={<PurchaseOrderPage />} />
+      <Route path="purchasing/purchase-order/new" element={<PurchaseOrderPage />} />
+      <Route path="purchasing/purchase-order/:id/edit" element={<PurchaseOrderPage />} />
+
+      <Route path="purchasing/delivery-advice" element={<DeliveryAdvicePage />} />
+      <Route path="purchasing/delivery-advice/new" element={<DeliveryAdvicePage />} />
+      <Route path="purchasing/delivery-advice/:id/edit" element={<DeliveryAdvicePage />} />
+
+      <Route path="inventory/supplier-delivery" element={<SupplierDeliveryPage />} />
+      <Route path="inventory/supplier-delivery/new" element={<SupplierDeliveryPage />} />
+      <Route path="inventory/supplier-delivery/:id/edit" element={<SupplierDeliveryPage />} />
+
+      <Route path="inventory/stock-transfer" element={<StockTransferPage />} />
+      <Route path="inventory/stock-transfer/new" element={<StockTransferPage />} />
+      <Route path="inventory/stock-transfer/:id/edit" element={<StockTransferPage />} />
+
+      <Route path="inventory/material-adjustment" element={<MaterialAdjustmentPage />} />
+      <Route path="inventory/material-adjustment/new" element={<MaterialAdjustmentPage />} />
+      <Route path="inventory/material-adjustment/:id/edit" element={<MaterialAdjustmentPage />} />
+
+      <Route path="admin/manage-users" element={<ManageUsersPage />} />
+      <Route path="admin/manage-roles" element={<ManageRolesPage />} />
+      <Route path="admin/system-settings" element={<SystemSettingsPage />} />
+      <Route path="profile" element={<ProfilePage />} />
+      <Route path="reports/:reportCode" element={<ReportRoutePage />} />
+
+      <Route path="*" element={<UnderDevelopmentPage />} />
+    </Routes>
   );
 }
 
@@ -115,6 +104,27 @@ function AppShell() {
   const [currentRoute, setCurrentRoute] = useState('/dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const deriveTitleFromRoute = (route: string) => {
+    const routeParts = route.split('/').filter(Boolean);
+    if (routeParts.length === 0 || routeParts[0] === 'dashboard') {
+      return 'Dashboard';
+    }
+    if (routeParts[0] === 'profile') {
+      return 'My Profile';
+    }
+    if (routeParts[0] === 'reports') {
+      return 'Reports';
+    }
+
+    const hasModulePrefix = ['masterlist', 'coordinating', 'purchasing', 'inventory', 'admin'].includes(routeParts[0]);
+    const source = hasModulePrefix && routeParts.length > 1 ? routeParts[1] : routeParts[routeParts.length - 1];
+
+    return source
+      .split('-')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   useEffect(() => {
     const routeFromUrl = location.pathname.startsWith('/app')
       ? location.pathname.slice(4) || '/dashboard'
@@ -122,22 +132,7 @@ function AppShell() {
 
     setCurrentRoute(routeFromUrl);
 
-    const routeParts = routeFromUrl.split('/').filter(Boolean);
-    if (routeParts.length === 0 || routeParts[0] === 'dashboard') {
-      setPageTitle('Dashboard');
-      return;
-    }
-
-    if (routeParts[0] === 'profile') {
-      setPageTitle('My Profile');
-      return;
-    }
-
-    const derivedTitle = routeParts[routeParts.length - 1]
-      .split('-')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    setPageTitle(derivedTitle);
+    setPageTitle(deriveTitleFromRoute(routeFromUrl));
   }, [location.pathname, setPageTitle]);
 
   const handleLogout = () => {
@@ -161,16 +156,7 @@ function AppShell() {
     if (title) {
       setPageTitle(title);
     } else {
-      const routeParts = route.split('/').filter(Boolean);
-      if (routeParts.length > 0) {
-        const derivedTitle = routeParts[0]
-          .split('-')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        setPageTitle(derivedTitle);
-      } else {
-        setPageTitle('Dashboard');
-      }
+      setPageTitle(deriveTitleFromRoute(route));
     }
   };
 
@@ -225,7 +211,7 @@ function AppShell() {
         }}
       >
         <Container maxWidth="xl">
-          <DynamicPage route={currentRoute} />
+          <AppContentRoutes />
         </Container>
       </Box>
 

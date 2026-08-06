@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Autocomplete,
   Alert,
@@ -200,6 +201,13 @@ function formatNumber(value: string | null | undefined): string {
 }
 
 export default function MaterialRequestPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/coordinating/material-request';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<MaterialRequestItemList[]>([]);
   const [total, setTotal] = useState(0);
@@ -221,7 +229,6 @@ export default function MaterialRequestPage() {
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [uoms, setUoms] = useState<UomItem[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -258,6 +265,24 @@ export default function MaterialRequestPage() {
 
     return () => clearTimeout(timer);
   }, [projectQuery]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -314,15 +339,17 @@ export default function MaterialRequestPage() {
   };
 
   const openCreate = () => {
-    setEditingId(null);
-    setForm(emptyForm());
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: MaterialRequestItemList) => {
-    setEditingId(item.material_request_id);
+  const openEditById = async (materialRequestId: number, navigateFirst: boolean = false) => {
+    if (navigateFirst) {
+      navigate(`${baseRoute}/${materialRequestId}/edit`);
+    }
+
+    setEditingId(materialRequestId);
     try {
-      const detail: MaterialRequestDetail = await materialRequestApi.get(item.material_request_id);
+      const detail: MaterialRequestDetail = await materialRequestApi.get(materialRequestId);
       setForm({
         project_id: detail.project_id.toString(),
         status_id: detail.status_id.toString(),
@@ -350,10 +377,14 @@ export default function MaterialRequestPage() {
             }))
           : [emptyItem()],
       });
-      setDialogOpen(true);
     } catch (err: any) {
       setError(err.message || 'Failed to load material request');
+      navigate(baseRoute);
     }
+  };
+
+  const openEdit = async (item: MaterialRequestItemList) => {
+    await openEditById(item.material_request_id, true);
   };
 
   const openView = async (item: MaterialRequestItemList) => {
@@ -437,9 +468,9 @@ export default function MaterialRequestPage() {
         setSuccess('Material Request created');
       }
 
-      setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
+      navigate(baseRoute);
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save material request');
@@ -578,6 +609,8 @@ export default function MaterialRequestPage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
+      <>
       <Paper sx={{ p: 3, mb: 2 }}>
         <Stack spacing={1.5}>
           <Breadcrumbs aria-label="breadcrumb">
@@ -697,8 +730,11 @@ export default function MaterialRequestPage() {
         <Divider />
         <TablePagination component="div" count={total} page={page} onPageChange={(_, nextPage) => setPage(nextPage)} rowsPerPage={rowsPerPage} onRowsPerPageChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(0); }} rowsPerPageOptions={[10, 25, 50, 100]} />
       </Paper>
+      </>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="lg">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Material Request' : 'New Material Request'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.25 }}>
@@ -761,10 +797,11 @@ export default function MaterialRequestPage() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => navigate(baseRoute)} disabled={saving}>Cancel</Button>
           <Button variant="contained" onClick={() => void submitForm()} disabled={saving}>{saving ? 'Saving...' : editingId ? 'Update' : 'Save'}</Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
 
       <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="lg">
         <DialogTitle>Material Request Details</DialogTitle>

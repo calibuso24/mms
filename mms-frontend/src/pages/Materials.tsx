@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Autocomplete,
   Box,
@@ -113,6 +114,13 @@ const createOptionRow = (): MaterialOptionForm => ({
 });
 
 export default function MaterialsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/masterlist/product-management';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? params.id || null : null;
+
   const [materials, setMaterials] = useState<Material[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [subCategories, setSubCategories] = useState<any[]>([]);
@@ -146,7 +154,6 @@ export default function MaterialsPage() {
     uom_id: '',
   });
   
-  const [showDialog, setShowDialog] = useState(false);
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [expandedSpecSection, setExpandedSpecSection] = useState(false);
   const [expandedOptionSection, setExpandedOptionSection] = useState(false);
@@ -254,6 +261,25 @@ export default function MaterialsPage() {
 
     return () => clearTimeout(timer);
   }, [componentMaterialQuery, editingMaterialId]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      resetForm();
+      setEditingMaterialId(null);
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingMaterialId !== routeEditId) {
+      void handleEditMaterial(routeEditId, false);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingMaterialId(null);
+      setError('');
+    }
+  }, [routeMode, routeEditId]);
 
   const loadInitialData = async () => {
     try {
@@ -366,16 +392,18 @@ export default function MaterialsPage() {
 
       await materialApi.create(submitData);
       resetForm();
-      setShowDialog(false);
+      navigate(baseRoute);
       loadMaterials();
     } catch (err: any) {
       setError(err.message || 'Failed to create material');
     }
   };
 
-  const handleEditMaterial = async (materialId: string) => {
+  const handleEditMaterial = async (materialId: string, navigateFirst: boolean = true) => {
+    if (navigateFirst) {
+      navigate(`${baseRoute}/${materialId}/edit`);
+    }
     setEditingMaterialId(materialId);
-    setShowDialog(true);
     try {
       const numericMaterialId = parseInt(materialId, 10);
       const [material, options] = await Promise.all([
@@ -457,6 +485,7 @@ export default function MaterialsPage() {
       loadSubCategories(material.category_id);
     } catch (err: any) {
       setError(err.message || 'Failed to load material');
+      navigate(baseRoute);
     }
   };
 
@@ -493,7 +522,7 @@ export default function MaterialsPage() {
 
       resetForm();
       setEditingMaterialId(null);
-      setShowDialog(false);
+      navigate(baseRoute);
       loadMaterials();
     } catch (err: any) {
       setError(err.message || 'Failed to update material');
@@ -815,18 +844,18 @@ export default function MaterialsPage() {
 
   const handleDialogClose = () => {
     resetForm();
-    setShowDialog(false);
     setEditingMaterialId(null);
+    navigate(baseRoute);
   };
 
   const handleOpenCreateDialog = () => {
-    resetForm();
-    setEditingMaterialId(null);
-    setShowDialog(true);
+    navigate(`${baseRoute}/new`);
   };
 
   return (
     <Box>
+      {routeMode === 'list' && (
+      <>
       {/* Header */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5" sx={{ fontWeight: 700, color: '#0b2748' }}>
@@ -1014,9 +1043,12 @@ export default function MaterialsPage() {
           />
         </TableContainer>
       )}
+      </>
+      )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={showDialog} onClose={handleDialogClose} maxWidth="md" fullWidth>
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle sx={{ fontWeight: 700, color: '#0b2748' }}>
           {editingMaterialId ? 'Edit Material' : 'Add New Material'}
         </DialogTitle>
@@ -1370,7 +1402,8 @@ export default function MaterialsPage() {
             {editingMaterialId ? 'Update' : 'Save'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
     </Box>
   );
 }

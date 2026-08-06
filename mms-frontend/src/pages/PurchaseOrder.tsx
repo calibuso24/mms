@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Autocomplete,
   Alert,
@@ -236,6 +237,13 @@ function toDateLocal(value: string | null | undefined): string {
 }
 
 export default function PurchaseOrderPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/purchasing/purchase-order';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<PurchaseOrderListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -261,7 +269,6 @@ export default function PurchaseOrderPage() {
   const [uoms, setUoms] = useState<UomItem[]>([]);
   const [requestOptions, setRequestOptions] = useState<RequestItemSummary[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -378,14 +385,14 @@ export default function PurchaseOrderPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: PurchaseOrderListItem) => {
+  async function openEditById(purchaseOrderId: number) {
     if (!canUpdate) return;
     try {
-      const detail: PurchaseOrderDetail = await purchaseOrderApi.get(item.purchase_order_id);
-      setEditingId(item.purchase_order_id);
+      const detail: PurchaseOrderDetail = await purchaseOrderApi.get(purchaseOrderId);
+      setEditingId(purchaseOrderId);
       setForm({
         project_id: String(detail.project_id),
         material_request_id: detail.material_request_id ? String(detail.material_request_id) : '',
@@ -396,7 +403,7 @@ export default function PurchaseOrderPage() {
         total_amount: detail.total_amount ?? '',
         notes: detail.notes ?? '',
         items: detail.items.length > 0
-          ? detail.items.map((line) => ({
+          ? detail.items.map((line: PurchaseOrderItemView) => ({
               row_id: `${Date.now()}-${line.purchase_order_item_id}`,
               purchase_order_item_id: line.purchase_order_item_id,
               material_request_item_id: line.material_request_item_id ? String(line.material_request_item_id) : '',
@@ -415,11 +422,35 @@ export default function PurchaseOrderPage() {
             }))
           : [emptyItem()],
       });
-      setDialogOpen(true);
+      if (location.pathname !== `${baseRoute}/${purchaseOrderId}/edit`) {
+        navigate(`${baseRoute}/${purchaseOrderId}/edit`);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load purchase order');
     }
+  }
+
+  const openEdit = async (item: PurchaseOrderListItem) => {
+    await openEditById(item.purchase_order_id);
   };
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
 
   const openView = async (item: PurchaseOrderListItem) => {
     try {
@@ -437,7 +468,7 @@ export default function PurchaseOrderPage() {
   };
 
   const closeDialog = () => {
-    setDialogOpen(false);
+    navigate(baseRoute);
     setEditingId(null);
     setForm(emptyForm());
   };
@@ -464,7 +495,7 @@ export default function PurchaseOrderPage() {
         ...current,
         project_id: String(detail.project_id),
         items: detail.items.length > 0
-          ? detail.items.map((line) => ({
+          ? detail.items.map((line: any) => ({
               row_id: `${Date.now()}-${line.material_request_item_id}`,
               material_request_item_id: String(line.material_request_item_id),
               material_id: String(line.material_id),
@@ -539,7 +570,9 @@ export default function PurchaseOrderPage() {
         await purchaseOrderApi.create(payload);
         setSuccess('Purchase order created');
       }
-      closeDialog();
+      navigate(baseRoute);
+      setEditingId(null);
+      setForm(emptyForm());
       await loadItems();
     } catch (err: any) {
       setError(err?.message || 'Failed to save purchase order');
@@ -701,6 +734,8 @@ export default function PurchaseOrderPage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
+      <>
       <Box sx={{ mb: 3 }}>
         <Breadcrumbs sx={{ mb: 1 }}>
           <Typography color="text.secondary">Purchasing Transactions</Typography>
@@ -959,8 +994,11 @@ export default function PurchaseOrderPage() {
           }}
         />
       </Paper>
+      </>
+      )}
 
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="xl">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Purchase Order' : 'New Purchase Order'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
@@ -1068,7 +1106,8 @@ export default function PurchaseOrderPage() {
             {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
 
       <Dialog open={viewOpen} onClose={closeView} fullWidth maxWidth="xl">
         <DialogTitle>Purchase Order Details</DialogTitle>

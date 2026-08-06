@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -147,6 +148,13 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function DeliveryAdvicePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/purchasing/delivery-advice';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<DeliveryAdviceListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -168,7 +176,6 @@ export default function DeliveryAdvicePage() {
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -203,6 +210,24 @@ export default function DeliveryAdvicePage() {
 
     void loadPurchaseOrderItems(Number(form.purchase_order_id));
   }, [form.purchase_order_id]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setError('');
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -266,13 +291,13 @@ export default function DeliveryAdvicePage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm());
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: DeliveryAdviceListItem) => {
-    setEditingId(item.delivery_advice_id);
+  const openEditById = async (deliveryAdviceId: number) => {
+    setEditingId(deliveryAdviceId);
     try {
-      const detail: DeliveryAdviceDetail = await deliveryAdviceApi.get(item.delivery_advice_id);
+      const detail: DeliveryAdviceDetail = await deliveryAdviceApi.get(deliveryAdviceId);
       setForm({
         purchase_order_id: detail.purchase_order_id.toString(),
         reference_code: detail.reference_code,
@@ -292,10 +317,16 @@ export default function DeliveryAdvicePage() {
             }))
           : [emptyItem()],
       });
-      setDialogOpen(true);
+      if (location.pathname !== `${baseRoute}/${deliveryAdviceId}/edit`) {
+        navigate(`${baseRoute}/${deliveryAdviceId}/edit`);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load delivery advice');
     }
+  };
+
+  const openEdit = async (item: DeliveryAdviceListItem) => {
+    await openEditById(item.delivery_advice_id);
   };
 
   const openView = async (item: DeliveryAdviceListItem) => {
@@ -380,9 +411,9 @@ export default function DeliveryAdvicePage() {
         setSuccess('Delivery Advice created');
       }
 
-      setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
+      navigate(baseRoute);
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save delivery advice');
@@ -487,6 +518,7 @@ export default function DeliveryAdvicePage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
       <Stack spacing={2}>
         <Box>
           <Typography variant="h5" fontWeight={700}>Delivery Advice</Typography>
@@ -659,8 +691,10 @@ export default function DeliveryAdvicePage() {
           )}
         </Paper>
       </Stack>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="lg">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Delivery Advice' : 'Create Delivery Advice'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
@@ -749,12 +783,13 @@ export default function DeliveryAdvicePage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => navigate(baseRoute)}>Cancel</Button>
           <Button variant="contained" onClick={submitForm} disabled={saving}>
             {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
 
       <Dialog open={viewOpen} onClose={() => setViewOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Delivery Advice Details</DialogTitle>

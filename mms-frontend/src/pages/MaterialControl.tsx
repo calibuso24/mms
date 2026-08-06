@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Autocomplete,
@@ -138,6 +139,13 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function MaterialControlPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const baseRoute = '/app/coordinating/material-control';
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
   const { account } = useAuth();
   const [items, setItems] = useState<MaterialControlItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -156,7 +164,6 @@ export default function MaterialControlPage() {
   const [projectQuery, setProjectQuery] = useState('');
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
   const [filters, setFilters] = useState({ project_id: '', status_id: '' });
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -227,6 +234,27 @@ export default function MaterialControlPage() {
 
     return () => clearTimeout(timer);
   }, [detailMaterialQuery]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      setEditingId(null);
+      setForm(emptyForm());
+      setDetailRows([]);
+      resetDetailForm();
+      setError('');
+      void loadDetailLookups();
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingId !== routeEditId) {
+      void openEditById(routeEditId);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingId(null);
+    }
+  }, [routeMode, routeEditId]);
 
   const loadPermissions = async () => {
     if (!account?.account_id) {
@@ -344,29 +372,43 @@ export default function MaterialControlPage() {
     }
   };
 
-  const openCreate = async () => {
-    setEditingId(null);
-    setForm(emptyForm());
-    setDetailRows([]);
-    resetDetailForm();
-    setDialogOpen(true);
-    await loadDetailLookups();
+  const openCreate = () => {
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (item: MaterialControlItem) => {
-    setEditingId(item.material_control_id);
+  async function openEditById(materialControlId: number) {
+    setEditingId(materialControlId);
     setForm({
-      project_id: item.project_id.toString(),
-      control_code: item.control_code,
-      budget: item.budget?.toString?.() ?? String(item.budget ?? ''),
-      total_estimated_cost: item.total_estimated_cost ?? '',
-      status_id: item.status_id.toString(),
-      notes: item.notes ?? '',
+      project_id: '',
+      control_code: '',
+      budget: '',
+      total_estimated_cost: '',
+      status_id: '',
+      notes: '',
     });
     resetDetailForm();
-    setDialogOpen(true);
-    await loadDetailLookups();
-    await loadDetailRows(item.material_control_id);
+    try {
+      const detail = await materialControlApi.get(materialControlId);
+      setForm({
+        project_id: detail.project_id.toString(),
+        control_code: detail.control_code,
+        budget: detail.budget?.toString?.() ?? String(detail.budget ?? ''),
+        total_estimated_cost: detail.total_estimated_cost ?? '',
+        status_id: detail.status_id.toString(),
+        notes: detail.notes ?? '',
+      });
+      await loadDetailLookups();
+      await loadDetailRows(materialControlId);
+      if (location.pathname !== `${baseRoute}/${materialControlId}/edit`) {
+        navigate(`${baseRoute}/${materialControlId}/edit`);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load material control');
+    }
+  }
+
+  const openEdit = async (item: MaterialControlItem) => {
+    await openEditById(item.material_control_id);
   };
 
   const openView = async (item: MaterialControlItem) => {
@@ -492,11 +534,11 @@ export default function MaterialControlPage() {
       }
 
       setSuccess(editingId ? 'Material Control updated' : 'Material Control created');
-      setDialogOpen(false);
       setEditingId(null);
       setForm(emptyForm());
       setDetailRows([]);
       resetDetailForm();
+      navigate(baseRoute);
       await loadItems();
     } catch (err: any) {
       setError(err.message || 'Failed to save material control');
@@ -623,6 +665,8 @@ export default function MaterialControlPage() {
 
   return (
     <Box>
+      {routeMode === 'list' && (
+      <>
       <Paper sx={{ p: 3, mb: 2 }}>
         <Stack spacing={1.5}>
           <Breadcrumbs aria-label="breadcrumb">
@@ -842,8 +886,11 @@ export default function MaterialControlPage() {
           rowsPerPageOptions={[10, 25, 50, 100]}
         />
       </Paper>
+      </>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="md">
+      {routeMode !== 'list' && (
+      <Paper>
         <DialogTitle>{editingId ? 'Edit Material Control' : 'New Material Control'}</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0.25 }}>
@@ -1069,12 +1116,13 @@ export default function MaterialControlPage() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => navigate(baseRoute)} disabled={saving}>Cancel</Button>
           <Button variant="contained" onClick={() => void submitForm()} disabled={saving}>
             {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Paper>
+      )}
       <Dialog open={importOpen} onClose={() => !importing && setImportOpen(false)} fullWidth maxWidth="lg">
         <DialogTitle>Import Material Control Items</DialogTitle>
         <DialogContent dividers>

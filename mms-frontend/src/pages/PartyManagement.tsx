@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -86,6 +87,7 @@ interface AddressInput {
   city?: string | null;
   province?: string | null;
   region?: string | null;
+  country_code?: string | null;
   postal_code?: string | null;
   is_primary?: boolean;
 }
@@ -161,6 +163,7 @@ const emptyAddress = (): AddressInput => ({
   city: '',
   province: '',
   region: '',
+  country_code: '',
   postal_code: '',
   is_primary: false,
 });
@@ -371,6 +374,7 @@ function normalizeAddresses(items: AddressInput[]): AddressInput[] {
     city: item.city?.trim() || null,
     province: item.province?.trim() || null,
     region: item.region?.trim() || null,
+    country_code: item.country_code?.trim() || null,
     postal_code: item.postal_code?.trim() || null,
     is_primary: !!item.is_primary,
   }));
@@ -426,7 +430,6 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPartyId, setEditingPartyId] = useState<number | null>(null);
   const [form, setForm] = useState<PartyFormState>(initialFormState);
   const [selectedScheduleTemplate, setSelectedScheduleTemplate] = useState<ScheduleTemplateCode>('custom');
@@ -443,6 +446,21 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   const title = mode === 'project' ? 'Project Management' : 'Supplier Management';
   const codeLabel = mode === 'project' ? 'Project Code' : 'Supplier Code';
   const nameLabel = mode === 'project' ? 'Project Name' : 'Supplier Name';
+  const baseRoute = mode === 'project' ? '/app/masterlist/project-management' : '/app/masterlist/supplier-management';
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
+  const routeMode = location.pathname.endsWith('/new') ? 'new' : (params.id ? 'edit' : 'list');
+  const routeEditId = routeMode === 'edit' ? Number(params.id) : null;
+
+  const getDefaultStatusId = (items: LookupItem[]) => {
+    const active = items.find((item) => String(item.code || '').toLowerCase() === 'active');
+    if (active) {
+      return String(active.look_up_id);
+    }
+    const first = items[0];
+    return first ? String(first.look_up_id) : '';
+  };
 
   const listApi = mode === 'project' ? projectApi : supplierApi;
 
@@ -458,6 +476,28 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   useEffect(() => {
     void loadData();
   }, [mode, page, rowsPerPage, search, sortBy, sortDir]);
+
+  useEffect(() => {
+    if (routeMode === 'new') {
+      const next = initialFormState();
+      next.status_id = getDefaultStatusId(statusOptions);
+      setForm(next);
+      setSelectedScheduleTemplate('custom');
+      setEditingPartyId(null);
+      setFormErrors({});
+      return;
+    }
+
+    if (routeMode === 'edit' && routeEditId && editingPartyId !== routeEditId) {
+      void openEdit(routeEditId, false);
+      return;
+    }
+
+    if (routeMode === 'list') {
+      setEditingPartyId(null);
+      setFormErrors({});
+    }
+  }, [routeMode, routeEditId, statusOptions]);
 
   const loadLookups = async () => {
     try {
@@ -502,15 +542,13 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
   };
 
   const openCreate = () => {
-    setForm(initialFormState());
-    setSelectedScheduleTemplate('custom');
-    setEditingPartyId(null);
-    setFormErrors({});
-    setDialogOpen(true);
+    navigate(`${baseRoute}/new`);
   };
 
-  const openEdit = async (partyId: number) => {
-    setDialogOpen(true);
+  const openEdit = async (partyId: number, navigateFirst: boolean = true) => {
+    if (navigateFirst) {
+      navigate(`${baseRoute}/${partyId}/edit`);
+    }
     setDialogLoading(true);
     setError('');
 
@@ -541,7 +579,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
       );
     } catch (err: any) {
       setError(err.message || `Failed to load ${title.toLowerCase()} details`);
-      setDialogOpen(false);
+      navigate(baseRoute);
     } finally {
       setDialogLoading(false);
     }
@@ -625,10 +663,10 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
         }
       }
 
-      setDialogOpen(false);
       setEditingPartyId(null);
       setForm(initialFormState());
       setSuccessMessage(`${mode === 'project' ? 'Project' : 'Supplier'} saved successfully`);
+      navigate(baseRoute);
       await loadData();
     } catch (err: any) {
       setError(err.message || `Failed to save ${title.toLowerCase()}`);
@@ -719,6 +757,8 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
 
   return (
     <Box>
+      {routeMode === 'list' && (
+      <>
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} spacing={2}>
           <Box>
@@ -864,13 +904,16 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
           />
         </Box>
       </Paper>
+      </>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="lg">
-        <form onSubmit={handleSave}>
-          <DialogTitle>
+      {routeMode !== 'list' && (
+        <Paper>
+          <form onSubmit={handleSave}>
+            <DialogTitle>
             {editingPartyId ? `Edit ${mode === 'project' ? 'Project' : 'Supplier'}` : `Create ${mode === 'project' ? 'Project' : 'Supplier'}`}
-          </DialogTitle>
-          <DialogContent dividers>
+            </DialogTitle>
+            <DialogContent dividers>
             {dialogLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
                 <CircularProgress />
@@ -917,7 +960,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                           value={form.status_id}
                           onChange={(e) => setForm((prev) => ({ ...prev, status_id: e.target.value }))}
                         >
-                          <MenuItem value="">Active</MenuItem>
+                          <MenuItem value="">Select Status</MenuItem>
                           {statusOptions.map((item: LookupItem) => (
                             <MenuItem key={item.look_up_id} value={String(item.look_up_id)}>{item.name}</MenuItem>
                           ))}
@@ -1085,6 +1128,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                               <Grid item xs={12} md={3}><TextField fullWidth label="City" value={address.city || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], city: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
                               <Grid item xs={12} md={3}><TextField fullWidth label="Province" value={address.province || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], province: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
                               <Grid item xs={12} md={3}><TextField fullWidth label="Region" value={address.region || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], region: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
+                              <Grid item xs={12} md={3}><TextField fullWidth label="Country Code" value={address.country_code || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], country_code: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
                               <Grid item xs={12} md={3}><TextField fullWidth label="Postal Code" value={address.postal_code || ''} onChange={(e) => { const next = [...form.addresses]; next[index] = { ...next[index], postal_code: e.target.value }; setForm((prev) => ({ ...prev, addresses: next })); }} /></Grid>
                             </Grid>
                           </CardContent>
@@ -1382,7 +1426,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
 
                               {(contact.addresses || []).map((address, addressIndex) => (
                                 <Grid key={`cp-${contactIndex}-ad-${addressIndex}`} container spacing={2} alignItems="center">
-                                  <Grid item xs={12} md={4}>
+                                  <Grid item xs={12} md={3}>
                                     <TextField
                                       fullWidth
                                       label="Address Type"
@@ -1402,7 +1446,21 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                                       ))}
                                     </TextField>
                                   </Grid>
-                                  <Grid item xs={12} md={5}>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="House No"
+                                      value={address.house_no || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], house_no: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={4}>
                                     <TextField
                                       fullWidth
                                       label="Street"
@@ -1416,7 +1474,7 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                                       }}
                                     />
                                   </Grid>
-                                  <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <Grid item xs={12} md={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                                     <Stack direction="row" spacing={1} alignItems="center">
                                       <FormControlLabel
                                         control={<Checkbox checked={!!address.is_primary} onChange={() => {
@@ -1441,6 +1499,90 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                                       </IconButton>
                                     </Stack>
                                   </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="Barangay"
+                                      value={address.barangay || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], barangay: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="City"
+                                      value={address.city || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], city: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="Province"
+                                      value={address.province || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], province: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="Region"
+                                      value={address.region || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], region: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="Country Code"
+                                      value={address.country_code || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], country_code: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} md={3}>
+                                    <TextField
+                                      fullWidth
+                                      label="Postal Code"
+                                      value={address.postal_code || ''}
+                                      onChange={(e) => {
+                                        const next = [...form.contacts];
+                                        const addresses = [...next[contactIndex].addresses];
+                                        addresses[addressIndex] = { ...addresses[addressIndex], postal_code: e.target.value };
+                                        next[contactIndex] = { ...next[contactIndex], addresses };
+                                        setForm((prev) => ({ ...prev, contacts: next }));
+                                      }}
+                                    />
+                                  </Grid>
                                 </Grid>
                               ))}
                             </Stack>
@@ -1457,17 +1599,18 @@ function PartyManagementPage({ mode }: { mode: Mode }) {
                 </Card>
               </Stack>
             )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDialogOpen(false)} disabled={saving}>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => navigate(baseRoute)} disabled={saving}>
               Cancel
-            </Button>
-            <Button variant="contained" type="submit" disabled={saving}>
+              </Button>
+              <Button variant="contained" type="submit" disabled={saving}>
               {saving ? <CircularProgress size={20} /> : 'Save'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+              </Button>
+            </DialogActions>
+          </form>
+        </Paper>
+      )}
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Delete {mode === 'project' ? 'Project' : 'Supplier'}</DialogTitle>
