@@ -96,14 +96,14 @@ Security model:
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | /api/material-control-items | Material Control VIEW |
-| GET | /api/material-control-items/:id | Material Control VIEW |
-| POST | /api/material-control-items | Material Control CREATE |
-| PUT | /api/material-control-items/:id | Material Control UPDATE |
-| DELETE | /api/material-control-items/:id | Material Control DELETE |
-| GET | /api/material-control-items/import/template | Material Control VIEW |
-| POST | /api/material-control-items/import/preview | Material Control CREATE |
-| POST | /api/material-control-items/import/import | Material Control CREATE |
+| GET | /api/material-controls/:id/items | Material Control VIEW |
+| GET | /api/material-controls/items/:id | Material Control VIEW |
+| POST | /api/material-controls/items | Material Control CREATE |
+| PUT | /api/material-controls/items/:id | Material Control UPDATE |
+| DELETE | /api/material-controls/items/:id | Material Control DELETE |
+| GET | /api/material-controls/import/template | Material Control VIEW |
+| POST | /api/material-controls/import/preview | Material Control CREATE |
+| POST | /api/material-controls/import/import | Material Control CREATE |
 
 Material control item import workflow:
 
@@ -120,6 +120,9 @@ Material control item import workflow:
 | GET | /api/material-requests/:id | Material Request VIEW |
 | POST | /api/material-requests | Material Request CREATE |
 | PUT | /api/material-requests/:id | Material Request UPDATE |
+| POST | /api/material-requests/:id/items | Material Request UPDATE |
+| PUT | /api/material-requests/:id/items/:itemId | Material Request UPDATE |
+| DELETE | /api/material-requests/:id/items/:itemId | Material Request UPDATE |
 | DELETE | /api/material-requests/:id | Material Request DELETE |
 | POST | /api/material-requests/:id/submit | Material Request UPDATE |
 | POST | /api/material-requests/:id/approve | Material Request APPROVE |
@@ -135,6 +138,9 @@ Material control item import workflow:
 | GET | /api/purchase-orders/:id | Purchase Order VIEW |
 | POST | /api/purchase-orders | Purchase Order CREATE |
 | PUT | /api/purchase-orders/:id | Purchase Order UPDATE |
+| POST | /api/purchase-orders/:id/items | Purchase Order UPDATE |
+| PUT | /api/purchase-orders/:id/items/:itemId | Purchase Order UPDATE |
+| DELETE | /api/purchase-orders/:id/items/:itemId | Purchase Order UPDATE |
 | DELETE | /api/purchase-orders/:id | Purchase Order DELETE |
 | POST | /api/purchase-orders/:id/approve | Purchase Order APPROVE |
 | POST | /api/purchase-orders/:id/cancel | Purchase Order APPROVE |
@@ -147,6 +153,9 @@ Material control item import workflow:
 | GET | /api/supplier-deliveries/:id | Supplier Delivery VIEW |
 | POST | /api/supplier-deliveries | Supplier Delivery CREATE |
 | PUT | /api/supplier-deliveries/:id | Supplier Delivery UPDATE |
+| POST | /api/supplier-deliveries/:id/items | Supplier Delivery UPDATE |
+| PUT | /api/supplier-deliveries/:id/items/:itemId | Supplier Delivery UPDATE |
+| DELETE | /api/supplier-deliveries/:id/items/:itemId | Supplier Delivery UPDATE |
 | DELETE | /api/supplier-deliveries/:id | Supplier Delivery DELETE |
 | POST | /api/supplier-deliveries/:id/post | Supplier Delivery APPROVE |
 | POST | /api/supplier-deliveries/:id/cancel | Supplier Delivery APPROVE |
@@ -159,6 +168,9 @@ Material control item import workflow:
 | GET | /api/delivery-advices/:id | Delivery Advice VIEW |
 | POST | /api/delivery-advices | Delivery Advice CREATE |
 | PUT | /api/delivery-advices/:id | Delivery Advice UPDATE |
+| POST | /api/delivery-advices/:id/items | Delivery Advice UPDATE |
+| PUT | /api/delivery-advices/:id/items/:itemId | Delivery Advice UPDATE |
+| DELETE | /api/delivery-advices/:id/items/:itemId | Delivery Advice UPDATE |
 | DELETE | /api/delivery-advices/:id | Delivery Advice DELETE |
 | POST | /api/delivery-advices/:id/submit | Delivery Advice UPDATE |
 | POST | /api/delivery-advices/:id/complete | Delivery Advice APPROVE |
@@ -172,6 +184,9 @@ Material control item import workflow:
 | GET | /api/stock-transfers/:id | Stock Transfer VIEW |
 | POST | /api/stock-transfers | Stock Transfer CREATE |
 | PUT | /api/stock-transfers/:id | Stock Transfer UPDATE |
+| POST | /api/stock-transfers/:id/items | Stock Transfer UPDATE |
+| PUT | /api/stock-transfers/:id/items/:itemId | Stock Transfer UPDATE |
+| DELETE | /api/stock-transfers/:id/items/:itemId | Stock Transfer UPDATE |
 | DELETE | /api/stock-transfers/:id | Stock Transfer DELETE |
 | POST | /api/stock-transfers/:id/submit | Stock Transfer UPDATE |
 | POST | /api/stock-transfers/:id/approve | Stock Transfer APPROVE |
@@ -185,6 +200,9 @@ Material control item import workflow:
 | GET | /api/material-adjustments/:id | Inventory Adjustment VIEW |
 | POST | /api/material-adjustments | Inventory Adjustment CREATE |
 | PUT | /api/material-adjustments/:id | Inventory Adjustment UPDATE |
+| POST | /api/material-adjustments/:id/items | Inventory Adjustment UPDATE |
+| PUT | /api/material-adjustments/:id/items/:itemId | Inventory Adjustment UPDATE |
+| DELETE | /api/material-adjustments/:id/items/:itemId | Inventory Adjustment UPDATE |
 | DELETE | /api/material-adjustments/:id | Inventory Adjustment DELETE |
 | POST | /api/material-adjustments/:id/approve | Inventory Adjustment APPROVE |
 | POST | /api/material-adjustments/:id/reject | Inventory Adjustment APPROVE |
@@ -343,6 +361,13 @@ Common status classes:
 - 409 conflict
 - 500 server/application errors
 
+Transaction concurrency behavior:
+
+- Transaction update and workflow-action endpoints now accept optional `expected_updated_at` in request body.
+- When provided, backend validates it against the latest persisted `updated_at` timestamp.
+- If values differ, backend returns `409` conflict to prevent silent overwrite during concurrent edits.
+- This is currently implemented for Material Control, Material Request, Purchase Order, Delivery Advice, Supplier Delivery, Stock Transfer, and Material Adjustment modules.
+
 ## Development Workflow
 
 Recommended local workflow:
@@ -381,4 +406,7 @@ When changing RBAC/navigation:
 
 | Date | Author | Summary |
 |---|---|---|
+| 2026-08-07 | Copilot | Added supplier-delivery item-level API routes and aligned guide with immediate line persistence behavior. |
+| 2026-08-07 | Copilot | Added delivery-advice item-level API routes and aligned guide with immediate line persistence behavior. |
+| 2026-08-07 | Copilot | Added purchase-order item-level API routes and aligned guide with immediate line persistence behavior. |
 | 2026-08-01 | Copilot | Replaced outdated API/auth content with current route map, RBAC modules, reporting integration behavior, and implementation-accurate frontend/backend workflow notes. |

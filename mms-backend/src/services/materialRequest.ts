@@ -10,6 +10,7 @@ import { MaterialRequestRepository } from '../repositories/materialRequest.js';
 import {
   CreateMaterialRequestDto,
   MaterialRequestItemDto,
+  MaterialRequestItemMutationDto,
   MaterialRequestListQuery,
   UpdateMaterialRequestDto,
 } from '../modules/material_request/dtos.js';
@@ -20,6 +21,8 @@ import {
   MaterialRequestListViewModel,
 } from '../modules/material_request/viewModels.js';
 import { MaterialRequestValidator } from '../modules/material_request/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
+import { TransactionLifecycleManager } from '../shared/transaction/lifecycle.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'material_request';
@@ -27,6 +30,16 @@ const PROJECT_LOOKUP_TYPE = 'party_type';
 const PROJECT_LOOKUP_CODE = 'project';
 const STATUS_LOOKUP_TYPE = 'material_request_status';
 const TERMINAL_STATUS_CODES = new Set(['approved', 'rejected', 'cancelled', 'completed', 'closed']);
+const lifecycleManager = new TransactionLifecycleManager({
+  moduleName: 'Material Request',
+  transitions: {
+    draft: ['submitted', 'cancelled'],
+    submitted: ['approved', 'rejected', 'cancelled'],
+    approved: ['completed', 'closed'],
+    rejected: ['closed'],
+    completed: ['closed'],
+  },
+});
 
 export class MaterialRequestService {
   private repository = new MaterialRequestRepository();
@@ -139,6 +152,8 @@ export class MaterialRequestService {
       throw new NotFoundError('Material Request not found');
     }
 
+    assertOptimisticConcurrency('Material Request', dto.expected_updated_at, existing.updated_at);
+
     if (dto.project_id !== undefined) {
       const project = await this.partyRepository.findById(dto.project_id);
       if (!project) {
@@ -240,31 +255,212 @@ export class MaterialRequestService {
     }
   }
 
-  async submitMaterialRequest(id: number, actorAccountId?: number): Promise<MaterialRequestDetailViewModel> {
-    return this.transitionStatus(id, 'submitted', actorAccountId);
+  async submitMaterialRequest(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialRequestDetailViewModel> {
+    return this.transitionStatus(id, 'submitted', actorAccountId, expectedUpdatedAt);
   }
 
-  async approveMaterialRequest(id: number, actorAccountId?: number): Promise<MaterialRequestDetailViewModel> {
-    return this.transitionStatus(id, 'approved', actorAccountId);
+  async approveMaterialRequest(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialRequestDetailViewModel> {
+    return this.transitionStatus(id, 'approved', actorAccountId, expectedUpdatedAt);
   }
 
-  async rejectMaterialRequest(id: number, actorAccountId?: number): Promise<MaterialRequestDetailViewModel> {
-    return this.transitionStatus(id, 'rejected', actorAccountId);
+  async rejectMaterialRequest(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialRequestDetailViewModel> {
+    return this.transitionStatus(id, 'rejected', actorAccountId, expectedUpdatedAt);
   }
 
-  async cancelMaterialRequest(id: number, actorAccountId?: number): Promise<MaterialRequestDetailViewModel> {
-    return this.transitionStatus(id, 'cancelled', actorAccountId);
+  async cancelMaterialRequest(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialRequestDetailViewModel> {
+    return this.transitionStatus(id, 'cancelled', actorAccountId, expectedUpdatedAt);
   }
 
-  async closeMaterialRequest(id: number, actorAccountId?: number): Promise<MaterialRequestDetailViewModel> {
-    return this.transitionStatus(id, 'closed', actorAccountId);
+  async closeMaterialRequest(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialRequestDetailViewModel> {
+    return this.transitionStatus(id, 'closed', actorAccountId, expectedUpdatedAt);
   }
 
-  private async transitionStatus(id: number, statusCode: string, actorAccountId?: number): Promise<MaterialRequestDetailViewModel> {
+  async addMaterialRequestItem(
+    requestId: number,
+    dto: MaterialRequestItemMutationDto,
+    actorAccountId?: number
+  ): Promise<MaterialRequestDetailViewModel> {
+    MaterialRequestValidator.validateItem(dto);
+
+    const request = await this.repository.findById(requestId);
+    if (!request) {
+      throw new NotFoundError('Material Request not found');
+    }
+
+    this.assertRequestMutable(request.status_code);
+    await this.validateAndNormalizeItems([dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      const created = await this.repository.createItem(requestId, dto, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'material_request',
+          entityId: requestId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'ADD',
+            material_request_item_id: created.material_request_item_id,
+            material_id: dto.material_id,
+          },
+          transactionId,
+          notes: 'Material Request item added',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getMaterialRequest(requestId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateMaterialRequestItem(
+    requestId: number,
+    itemId: number,
+    dto: MaterialRequestItemMutationDto,
+    actorAccountId?: number
+  ): Promise<MaterialRequestDetailViewModel> {
+    MaterialRequestValidator.validateItem(dto);
+
+    const request = await this.repository.findById(requestId);
+    if (!request) {
+      throw new NotFoundError('Material Request not found');
+    }
+    this.assertRequestMutable(request.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Material Request item not found');
+    }
+
+    const items = await this.repository.findItemsByRequestId(requestId);
+    const belongsToRequest = items.some((row) => row.material_request_item_id === itemId);
+    if (!belongsToRequest) {
+      throw new ConflictError('Item does not belong to the material request');
+    }
+
+    assertOptimisticConcurrency('Material Request item', dto.expected_updated_at, item.updated_at);
+    await this.validateAndNormalizeItems([dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.updateItem(itemId, dto, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'material_request',
+          entityId: requestId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'UPDATE',
+            material_request_item_id: itemId,
+            material_id: dto.material_id,
+          },
+          transactionId,
+          notes: 'Material Request item updated',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getMaterialRequest(requestId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteMaterialRequestItem(
+    requestId: number,
+    itemId: number,
+    expectedUpdatedAt: string | null | undefined,
+    actorAccountId?: number
+  ): Promise<MaterialRequestDetailViewModel> {
+    const request = await this.repository.findById(requestId);
+    if (!request) {
+      throw new NotFoundError('Material Request not found');
+    }
+    this.assertRequestMutable(request.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Material Request item not found');
+    }
+
+    const items = await this.repository.findItemsByRequestId(requestId);
+    const belongsToRequest = items.some((row) => row.material_request_item_id === itemId);
+    if (!belongsToRequest) {
+      throw new ConflictError('Item does not belong to the material request');
+    }
+
+    assertOptimisticConcurrency('Material Request item', expectedUpdatedAt, item.updated_at);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.softDeleteItem(itemId, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'material_request',
+          entityId: requestId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'DELETE',
+            material_request_item_id: itemId,
+            material_id: item.material_id,
+          },
+          transactionId,
+          notes: 'Material Request item deleted',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getMaterialRequest(requestId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async transitionStatus(
+    id: number,
+    statusCode: string,
+    actorAccountId?: number,
+    expectedUpdatedAt?: string | null
+  ): Promise<MaterialRequestDetailViewModel> {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundError('Material Request not found');
     }
+
+    assertOptimisticConcurrency('Material Request', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, statusCode);
 
     const status = await this.resolveStatusByCode(statusCode);
     const reviewFields = this.getReviewFields(statusCode, actorAccountId ?? null);
@@ -394,6 +590,12 @@ export class MaterialRequestService {
     };
   }
 
+  private assertRequestMutable(statusCode: string): void {
+    if (TERMINAL_STATUS_CODES.has(statusCode)) {
+      throw new ConflictError('Terminal material requests cannot be modified');
+    }
+  }
+
   private mapListRow(row: any): MaterialRequestListItemViewModel {
     return {
       material_request_id: row.material_request_id,
@@ -436,6 +638,7 @@ export class MaterialRequestService {
       uom_name: row.uom_name,
       uom_abbreviation: row.uom_abbreviation,
       notes: row.notes ?? null,
+      updated_at: row.updated_at ?? null,
     };
   }
 }

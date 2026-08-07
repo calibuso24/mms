@@ -37,6 +37,7 @@ export interface MaterialRequestItemViewModel {
   uom_name: string;
   uom_abbreviation: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export interface MaterialRequestDetailViewModel extends MaterialRequestListItemViewModel {

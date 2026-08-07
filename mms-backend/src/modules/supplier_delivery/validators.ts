@@ -1,6 +1,49 @@
 import { ValidationError } from '../../utils/errors.js';
 
 export class SupplierDeliveryValidator {
+  static validateItem(data: {
+    purchase_order_item_id: number;
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    delivered_quantity: number;
+    accepted_quantity: number;
+    rejected_quantity?: number;
+    notes?: string | null;
+  }) {
+    const errors: string[] = [];
+
+    if (!Number.isInteger(data.purchase_order_item_id) || data.purchase_order_item_id <= 0) {
+      errors.push('Purchase order item is required');
+    }
+    if (!Number.isInteger(data.material_id) || data.material_id <= 0) {
+      errors.push('Material is required');
+    }
+    if (data.material_brand_id !== undefined && data.material_brand_id !== null && (!Number.isInteger(data.material_brand_id) || data.material_brand_id <= 0)) {
+      errors.push('Material brand must be a positive integer');
+    }
+    if (!Number.isInteger(data.uom_id) || data.uom_id <= 0) {
+      errors.push('Unit of measure is required');
+    }
+    if (!Number.isFinite(data.delivered_quantity) || data.delivered_quantity <= 0) {
+      errors.push('Delivered quantity must be greater than zero');
+    }
+    if (!Number.isFinite(data.accepted_quantity) || data.accepted_quantity < 0) {
+      errors.push('Accepted quantity must be a non-negative number');
+    }
+    const rejected = data.rejected_quantity ?? data.delivered_quantity - data.accepted_quantity;
+    if (!Number.isFinite(rejected) || rejected < 0) {
+      errors.push('Rejected quantity must be a non-negative number');
+    }
+    if (Math.abs((data.accepted_quantity + rejected) - data.delivered_quantity) > 0.000001) {
+      errors.push('Accepted + rejected must equal delivered quantity');
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationError(errors.join('; '));
+    }
+  }
+
   static validateCreate(data: {
     purchase_order_id: number;
     supplier_id: number;

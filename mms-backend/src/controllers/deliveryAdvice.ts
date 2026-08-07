@@ -98,6 +98,7 @@ export class DeliveryAdviceController {
           issued_at: req.body.issued_at ?? undefined,
           received_at: req.body.received_at ?? undefined,
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
                 purchase_order_item_id:
@@ -128,6 +129,108 @@ export class DeliveryAdviceController {
     }
   }
 
+  async addDeliveryAdviceItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid delivery advice ID');
+      }
+
+      const result = await this.service.addDeliveryAdviceItem(
+        id,
+        {
+          purchase_order_item_id:
+            req.body.purchase_order_item_id === undefined || req.body.purchase_order_item_id === null || req.body.purchase_order_item_id === ''
+              ? null
+              : Number(req.body.purchase_order_item_id),
+          material_id: Number(req.body.material_id),
+          material_brand_id:
+            req.body.material_brand_id === undefined || req.body.material_brand_id === null || req.body.material_brand_id === ''
+              ? null
+              : Number(req.body.material_brand_id),
+          uom_id: Number(req.body.uom_id),
+          advised_quantity: Number(req.body.advised_quantity),
+          received_quantity:
+            req.body.received_quantity === undefined || req.body.received_quantity === null || req.body.received_quantity === ''
+              ? 0
+              : Number(req.body.received_quantity),
+          notes: req.body.notes ?? null,
+        },
+        req.accountId
+      );
+
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateDeliveryAdviceItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid delivery advice ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid delivery advice item ID');
+      }
+
+      const result = await this.service.updateDeliveryAdviceItem(
+        id,
+        itemId,
+        {
+          purchase_order_item_id:
+            req.body.purchase_order_item_id === undefined || req.body.purchase_order_item_id === null || req.body.purchase_order_item_id === ''
+              ? null
+              : Number(req.body.purchase_order_item_id),
+          material_id: Number(req.body.material_id),
+          material_brand_id:
+            req.body.material_brand_id === undefined || req.body.material_brand_id === null || req.body.material_brand_id === ''
+              ? null
+              : Number(req.body.material_brand_id),
+          uom_id: Number(req.body.uom_id),
+          advised_quantity: Number(req.body.advised_quantity),
+          received_quantity:
+            req.body.received_quantity === undefined || req.body.received_quantity === null || req.body.received_quantity === ''
+              ? 0
+              : Number(req.body.received_quantity),
+          notes: req.body.notes ?? null,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
+        },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteDeliveryAdviceItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid delivery advice ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid delivery advice item ID');
+      }
+
+      const result = await this.service.deleteDeliveryAdviceItem(
+        id,
+        itemId,
+        req.body?.expected_updated_at ?? undefined,
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteDeliveryAdvice(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);
@@ -149,7 +252,7 @@ export class DeliveryAdviceController {
         throw new ValidationError('Invalid delivery advice ID');
       }
 
-      res.json(await this.service.submitDeliveryAdvice(id, req.accountId));
+      res.json(await this.service.submitDeliveryAdvice(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -162,7 +265,7 @@ export class DeliveryAdviceController {
         throw new ValidationError('Invalid delivery advice ID');
       }
 
-      res.json(await this.service.completeDeliveryAdvice(id, req.accountId));
+      res.json(await this.service.completeDeliveryAdvice(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -175,7 +278,7 @@ export class DeliveryAdviceController {
         throw new ValidationError('Invalid delivery advice ID');
       }
 
-      res.json(await this.service.cancelDeliveryAdvice(id, req.accountId));
+      res.json(await this.service.cancelDeliveryAdvice(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }

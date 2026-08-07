@@ -11,6 +11,10 @@ export interface PurchaseOrderItemDto {
   notes?: string | null;
 }
 
+export interface PurchaseOrderItemMutationDto extends PurchaseOrderItemDto {
+  expected_updated_at?: string | null;
+}
+
 export interface CreatePurchaseOrderDto {
   project_id: number;
   material_request_id?: number | null;
@@ -32,6 +36,7 @@ export interface UpdatePurchaseOrderDto {
   order_type_id?: number;
   total_amount?: number | null;
   notes?: string | null;
+  expected_updated_at?: string | null;
   items?: PurchaseOrderItemDto[];
 }
 

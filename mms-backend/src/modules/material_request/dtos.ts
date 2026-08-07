@@ -9,6 +9,10 @@ export interface MaterialRequestItemDto {
   notes?: string | null;
 }
 
+export interface MaterialRequestItemMutationDto extends MaterialRequestItemDto {
+  expected_updated_at?: string | null;
+}
+
 export interface CreateMaterialRequestDto {
   project_id: number;
   status_id?: number;
@@ -30,6 +34,7 @@ export interface UpdateMaterialRequestDto {
   stock_checked?: boolean;
   ceo_approval_required?: boolean;
   notes?: string | null;
+  expected_updated_at?: string | null;
   items?: MaterialRequestItemDto[];
 }
 

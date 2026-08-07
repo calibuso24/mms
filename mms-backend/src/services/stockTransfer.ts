@@ -7,6 +7,7 @@ import { PurchaseOrderRepository } from '../repositories/purchaseOrder.js';
 import { StockTransferRepository } from '../repositories/stockTransfer.js';
 import {
   CreateStockTransferDto,
+  StockTransferItemMutationDto,
   StockTransferItemDto,
   StockTransferListQuery,
   UpdateStockTransferDto,
@@ -18,6 +19,8 @@ import {
   StockTransferListViewModel,
 } from '../modules/stock_transfer/viewModels.js';
 import { StockTransferValidator } from '../modules/stock_transfer/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
+import { TransactionLifecycleManager } from '../shared/transaction/lifecycle.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'stock_transfer';
@@ -27,6 +30,13 @@ const DRAFT_STATUS_CODE = 'draft';
 const SUBMITTED_STATUS_CODE = 'submitted';
 const APPROVED_STATUS_CODE = 'approved';
 const CANCELLED_STATUS_CODE = 'cancelled';
+const lifecycleManager = new TransactionLifecycleManager({
+  moduleName: 'Stock Transfer',
+  transitions: {
+    draft: ['submitted', 'cancelled'],
+    submitted: ['approved', 'cancelled'],
+  },
+});
 
 export class StockTransferService {
   private repository = new StockTransferRepository();
@@ -136,6 +146,8 @@ export class StockTransferService {
     if (!existing) {
       throw new NotFoundError('Stock Transfer not found');
     }
+
+    assertOptimisticConcurrency('Stock Transfer', dto.expected_updated_at, existing.updated_at);
 
     if (existing.status_code !== DRAFT_STATUS_CODE) {
       throw new ConflictError('Only draft stock transfers can be updated');
@@ -253,35 +265,208 @@ export class StockTransferService {
     }
   }
 
-  async submitStockTransfer(id: number, actorAccountId?: number): Promise<StockTransferDetailViewModel> {
-    return this.transitionStatus(id, SUBMITTED_STATUS_CODE, actorAccountId);
+  async submitStockTransfer(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<StockTransferDetailViewModel> {
+    return this.transitionStatus(id, SUBMITTED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  async approveStockTransfer(id: number, actorAccountId?: number): Promise<StockTransferDetailViewModel> {
-    return this.transitionStatus(id, APPROVED_STATUS_CODE, actorAccountId);
+  async approveStockTransfer(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<StockTransferDetailViewModel> {
+    return this.transitionStatus(id, APPROVED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  async cancelStockTransfer(id: number, actorAccountId?: number): Promise<StockTransferDetailViewModel> {
-    return this.transitionStatus(id, CANCELLED_STATUS_CODE, actorAccountId);
+  async cancelStockTransfer(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<StockTransferDetailViewModel> {
+    return this.transitionStatus(id, CANCELLED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  private async transitionStatus(id: number, targetStatusCode: string, actorAccountId?: number): Promise<StockTransferDetailViewModel> {
+  async addStockTransferItem(
+    transferId: number,
+    dto: StockTransferItemMutationDto,
+    actorAccountId?: number
+  ): Promise<StockTransferDetailViewModel> {
+    StockTransferValidator.validateItem(dto);
+
+    const transfer = await this.repository.findById(transferId);
+    if (!transfer) {
+      throw new NotFoundError('Stock Transfer not found');
+    }
+    this.assertTransferMutable(transfer.status_code);
+
+    const [normalized] = await this.validateAndNormalizeItems(transfer.purchase_order_id, [dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      const created = await this.repository.createItem(transferId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'stock_transfer',
+          entityId: transferId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'ADD',
+            stock_transfer_item_id: created.stock_transfer_item_id,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Stock Transfer item added',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getStockTransfer(transferId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateStockTransferItem(
+    transferId: number,
+    itemId: number,
+    dto: StockTransferItemMutationDto,
+    actorAccountId?: number
+  ): Promise<StockTransferDetailViewModel> {
+    StockTransferValidator.validateItem(dto);
+
+    const transfer = await this.repository.findById(transferId);
+    if (!transfer) {
+      throw new NotFoundError('Stock Transfer not found');
+    }
+    this.assertTransferMutable(transfer.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Stock Transfer item not found');
+    }
+
+    const items = await this.repository.findItemsByTransferId(transferId);
+    const belongsToTransfer = items.some((row) => row.stock_transfer_item_id === itemId);
+    if (!belongsToTransfer) {
+      throw new ConflictError('Item does not belong to the stock transfer');
+    }
+
+    assertOptimisticConcurrency('Stock Transfer item', dto.expected_updated_at, item.updated_at);
+
+    const [normalized] = await this.validateAndNormalizeItems(transfer.purchase_order_id, [dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.updateItem(itemId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'stock_transfer',
+          entityId: transferId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'UPDATE',
+            stock_transfer_item_id: itemId,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Stock Transfer item updated',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getStockTransfer(transferId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteStockTransferItem(
+    transferId: number,
+    itemId: number,
+    expectedUpdatedAt: string | null | undefined,
+    actorAccountId?: number
+  ): Promise<StockTransferDetailViewModel> {
+    const transfer = await this.repository.findById(transferId);
+    if (!transfer) {
+      throw new NotFoundError('Stock Transfer not found');
+    }
+    this.assertTransferMutable(transfer.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Stock Transfer item not found');
+    }
+
+    const items = await this.repository.findItemsByTransferId(transferId);
+    const belongsToTransfer = items.some((row) => row.stock_transfer_item_id === itemId);
+    if (!belongsToTransfer) {
+      throw new ConflictError('Item does not belong to the stock transfer');
+    }
+
+    assertOptimisticConcurrency('Stock Transfer item', expectedUpdatedAt, item.updated_at);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.softDeleteItem(itemId, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'stock_transfer',
+          entityId: transferId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'DELETE',
+            stock_transfer_item_id: itemId,
+            material_id: item.material_id,
+          },
+          transactionId,
+          notes: 'Stock Transfer item deleted',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getStockTransfer(transferId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async transitionStatus(
+    id: number,
+    targetStatusCode: string,
+    actorAccountId?: number,
+    expectedUpdatedAt?: string | null
+  ): Promise<StockTransferDetailViewModel> {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundError('Stock Transfer not found');
     }
 
-    if (targetStatusCode === SUBMITTED_STATUS_CODE && existing.status_code !== DRAFT_STATUS_CODE) {
-      throw new ConflictError('Only draft stock transfers can be submitted');
-    }
-
-    if (targetStatusCode === APPROVED_STATUS_CODE && existing.status_code !== SUBMITTED_STATUS_CODE) {
-      throw new ConflictError('Only submitted stock transfers can be approved');
-    }
-
-    if (targetStatusCode === CANCELLED_STATUS_CODE && !new Set([DRAFT_STATUS_CODE, SUBMITTED_STATUS_CODE]).has(existing.status_code)) {
-      throw new ConflictError('Only draft or submitted stock transfers can be cancelled');
-    }
+    assertOptimisticConcurrency('Stock Transfer', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, targetStatusCode);
 
     const status = await this.requireLookupByCode(STATUS_LOOKUP_TYPE, targetStatusCode, 'status_id');
     const client = await pool.connect();
@@ -362,6 +547,12 @@ export class StockTransferService {
     });
   }
 
+  private assertTransferMutable(statusCode: string): void {
+    if (statusCode !== DRAFT_STATUS_CODE) {
+      throw new ConflictError('Only draft stock transfers can be modified');
+    }
+  }
+
   private async requireLookup(id: number, lookupType: string, fieldName: string) {
     const lookup = await this.lookupRepository.findById(id);
     if (!lookup || lookup.look_up_type !== lookupType) {
@@ -433,6 +624,7 @@ export class StockTransferService {
       uom_abbreviation: row.uom_abbreviation,
       quantity: row.quantity,
       notes: row.notes,
+      updated_at: row.updated_at ?? null,
     };
   }
 }

@@ -1,6 +1,53 @@
 import { ValidationError } from '../../utils/errors.js';
 
 export class PurchaseOrderValidator {
+  static validateItem(data: {
+    material_request_item_id?: number | null;
+    material_id: number;
+    requested_quantity: number;
+    ordered_quantity: number;
+    received_quantity?: number;
+    uom_id: number;
+    unit_price?: number | null;
+    line_total?: number | null;
+    supplier_reference?: string | null;
+    notes?: string | null;
+  }) {
+    const errors: string[] = [];
+
+    if (data.material_request_item_id !== undefined && data.material_request_item_id !== null && (!Number.isInteger(data.material_request_item_id) || data.material_request_item_id <= 0)) {
+      errors.push('Material request item must be a positive integer');
+    }
+    if (!Number.isInteger(data.material_id) || data.material_id <= 0) {
+      errors.push('Material is required');
+    }
+    if (!Number.isFinite(data.requested_quantity) || data.requested_quantity <= 0) {
+      errors.push('Requested quantity must be greater than zero');
+    }
+    if (!Number.isFinite(data.ordered_quantity) || data.ordered_quantity <= 0) {
+      errors.push('Ordered quantity must be greater than zero');
+    }
+    if (data.received_quantity !== undefined && data.received_quantity !== null) {
+      if (!Number.isFinite(data.received_quantity) || data.received_quantity < 0) {
+        errors.push('Received quantity must be a non-negative number');
+      } else if (Number.isFinite(data.ordered_quantity) && data.received_quantity > data.ordered_quantity) {
+        errors.push('Received quantity cannot exceed ordered quantity');
+      }
+    }
+    if (!Number.isInteger(data.uom_id) || data.uom_id <= 0) {
+      errors.push('Unit of measure is required');
+    }
+    if (data.unit_price !== undefined && data.unit_price !== null && (!Number.isFinite(data.unit_price) || data.unit_price < 0)) {
+      errors.push('Unit price must be a non-negative number');
+    }
+    if (data.line_total !== undefined && data.line_total !== null && (!Number.isFinite(data.line_total) || data.line_total < 0)) {
+      errors.push('Line total must be a non-negative number');
+    }
+    if (errors.length > 0) {
+      throw new ValidationError(errors.join('; '));
+    }
+  }
+
   static validateCreate(data: {
     project_id: number;
     material_request_id?: number | null;

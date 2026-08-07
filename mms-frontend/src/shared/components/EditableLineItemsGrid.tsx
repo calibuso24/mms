@@ -25,6 +25,8 @@ export interface EditableLineItemsGridProps<R extends GridValidRowModel> {
   createRow: () => R;
   getRowId: (row: R) => GridRowId;
   processRowUpdate?: (newRow: R, oldRow: R, currentRows: R[]) => R;
+  onRowUpdateCommitted?: (newRow: R, oldRow: R) => Promise<R> | R;
+  onRowDelete?: (row: R) => Promise<void> | void;
   validateRow?: (row: R, currentRows: R[]) => Record<string, string>;
   shouldConfirmDelete?: (row: R) => boolean;
   getDeleteConfirmMessage?: (row: R) => string;
@@ -62,7 +64,8 @@ function normalizeSingleSelectOptions(valueOptions: unknown): SingleSelectOption
 }
 
 function SingleSelectAutocompleteEditCell(params: GridRenderEditCellParams) {
-  const options = normalizeSingleSelectOptions(params.colDef.valueOptions);
+  const singleSelectColDef = params.colDef as GridColDef & { valueOptions?: unknown };
+  const options = normalizeSingleSelectOptions(singleSelectColDef.valueOptions);
   const selected = options.find((option) => option.value === String(params.value ?? '')) || null;
 
   return (
@@ -103,6 +106,8 @@ export default function EditableLineItemsGrid<R extends GridValidRowModel>({
   createRow,
   getRowId,
   processRowUpdate,
+  onRowUpdateCommitted,
+  onRowDelete,
   validateRow,
   shouldConfirmDelete,
   getDeleteConfirmMessage,
@@ -182,6 +187,10 @@ export default function EditableLineItemsGrid<R extends GridValidRowModel>({
                 }
               }
 
+              if (onRowDelete) {
+                await onRowDelete(targetRow);
+              }
+
               setRows((current) => current.filter((item) => String(getRowId(item)) !== String(params.id)));
             }}
             showInMenu={false}
@@ -189,7 +198,7 @@ export default function EditableLineItemsGrid<R extends GridValidRowModel>({
         ],
       } as GridColDef<R>,
     ];
-  }, [columns, rows, getRowId, shouldConfirmDelete, getDeleteConfirmMessage, setRows, disabled]);
+  }, [columns, rows, getRowId, shouldConfirmDelete, getDeleteConfirmMessage, setRows, disabled, onRowDelete]);
 
   const defaultFocusField = useMemo(() => {
     const firstEditable = columns.find((column) => column.editable);
@@ -236,13 +245,19 @@ export default function EditableLineItemsGrid<R extends GridValidRowModel>({
           getRowId={(row) => getRowId(row as R)}
           editMode="cell"
           disableRowSelectionOnClick
-          processRowUpdate={(newRow, oldRow) => {
+          processRowUpdate={async (newRow, oldRow) => {
             const castNew = newRow as R;
             const castOld = oldRow as R;
             let finalRow = castNew;
 
+            const currentRows = rows as R[];
+            finalRow = processRowUpdate ? processRowUpdate(castNew, castOld, currentRows) : castNew;
+
+            if (onRowUpdateCommitted) {
+              finalRow = await onRowUpdateCommitted(finalRow, castOld);
+            }
+
             setRows((current) => {
-              finalRow = processRowUpdate ? processRowUpdate(castNew, castOld, current) : castNew;
               return current.map((row) => (String(getRowId(row)) === String(getRowId(castOld)) ? finalRow : row));
             });
 

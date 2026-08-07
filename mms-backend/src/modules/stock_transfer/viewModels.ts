@@ -44,6 +44,7 @@ export interface StockTransferItemViewModel {
   uom_abbreviation: string;
   quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export interface StockTransferDetailViewModel extends StockTransferListItemViewModel {

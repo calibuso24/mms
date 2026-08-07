@@ -8,6 +8,7 @@ import { PartyRepository } from '../repositories/party.js';
 import { UnitOfMeasureRepository } from '../repositories/unitOfMeasure.js';
 import {
   CreateMaterialAdjustmentDto,
+  MaterialAdjustmentItemMutationDto,
   MaterialAdjustmentItemDto,
   MaterialAdjustmentListQuery,
   UpdateMaterialAdjustmentDto,
@@ -19,6 +20,8 @@ import {
   MaterialAdjustmentListViewModel,
 } from '../modules/material_adjustment/viewModels.js';
 import { MaterialAdjustmentValidator } from '../modules/material_adjustment/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
+import { TransactionLifecycleManager } from '../shared/transaction/lifecycle.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'material_adjustment';
@@ -30,6 +33,13 @@ const PENDING_STATUS_CODE = 'pending';
 const APPROVED_STATUS_CODE = 'approved';
 const REJECTED_STATUS_CODE = 'rejected';
 const COMPLETED_STATUS_CODE = 'completed';
+const lifecycleManager = new TransactionLifecycleManager({
+  moduleName: 'Material Adjustment',
+  transitions: {
+    pending: ['approved', 'rejected'],
+    approved: ['completed'],
+  },
+});
 
 export class MaterialAdjustmentService {
   private repository = new MaterialAdjustmentRepository();
@@ -138,9 +148,8 @@ export class MaterialAdjustmentService {
       throw new NotFoundError('Material Adjustment not found');
     }
 
-    if (existing.status_code !== PENDING_STATUS_CODE) {
-      throw new ConflictError('Only pending adjustments can be updated');
-    }
+    assertOptimisticConcurrency('Material Adjustment', dto.expected_updated_at, existing.updated_at);
+    this.assertAdjustmentMutable(existing.status_code);
 
     if (dto.project_id !== undefined) {
       const project = await this.partyRepository.findById(dto.project_id);
@@ -244,31 +253,208 @@ export class MaterialAdjustmentService {
     }
   }
 
-  async approveMaterialAdjustment(id: number, actorAccountId?: number): Promise<MaterialAdjustmentDetailViewModel> {
-    return this.transitionStatus(id, APPROVED_STATUS_CODE, actorAccountId, true);
+  async approveMaterialAdjustment(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialAdjustmentDetailViewModel> {
+    return this.transitionStatus(id, APPROVED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  async rejectMaterialAdjustment(id: number, actorAccountId?: number): Promise<MaterialAdjustmentDetailViewModel> {
-    return this.transitionStatus(id, REJECTED_STATUS_CODE, actorAccountId, true);
+  async rejectMaterialAdjustment(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialAdjustmentDetailViewModel> {
+    return this.transitionStatus(id, REJECTED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  async completeMaterialAdjustment(id: number, actorAccountId?: number): Promise<MaterialAdjustmentDetailViewModel> {
-    return this.transitionStatus(id, COMPLETED_STATUS_CODE, actorAccountId, false);
+  async completeMaterialAdjustment(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<MaterialAdjustmentDetailViewModel> {
+    return this.transitionStatus(id, COMPLETED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  private async transitionStatus(id: number, targetStatusCode: string, actorAccountId?: number, fromPendingOnly = false): Promise<MaterialAdjustmentDetailViewModel> {
+  async addMaterialAdjustmentItem(
+    adjustmentId: number,
+    dto: MaterialAdjustmentItemMutationDto,
+    actorAccountId?: number
+  ): Promise<MaterialAdjustmentDetailViewModel> {
+    MaterialAdjustmentValidator.validateItem(dto);
+
+    const adjustment = await this.repository.findById(adjustmentId);
+    if (!adjustment) {
+      throw new NotFoundError('Material Adjustment not found');
+    }
+    this.assertAdjustmentMutable(adjustment.status_code);
+
+    const [normalized] = await this.validateAndNormalizeItems([dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      const created = await this.repository.createItem(adjustmentId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'material_adjustment',
+          entityId: adjustmentId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'ADD',
+            material_adjustment_item_id: created.material_adjustment_item_id,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Material Adjustment item added',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getMaterialAdjustment(adjustmentId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateMaterialAdjustmentItem(
+    adjustmentId: number,
+    itemId: number,
+    dto: MaterialAdjustmentItemMutationDto,
+    actorAccountId?: number
+  ): Promise<MaterialAdjustmentDetailViewModel> {
+    MaterialAdjustmentValidator.validateItem(dto);
+
+    const adjustment = await this.repository.findById(adjustmentId);
+    if (!adjustment) {
+      throw new NotFoundError('Material Adjustment not found');
+    }
+    this.assertAdjustmentMutable(adjustment.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Material Adjustment item not found');
+    }
+
+    const items = await this.repository.findItemsByAdjustmentId(adjustmentId);
+    const belongsToAdjustment = items.some((row) => row.material_adjustment_item_id === itemId);
+    if (!belongsToAdjustment) {
+      throw new ConflictError('Item does not belong to the material adjustment');
+    }
+
+    assertOptimisticConcurrency('Material Adjustment item', dto.expected_updated_at, item.updated_at);
+
+    const [normalized] = await this.validateAndNormalizeItems([dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.updateItem(itemId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'material_adjustment',
+          entityId: adjustmentId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'UPDATE',
+            material_adjustment_item_id: itemId,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Material Adjustment item updated',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getMaterialAdjustment(adjustmentId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteMaterialAdjustmentItem(
+    adjustmentId: number,
+    itemId: number,
+    expectedUpdatedAt: string | null | undefined,
+    actorAccountId?: number
+  ): Promise<MaterialAdjustmentDetailViewModel> {
+    const adjustment = await this.repository.findById(adjustmentId);
+    if (!adjustment) {
+      throw new NotFoundError('Material Adjustment not found');
+    }
+    this.assertAdjustmentMutable(adjustment.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Material Adjustment item not found');
+    }
+
+    const items = await this.repository.findItemsByAdjustmentId(adjustmentId);
+    const belongsToAdjustment = items.some((row) => row.material_adjustment_item_id === itemId);
+    if (!belongsToAdjustment) {
+      throw new ConflictError('Item does not belong to the material adjustment');
+    }
+
+    assertOptimisticConcurrency('Material Adjustment item', expectedUpdatedAt, item.updated_at);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.softDeleteItem(itemId, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'material_adjustment',
+          entityId: adjustmentId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'DELETE',
+            material_adjustment_item_id: itemId,
+            material_id: item.material_id,
+          },
+          transactionId,
+          notes: 'Material Adjustment item deleted',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getMaterialAdjustment(adjustmentId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async transitionStatus(
+    id: number,
+    targetStatusCode: string,
+    actorAccountId?: number,
+    expectedUpdatedAt?: string | null
+  ): Promise<MaterialAdjustmentDetailViewModel> {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundError('Material Adjustment not found');
     }
 
-    if (fromPendingOnly && existing.status_code !== PENDING_STATUS_CODE) {
-      throw new ConflictError('Only pending adjustments can be transitioned');
-    }
-
-    if (targetStatusCode === COMPLETED_STATUS_CODE && existing.status_code !== APPROVED_STATUS_CODE) {
-      throw new ConflictError('Only approved adjustments can be completed');
-    }
+    assertOptimisticConcurrency('Material Adjustment', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, targetStatusCode);
 
     const status = await this.requireLookupByCode(STATUS_LOOKUP_TYPE, targetStatusCode, 'status_id');
 
@@ -353,6 +539,12 @@ export class MaterialAdjustmentService {
     return normalized;
   }
 
+  private assertAdjustmentMutable(statusCode: string): void {
+    if (statusCode !== PENDING_STATUS_CODE) {
+      throw new ConflictError('Only pending adjustments can be updated');
+    }
+  }
+
   private async requireLookup(id: number, lookupType: string, fieldName: string) {
     const lookup = await this.lookupRepository.findById(id);
     if (!lookup || lookup.look_up_type !== lookupType) {
@@ -423,6 +615,7 @@ export class MaterialAdjustmentService {
       adjustment_quantity: row.adjustment_quantity,
       resulting_quantity: row.resulting_quantity,
       notes: row.notes,
+      updated_at: row.updated_at ?? null,
     };
   }
 }

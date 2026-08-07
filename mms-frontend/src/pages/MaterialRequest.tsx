@@ -82,6 +82,7 @@ interface UomItem {
 interface RequestItemForm {
   row_id: string;
   material_request_item_id?: number;
+  updated_at?: string | null;
   material_id: string;
   description: string;
   specification: string;
@@ -109,6 +110,7 @@ interface MaterialRequestItemView {
   uom_name: string;
   uom_abbreviation: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 interface MaterialRequestItemList {
@@ -235,6 +237,7 @@ export default function MaterialRequestPage() {
   const [viewItem, setViewItem] = useState<MaterialRequestDetail | null>(null);
   const [deleteItem, setDeleteItem] = useState<MaterialRequestItemList | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Material Request:VIEW');
@@ -270,6 +273,7 @@ export default function MaterialRequestPage() {
     if (routeMode === 'new') {
       setEditingId(null);
       setForm(emptyForm());
+      setEditingVersion(null);
       setError('');
       return;
     }
@@ -281,6 +285,7 @@ export default function MaterialRequestPage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -350,6 +355,7 @@ export default function MaterialRequestPage() {
     setEditingId(materialRequestId);
     try {
       const detail: MaterialRequestDetail = await materialRequestApi.get(materialRequestId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         project_id: detail.project_id.toString(),
         status_id: detail.status_id.toString(),
@@ -363,6 +369,7 @@ export default function MaterialRequestPage() {
           ? detail.items.map((row) => ({
               row_id: `${Date.now()}-${row.material_request_item_id}`,
               material_request_item_id: row.material_request_item_id,
+              updated_at: row.updated_at ?? null,
               material_id: row.material_id.toString(),
               description: row.material_name,
               specification: '',
@@ -437,7 +444,7 @@ export default function MaterialRequestPage() {
     setError('');
 
     try {
-      const payload = {
+      const basePayload = {
         project_id: Number(form.project_id),
         status_id: form.status_id ? Number(form.status_id) : undefined,
         requested_at: form.requested_at || null,
@@ -446,29 +453,37 @@ export default function MaterialRequestPage() {
         stock_checked: form.stock_checked,
         ceo_approval_required: form.ceo_approval_required,
         notes: form.notes.trim() || null,
-        items: form.items
-          .filter((item) => item.material_id && item.uom_id && item.requested_quantity)
-          .map((item) => ({
-            material_id: Number(item.material_id),
-            requested_quantity: Number(item.requested_quantity),
-            approved_quantity: item.approved_quantity === '' ? null : Number(item.approved_quantity),
-            estimated_quantity: item.estimated_quantity === '' ? null : Number(item.estimated_quantity),
-            area_usage: item.area_usage || null,
-            remarks: item.remarks || null,
-            uom_id: Number(item.uom_id),
-            notes: item.notes || null,
-          })),
       };
 
       if (editingId) {
-        await materialRequestApi.update(editingId, payload);
+        const updated = await materialRequestApi.update(editingId, {
+          ...basePayload,
+          expected_updated_at: editingVersion ?? undefined,
+        });
+        setEditingVersion(updated?.updated_at ?? editingVersion);
         setSuccess('Material Request updated');
       } else {
+        const payload = {
+          ...basePayload,
+          items: form.items
+            .filter((item) => item.material_id && item.uom_id && item.requested_quantity)
+            .map((item) => ({
+              material_id: Number(item.material_id),
+              requested_quantity: Number(item.requested_quantity),
+              approved_quantity: item.approved_quantity === '' ? null : Number(item.approved_quantity),
+              estimated_quantity: item.estimated_quantity === '' ? null : Number(item.estimated_quantity),
+              area_usage: item.area_usage || null,
+              remarks: item.remarks || null,
+              uom_id: Number(item.uom_id),
+              notes: item.notes || null,
+            })),
+        };
         await materialRequestApi.create(payload);
         setSuccess('Material Request created');
       }
 
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       navigate(baseRoute);
       await loadItems();
@@ -582,19 +597,82 @@ export default function MaterialRequestPage() {
     return nextRow;
   };
 
+  const toDetailPayload = (row: RequestItemForm) => ({
+    material_id: Number(row.material_id),
+    requested_quantity: Number(row.requested_quantity),
+    approved_quantity: row.approved_quantity === '' ? null : Number(row.approved_quantity),
+    estimated_quantity: row.estimated_quantity === '' ? null : Number(row.estimated_quantity),
+    area_usage: row.area_usage || null,
+    remarks: row.remarks || null,
+    uom_id: Number(row.uom_id),
+    notes: row.notes || null,
+  });
+
+  const handleDetailRowCommitted = async (newRow: RequestItemForm, oldRow: RequestItemForm): Promise<RequestItemForm> => {
+    if (!editingId) {
+      return newRow;
+    }
+
+    const rowErrors = validateDetailRow(newRow, form.items.map((item) => (item.row_id === oldRow.row_id ? newRow : item)));
+    if (Object.keys(rowErrors).length > 0) {
+      return newRow;
+    }
+
+    if (!newRow.material_id || !newRow.uom_id || !newRow.requested_quantity) {
+      return newRow;
+    }
+
+    if (newRow.material_request_item_id) {
+      const detail = await materialRequestApi.updateItem(editingId, newRow.material_request_item_id, {
+        ...toDetailPayload(newRow),
+        expected_updated_at: oldRow.updated_at ?? null,
+      });
+      const savedItem = Array.isArray(detail?.items)
+        ? detail.items.find((item: MaterialRequestItemView) => item.material_request_item_id === newRow.material_request_item_id)
+        : null;
+      return {
+        ...newRow,
+        updated_at: savedItem?.updated_at ?? newRow.updated_at ?? null,
+      };
+    }
+
+    const detail = await materialRequestApi.addItem(editingId, toDetailPayload(newRow));
+    const createdItem = Array.isArray(detail?.items)
+      ? [...detail.items].sort((a: MaterialRequestItemView, b: MaterialRequestItemView) => b.material_request_item_id - a.material_request_item_id)[0]
+      : null;
+
+    return {
+      ...newRow,
+      material_request_item_id: createdItem?.material_request_item_id,
+      updated_at: createdItem?.updated_at ?? null,
+    };
+  };
+
+  const handleDetailRowDelete = async (row: RequestItemForm): Promise<void> => {
+    if (!editingId || !row.material_request_item_id) {
+      return;
+    }
+
+    await materialRequestApi.deleteItem(editingId, row.material_request_item_id, {
+      expected_updated_at: row.updated_at ?? null,
+    });
+  };
+
   const transition = async (action: 'submit' | 'approve' | 'reject' | 'cancel' | 'close') => {
     if (!viewItem) return;
     try {
+      const latest = await materialRequestApi.get(viewItem.material_request_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const response =
         action === 'submit'
-          ? await materialRequestApi.submit(viewItem.material_request_id)
+          ? await materialRequestApi.submit(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
           : action === 'approve'
-            ? await materialRequestApi.approve(viewItem.material_request_id)
+            ? await materialRequestApi.approve(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
             : action === 'reject'
-              ? await materialRequestApi.reject(viewItem.material_request_id)
+              ? await materialRequestApi.reject(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
               : action === 'cancel'
-                ? await materialRequestApi.cancel(viewItem.material_request_id)
-                : await materialRequestApi.close(viewItem.material_request_id);
+                ? await materialRequestApi.cancel(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
+                : await materialRequestApi.close(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(response);
       setSuccess(`Material Request ${action}d`);
       await loadItems();
@@ -785,6 +863,8 @@ export default function MaterialRequestPage() {
                 createRow={emptyItem}
                 getRowId={(row) => row.row_id}
                 processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+                onRowUpdateCommitted={handleDetailRowCommitted}
+                onRowDelete={handleDetailRowDelete}
                 validateRow={validateDetailRow}
                 shouldConfirmDelete={(row) => Boolean(row.material_request_item_id)}
                 getDeleteConfirmMessage={() => 'Delete this saved detail row?'}

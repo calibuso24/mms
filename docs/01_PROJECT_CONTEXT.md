@@ -143,6 +143,10 @@ mms/
 - /api/material-adjustments
 - /api/projects, /api/suppliers
 
+Transaction workflow note:
+
+- Transaction update and workflow-action endpoints support optimistic concurrency via optional `expected_updated_at` request token, returning `409` on stale writes.
+
 ### Frontend pages currently implemented
 
 - Login

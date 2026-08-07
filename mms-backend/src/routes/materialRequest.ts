@@ -7,6 +7,9 @@ const controller = new MaterialRequestController();
 
 router.get('/', requirePermission('Material Request', 'VIEW'), (req, res, next) => controller.listMaterialRequests(req, res, next));
 router.get('/:id', requirePermission('Material Request', 'VIEW'), (req, res, next) => controller.getMaterialRequest(req, res, next));
+router.post('/:id/items', requirePermission('Material Request', 'UPDATE'), (req, res, next) => controller.addMaterialRequestItem(req, res, next));
+router.put('/:id/items/:itemId', requirePermission('Material Request', 'UPDATE'), (req, res, next) => controller.updateMaterialRequestItem(req, res, next));
+router.delete('/:id/items/:itemId', requirePermission('Material Request', 'UPDATE'), (req, res, next) => controller.deleteMaterialRequestItem(req, res, next));
 router.post('/', requirePermission('Material Request', 'CREATE'), (req, res, next) => controller.createMaterialRequest(req, res, next));
 router.put('/:id', requirePermission('Material Request', 'UPDATE'), (req, res, next) => controller.updateMaterialRequest(req, res, next));
 router.delete('/:id', requirePermission('Material Request', 'DELETE'), (req, res, next) => controller.deleteMaterialRequest(req, res, next));

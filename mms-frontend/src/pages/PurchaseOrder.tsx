@@ -101,6 +101,7 @@ interface RequestItemSummary {
 interface PurchaseOrderItemForm {
   row_id: string;
   purchase_order_item_id?: number;
+  updated_at?: string | null;
   material_request_item_id: string;
   material_id: string;
   description: string;
@@ -132,6 +133,7 @@ interface PurchaseOrderItemView {
   line_total: string | null;
   supplier_reference: string | null;
   notes: string | null;
+  updated_at: string | null;
 }
 
 interface PurchaseOrderListItem {
@@ -275,6 +277,7 @@ export default function PurchaseOrderPage() {
   const [viewItem, setViewItem] = useState<PurchaseOrderDetail | null>(null);
   const [deleteItem, setDeleteItem] = useState<PurchaseOrderListItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Purchase Order:VIEW');
@@ -384,6 +387,7 @@ export default function PurchaseOrderPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     setForm(emptyForm());
     navigate(`${baseRoute}/new`);
   };
@@ -393,6 +397,7 @@ export default function PurchaseOrderPage() {
     try {
       const detail: PurchaseOrderDetail = await purchaseOrderApi.get(purchaseOrderId);
       setEditingId(purchaseOrderId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         project_id: String(detail.project_id),
         material_request_id: detail.material_request_id ? String(detail.material_request_id) : '',
@@ -406,6 +411,7 @@ export default function PurchaseOrderPage() {
           ? detail.items.map((line: PurchaseOrderItemView) => ({
               row_id: `${Date.now()}-${line.purchase_order_item_id}`,
               purchase_order_item_id: line.purchase_order_item_id,
+              updated_at: line.updated_at ?? null,
               material_request_item_id: line.material_request_item_id ? String(line.material_request_item_id) : '',
               material_id: String(line.material_id),
               description: line.material_name,
@@ -437,6 +443,7 @@ export default function PurchaseOrderPage() {
   useEffect(() => {
     if (routeMode === 'new') {
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setError('');
       return;
@@ -449,6 +456,7 @@ export default function PurchaseOrderPage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -520,24 +528,26 @@ export default function PurchaseOrderPage() {
   };
 
   const handleSave = async () => {
-    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
-    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
-    if (firstError) {
-      setError(Object.values(firstError)[0]);
-      return;
-    }
-
     if (!form.project_id || !form.supplier_party_id || !form.order_type_id) {
       setError('Project, supplier, and order type are required');
       return;
     }
 
-    if (!form.items.length) {
-      setError('At least one line item is required');
-      return;
+    if (!editingId) {
+      const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+      const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+      if (firstError) {
+        setError(Object.values(firstError)[0]);
+        return;
+      }
+
+      if (!form.items.length) {
+        setError('At least one line item is required');
+        return;
+      }
     }
 
-    const payload = {
+    const payload: any = {
       project_id: Number(form.project_id),
       material_request_id: form.material_request_id ? Number(form.material_request_id) : null,
       supplier_party_id: Number(form.supplier_party_id),
@@ -546,7 +556,12 @@ export default function PurchaseOrderPage() {
       order_type_id: Number(form.order_type_id),
       total_amount: form.total_amount ? Number(form.total_amount) : null,
       notes: form.notes || null,
-      items: form.items.map((item) => ({
+    };
+
+    if (editingId) {
+      payload.expected_updated_at = editingVersion ?? undefined;
+    } else {
+      payload.items = form.items.map((item) => ({
         material_request_item_id: item.material_request_item_id ? Number(item.material_request_item_id) : null,
         material_id: Number(item.material_id),
         requested_quantity: Number(item.requested_quantity),
@@ -557,14 +572,15 @@ export default function PurchaseOrderPage() {
         line_total: item.line_total ? Number(item.line_total) : null,
         supplier_reference: item.supplier_reference || null,
         notes: item.notes || null,
-      })),
-    };
+      }));
+    }
 
     setSaving(true);
     setError('');
     try {
       if (editingId) {
-        await purchaseOrderApi.update(editingId, payload);
+        const updated = await purchaseOrderApi.update(editingId, payload);
+        setEditingVersion(updated?.updated_at ?? editingVersion);
         setSuccess('Purchase order updated');
       } else {
         await purchaseOrderApi.create(payload);
@@ -572,6 +588,7 @@ export default function PurchaseOrderPage() {
       }
       navigate(baseRoute);
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       await loadItems();
     } catch (err: any) {
@@ -603,9 +620,11 @@ export default function PurchaseOrderPage() {
     setSaving(true);
     setError('');
     try {
+      const latest = await purchaseOrderApi.get(viewItem.purchase_order_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const updated = action === 'approve'
-        ? await purchaseOrderApi.approve(viewItem.purchase_order_id)
-        : await purchaseOrderApi.cancel(viewItem.purchase_order_id);
+        ? await purchaseOrderApi.approve(viewItem.purchase_order_id, { expected_updated_at: expectedUpdatedAt })
+        : await purchaseOrderApi.cancel(viewItem.purchase_order_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(updated);
       setSuccess(action === 'approve' ? 'Purchase order approved' : 'Purchase order cancelled');
       await loadItems();
@@ -730,6 +749,69 @@ export default function PurchaseOrderPage() {
     nextRow.line_total = quantity > 0 && unitCost > 0 ? (quantity * unitCost).toFixed(2) : '';
 
     return nextRow;
+  };
+
+  const toDetailPayload = (row: PurchaseOrderItemForm) => ({
+    material_request_item_id: row.material_request_item_id ? Number(row.material_request_item_id) : null,
+    material_id: Number(row.material_id),
+    requested_quantity: Number(row.requested_quantity),
+    ordered_quantity: Number(row.ordered_quantity),
+    received_quantity: row.received_quantity ? Number(row.received_quantity) : 0,
+    uom_id: Number(row.uom_id),
+    unit_price: row.unit_price ? Number(row.unit_price) : null,
+    line_total: row.line_total ? Number(row.line_total) : null,
+    supplier_reference: row.supplier_reference || null,
+    notes: row.notes || null,
+  });
+
+  const handleDetailRowCommitted = async (newRow: PurchaseOrderItemForm, oldRow: PurchaseOrderItemForm): Promise<PurchaseOrderItemForm> => {
+    if (!editingId) {
+      return newRow;
+    }
+
+    const rowErrors = validateDetailRow(newRow, form.items.map((item) => (item.row_id === oldRow.row_id ? newRow : item)));
+    if (Object.keys(rowErrors).length > 0) {
+      return newRow;
+    }
+
+    if (!newRow.material_id || !newRow.uom_id || !newRow.ordered_quantity) {
+      return newRow;
+    }
+
+    if (newRow.purchase_order_item_id) {
+      const detail = await purchaseOrderApi.updateItem(editingId, newRow.purchase_order_item_id, {
+        ...toDetailPayload(newRow),
+        expected_updated_at: oldRow.updated_at ?? null,
+      });
+      const savedItem = Array.isArray(detail?.items)
+        ? detail.items.find((item: PurchaseOrderItemView) => item.purchase_order_item_id === newRow.purchase_order_item_id)
+        : null;
+      return {
+        ...newRow,
+        updated_at: savedItem?.updated_at ?? newRow.updated_at ?? null,
+      };
+    }
+
+    const detail = await purchaseOrderApi.addItem(editingId, toDetailPayload(newRow));
+    const createdItem = Array.isArray(detail?.items)
+      ? [...detail.items].sort((a: PurchaseOrderItemView, b: PurchaseOrderItemView) => b.purchase_order_item_id - a.purchase_order_item_id)[0]
+      : null;
+
+    return {
+      ...newRow,
+      purchase_order_item_id: createdItem?.purchase_order_item_id,
+      updated_at: createdItem?.updated_at ?? null,
+    };
+  };
+
+  const handleDetailRowDelete = async (row: PurchaseOrderItemForm): Promise<void> => {
+    if (!editingId || !row.purchase_order_item_id) {
+      return;
+    }
+
+    await purchaseOrderApi.deleteItem(editingId, row.purchase_order_item_id, {
+      expected_updated_at: row.updated_at ?? null,
+    });
   };
 
   return (
@@ -1089,6 +1171,8 @@ export default function PurchaseOrderPage() {
                 createRow={emptyItem}
                 getRowId={(row) => row.row_id}
                 processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+                onRowUpdateCommitted={handleDetailRowCommitted}
+                onRowDelete={handleDetailRowDelete}
                 validateRow={validateDetailRow}
                 shouldConfirmDelete={(row) => Boolean(row.purchase_order_item_id)}
                 getDeleteConfirmMessage={() => 'Delete this saved detail row?'}

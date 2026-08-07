@@ -45,6 +45,105 @@ export class MaterialRequestController {
     }
   }
 
+  async addMaterialRequestItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid material request ID');
+      }
+
+      const result = await this.service.addMaterialRequestItem(
+        id,
+        {
+          material_id: Number(req.body.material_id),
+          requested_quantity: Number(req.body.requested_quantity),
+          approved_quantity:
+            req.body.approved_quantity === undefined || req.body.approved_quantity === null || req.body.approved_quantity === ''
+              ? null
+              : Number(req.body.approved_quantity),
+          estimated_quantity:
+            req.body.estimated_quantity === undefined || req.body.estimated_quantity === null || req.body.estimated_quantity === ''
+              ? null
+              : Number(req.body.estimated_quantity),
+          area_usage: req.body.area_usage ?? null,
+          remarks: req.body.remarks ?? null,
+          uom_id: Number(req.body.uom_id),
+          notes: req.body.notes ?? null,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
+        },
+        req.accountId
+      );
+
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMaterialRequestItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid material request ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid material request item ID');
+      }
+
+      const result = await this.service.updateMaterialRequestItem(
+        id,
+        itemId,
+        {
+          material_id: Number(req.body.material_id),
+          requested_quantity: Number(req.body.requested_quantity),
+          approved_quantity:
+            req.body.approved_quantity === undefined || req.body.approved_quantity === null || req.body.approved_quantity === ''
+              ? null
+              : Number(req.body.approved_quantity),
+          estimated_quantity:
+            req.body.estimated_quantity === undefined || req.body.estimated_quantity === null || req.body.estimated_quantity === ''
+              ? null
+              : Number(req.body.estimated_quantity),
+          area_usage: req.body.area_usage ?? null,
+          remarks: req.body.remarks ?? null,
+          uom_id: Number(req.body.uom_id),
+          notes: req.body.notes ?? null,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
+        },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteMaterialRequestItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid material request ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid material request item ID');
+      }
+
+      const result = await this.service.deleteMaterialRequestItem(
+        id,
+        itemId,
+        req.body?.expected_updated_at ?? undefined,
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createMaterialRequest(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await this.service.createMaterialRequest(
@@ -104,6 +203,7 @@ export class MaterialRequestController {
           ceo_approval_required:
             req.body.ceo_approval_required === undefined ? undefined : req.body.ceo_approval_required === true || req.body.ceo_approval_required === 'true',
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
                 material_id: Number(item.material_id),
@@ -153,7 +253,7 @@ export class MaterialRequestController {
         throw new ValidationError('Invalid material request ID');
       }
 
-      res.json(await this.service.submitMaterialRequest(id, req.accountId));
+      res.json(await this.service.submitMaterialRequest(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -166,7 +266,7 @@ export class MaterialRequestController {
         throw new ValidationError('Invalid material request ID');
       }
 
-      res.json(await this.service.approveMaterialRequest(id, req.accountId));
+      res.json(await this.service.approveMaterialRequest(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -179,7 +279,7 @@ export class MaterialRequestController {
         throw new ValidationError('Invalid material request ID');
       }
 
-      res.json(await this.service.rejectMaterialRequest(id, req.accountId));
+      res.json(await this.service.rejectMaterialRequest(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -192,7 +292,7 @@ export class MaterialRequestController {
         throw new ValidationError('Invalid material request ID');
       }
 
-      res.json(await this.service.cancelMaterialRequest(id, req.accountId));
+      res.json(await this.service.cancelMaterialRequest(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -205,7 +305,7 @@ export class MaterialRequestController {
         throw new ValidationError('Invalid material request ID');
       }
 
-      res.json(await this.service.closeMaterialRequest(id, req.accountId));
+      res.json(await this.service.closeMaterialRequest(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }

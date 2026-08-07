@@ -34,6 +34,7 @@ export interface DeliveryAdviceItemRow {
   advised_quantity: string;
   received_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export class DeliveryAdviceRepository {
@@ -197,7 +198,8 @@ export class DeliveryAdviceRepository {
         u.abbreviation AS uom_abbreviation,
         dai.advised_quantity::TEXT AS advised_quantity,
         dai.received_quantity::TEXT AS received_quantity,
-        dai.notes
+        dai.notes,
+        dai.log_date_updated AS updated_at
       FROM delivery_advice_item dai
       JOIN material m ON m.material_id = dai.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = dai.uom_id AND u.is_deleted = false
@@ -358,6 +360,130 @@ export class DeliveryAdviceRepository {
         ]
       );
     }
+  }
+
+  async findItemById(itemId: number, client?: PoolClient): Promise<DeliveryAdviceItemRow | null> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        dai.delivery_advice_item_id,
+        dai.purchase_order_item_id,
+        dai.material_id,
+        m.product_code AS material_code,
+        m.product_name AS material_name,
+        dai.material_brand_id,
+        b.brand_name AS material_brand_name,
+        dai.uom_id,
+        u.uom_name,
+        u.abbreviation AS uom_abbreviation,
+        dai.advised_quantity::TEXT AS advised_quantity,
+        dai.received_quantity::TEXT AS received_quantity,
+        dai.notes,
+        dai.log_date_updated AS updated_at
+      FROM delivery_advice_item dai
+      JOIN material m ON m.material_id = dai.material_id AND m.is_deleted = false
+      JOIN unit_of_measure u ON u.uom_id = dai.uom_id AND u.is_deleted = false
+      LEFT JOIN material_brand mb ON mb.material_brand_id = dai.material_brand_id AND mb.is_deleted = false
+      LEFT JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
+      WHERE dai.delivery_advice_item_id = $1
+        AND dai.is_deleted = false`,
+      [itemId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async createItem(deliveryAdviceId: number, item: {
+    purchase_order_item_id?: number | null;
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    advised_quantity: number;
+    received_quantity?: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<{ delivery_advice_item_id: number }> {
+    const result = await this.getExecutor(client).query(
+      `INSERT INTO delivery_advice_item (
+        delivery_advice_id,
+        purchase_order_item_id,
+        material_id,
+        material_brand_id,
+        uom_id,
+        advised_quantity,
+        received_quantity,
+        notes,
+        log_date_created,
+        log_created_by_account_id,
+        log_module_created
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
+      RETURNING delivery_advice_item_id`,
+      [
+        deliveryAdviceId,
+        item.purchase_order_item_id ?? null,
+        item.material_id,
+        item.material_brand_id ?? null,
+        item.uom_id,
+        item.advised_quantity,
+        item.received_quantity ?? 0,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  async updateItem(itemId: number, item: {
+    purchase_order_item_id?: number | null;
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    advised_quantity: number;
+    received_quantity?: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE delivery_advice_item
+       SET purchase_order_item_id = $2,
+           material_id = $3,
+           material_brand_id = $4,
+           uom_id = $5,
+           advised_quantity = $6,
+           received_quantity = $7,
+           notes = $8,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $9,
+           log_module_updated = $10
+       WHERE delivery_advice_item_id = $1
+         AND is_deleted = false`,
+      [
+        itemId,
+        item.purchase_order_item_id ?? null,
+        item.material_id,
+        item.material_brand_id ?? null,
+        item.uom_id,
+        item.advised_quantity,
+        item.received_quantity ?? 0,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+  }
+
+  async softDeleteItem(itemId: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE delivery_advice_item
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE delivery_advice_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
   }
 
   async softDelete(id: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {

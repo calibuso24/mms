@@ -14,6 +14,7 @@ export interface UpdateMaterialControlDto {
   total_estimated_cost?: number | null;
   status_id?: number;
   notes?: string | null;
+  expected_updated_at?: string | null;
 }
 
 export interface MaterialControlListQuery {
@@ -46,6 +47,7 @@ export interface UpdateMaterialControlItemDto {
   estimated_total_cost?: number | null;
   remarks?: string | null;
   line_no?: number;
+  expected_updated_at?: string | null;
 }
 
 export interface MaterialControlItemListQuery {

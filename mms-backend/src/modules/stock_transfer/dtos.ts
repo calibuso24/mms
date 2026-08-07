@@ -8,6 +8,10 @@ export interface StockTransferItemDto {
   notes?: string | null;
 }
 
+export interface StockTransferItemMutationDto extends StockTransferItemDto {
+  expected_updated_at?: string | null;
+}
+
 export interface CreateStockTransferDto {
   transfer_type_id: number;
   source_id: number;
@@ -37,6 +41,7 @@ export interface UpdateStockTransferDto {
   transfer_date?: string | null;
   reference_code?: string | null;
   notes?: string | null;
+  expected_updated_at?: string | null;
   items?: StockTransferItemDto[];
 }
 

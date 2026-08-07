@@ -9,6 +9,10 @@ export interface SupplierDeliveryItemDto {
   notes?: string | null;
 }
 
+export interface SupplierDeliveryItemMutationDto extends SupplierDeliveryItemDto {
+  expected_updated_at?: string | null;
+}
+
 export interface CreateSupplierDeliveryDto {
   purchase_order_id: number;
   supplier_id: number;
@@ -29,6 +33,7 @@ export interface UpdateSupplierDeliveryDto {
   delivery_date?: string | null;
   reference_code?: string | null;
   notes?: string | null;
+  expected_updated_at?: string | null;
   items?: SupplierDeliveryItemDto[];
   delivery_advice_ids?: number[];
 }

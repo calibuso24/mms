@@ -8,6 +8,7 @@ export interface MaterialRequestListRow {
   project_code: string;
   project_name: string;
   status_id: number;
+  status_code: string;
   status_name: string;
   requested_by_account_id: number | null;
   requested_by_account_name: string | null;
@@ -40,6 +41,7 @@ export interface MaterialRequestItemRow {
   uom_name: string;
   uom_abbreviation: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 type QueryExecutor = PoolClient | typeof pool;
@@ -58,6 +60,7 @@ export class MaterialRequestRepository {
         p.party_code AS project_code,
         p.party_name AS project_name,
         mr.status_id,
+        s.code AS status_code,
         s.name AS status_name,
         mr.requested_by_account_id,
         COALESCE(rqa.full_name, rqa.user_name) AS requested_by_account_name,
@@ -170,6 +173,7 @@ export class MaterialRequestRepository {
         p.party_code AS project_code,
         p.party_name AS project_name,
         mr.status_id,
+        s.code AS status_code,
         s.name AS status_name,
         mr.requested_by_account_id,
         COALESCE(rqa.full_name, rqa.user_name) AS requested_by_account_name,
@@ -224,7 +228,8 @@ export class MaterialRequestRepository {
         mri.uom_id,
         u.uom_name,
         u.abbreviation AS uom_abbreviation,
-        mri.notes
+        mri.notes,
+        mri.log_date_updated AS updated_at
       FROM material_request_item mri
       JOIN material m ON m.material_id = mri.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = mri.uom_id AND u.is_deleted = false
@@ -417,6 +422,135 @@ export class MaterialRequestRepository {
         ]
       );
     }
+  }
+
+  async findItemById(itemId: number, client?: PoolClient): Promise<MaterialRequestItemRow | null> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        mri.material_request_item_id,
+        mri.material_id,
+        m.product_code AS material_code,
+        m.product_name AS material_name,
+        mri.requested_quantity::TEXT AS requested_quantity,
+        mri.approved_quantity::TEXT AS approved_quantity,
+        mri.estimated_quantity::TEXT AS estimated_quantity,
+        mri.area_usage,
+        mri.remarks,
+        mri.uom_id,
+        u.uom_name,
+        u.abbreviation AS uom_abbreviation,
+        mri.notes,
+        mri.log_date_updated AS updated_at
+      FROM material_request_item mri
+      JOIN material m ON m.material_id = mri.material_id AND m.is_deleted = false
+      JOIN unit_of_measure u ON u.uom_id = mri.uom_id AND u.is_deleted = false
+      WHERE mri.material_request_item_id = $1
+        AND mri.is_deleted = false`,
+      [itemId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async createItem(requestId: number, item: {
+    material_id: number;
+    requested_quantity: number;
+    approved_quantity?: number | null;
+    estimated_quantity?: number | null;
+    area_usage?: string | null;
+    remarks?: string | null;
+    uom_id: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<{ material_request_item_id: number }> {
+    const result = await this.getExecutor(client).query(
+      `INSERT INTO material_request_item (
+        material_request_id,
+        material_id,
+        requested_quantity,
+        approved_quantity,
+        estimated_quantity,
+        area_usage,
+        remarks,
+        uom_id,
+        notes,
+        log_date_created,
+        log_created_by_account_id,
+        log_module_created
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11
+      ) RETURNING material_request_item_id`,
+      [
+        requestId,
+        item.material_id,
+        item.requested_quantity,
+        item.approved_quantity ?? null,
+        item.estimated_quantity ?? null,
+        item.area_usage ?? null,
+        item.remarks ?? null,
+        item.uom_id,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  async updateItem(itemId: number, item: {
+    material_id: number;
+    requested_quantity: number;
+    approved_quantity?: number | null;
+    estimated_quantity?: number | null;
+    area_usage?: string | null;
+    remarks?: string | null;
+    uom_id: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE material_request_item
+       SET material_id = $2,
+           requested_quantity = $3,
+           approved_quantity = $4,
+           estimated_quantity = $5,
+           area_usage = $6,
+           remarks = $7,
+           uom_id = $8,
+           notes = $9,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $10,
+           log_module_updated = $11
+       WHERE material_request_item_id = $1
+         AND is_deleted = false`,
+      [
+        itemId,
+        item.material_id,
+        item.requested_quantity,
+        item.approved_quantity ?? null,
+        item.estimated_quantity ?? null,
+        item.area_usage ?? null,
+        item.remarks ?? null,
+        item.uom_id,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+  }
+
+  async softDeleteItem(itemId: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE material_request_item
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE material_request_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
   }
 
   async softDelete(id: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {

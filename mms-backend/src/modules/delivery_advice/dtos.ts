@@ -8,6 +8,10 @@ export interface DeliveryAdviceItemDto {
   notes?: string | null;
 }
 
+export interface DeliveryAdviceItemMutationDto extends DeliveryAdviceItemDto {
+  expected_updated_at?: string | null;
+}
+
 export interface CreateDeliveryAdviceDto {
   purchase_order_id: number;
   reference_code: string;
@@ -23,6 +27,7 @@ export interface UpdateDeliveryAdviceDto {
   issued_at?: string | null;
   received_at?: string | null;
   notes?: string | null;
+  expected_updated_at?: string | null;
   items?: DeliveryAdviceItemDto[];
 }
 

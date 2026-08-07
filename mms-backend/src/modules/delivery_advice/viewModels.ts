@@ -29,6 +29,7 @@ export interface DeliveryAdviceItemViewModel {
   advised_quantity: string;
   received_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export interface DeliveryAdviceDetailViewModel extends DeliveryAdviceListItemViewModel {

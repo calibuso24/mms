@@ -114,6 +114,7 @@ interface StockTransferListItem {
   transfer_date: string;
   item_count: number;
   reference_code: string | null;
+  updated_at: string | null;
 }
 
 interface StockTransferItem {
@@ -126,6 +127,7 @@ interface StockTransferItem {
   uom_abbreviation: string;
   quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 interface StockTransferDetail extends StockTransferListItem {
@@ -135,6 +137,7 @@ interface StockTransferDetail extends StockTransferListItem {
 interface ItemForm {
   row_id: string;
   stock_transfer_item_id?: number;
+  updated_at?: string | null;
   purchase_order_item_id: string;
   material_id: string;
   description: string;
@@ -159,6 +162,7 @@ interface FormState {
 const emptyItem = (): ItemForm => ({
   row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   stock_transfer_item_id: undefined,
+  updated_at: null,
   purchase_order_item_id: '',
   material_id: '',
   description: '',
@@ -226,6 +230,7 @@ export default function StockTransferPage() {
   const [viewItem, setViewItem] = useState<StockTransferDetail | null>(null);
   const [deleteItem, setDeleteItem] = useState<StockTransferListItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Stock Transfer:VIEW');
@@ -258,6 +263,7 @@ export default function StockTransferPage() {
   useEffect(() => {
     if (routeMode === 'new') {
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setError('');
       return;
@@ -270,6 +276,7 @@ export default function StockTransferPage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -348,6 +355,7 @@ export default function StockTransferPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     setForm(emptyForm());
     navigate(`${baseRoute}/new`);
   };
@@ -356,6 +364,7 @@ export default function StockTransferPage() {
     setEditingId(stockTransferId);
     try {
       const detail: StockTransferDetail = await stockTransferApi.get(stockTransferId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         transfer_type_id: detail.transfer_type_id.toString(),
         source_id: detail.source_id.toString(),
@@ -368,6 +377,7 @@ export default function StockTransferPage() {
           ? detail.items.map((row) => ({
               row_id: `${Date.now()}-${row.stock_transfer_item_id}`,
               stock_transfer_item_id: row.stock_transfer_item_id,
+              updated_at: row.updated_at ?? null,
               purchase_order_item_id: row.purchase_order_item_id ? row.purchase_order_item_id.toString() : '',
               material_id: row.material_id.toString(),
               description: row.material_name,
@@ -455,7 +465,7 @@ export default function StockTransferPage() {
     setError('');
 
     try {
-      const payload = {
+      const payload: any = {
         transfer_type_id: Number(form.transfer_type_id),
         source_id: Number(form.source_id),
         destination_id: Number(form.destination_id),
@@ -463,7 +473,15 @@ export default function StockTransferPage() {
         transfer_date: form.transfer_date || null,
         reference_code: form.reference_code.trim() || null,
         notes: form.notes.trim() || null,
-        items: form.items
+      };
+
+      if (editingId) {
+        payload.expected_updated_at = editingVersion ?? undefined;
+        const updated = await stockTransferApi.update(editingId, payload);
+        setEditingVersion(updated?.updated_at ?? editingVersion);
+        setSuccess('Stock Transfer updated');
+      } else {
+        payload.items = form.items
           .filter((item) => item.material_id && item.uom_id && item.quantity)
           .map((item) => ({
             purchase_order_item_id: item.purchase_order_item_id ? Number(item.purchase_order_item_id) : null,
@@ -471,18 +489,13 @@ export default function StockTransferPage() {
             uom_id: Number(item.uom_id),
             quantity: Number(item.quantity),
             notes: item.notes || null,
-          })),
-      };
-
-      if (editingId) {
-        await stockTransferApi.update(editingId, payload);
-        setSuccess('Stock Transfer updated');
-      } else {
+          }));
         await stockTransferApi.create(payload);
         setSuccess('Stock Transfer created');
       }
 
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       navigate(baseRoute);
       await loadItems();
@@ -513,11 +526,13 @@ export default function StockTransferPage() {
     if (!viewItem) return;
 
     try {
+      const latest = await stockTransferApi.get(viewItem.stock_transfer_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const next = action === 'submit'
-        ? await stockTransferApi.submit(viewItem.stock_transfer_id)
+        ? await stockTransferApi.submit(viewItem.stock_transfer_id, { expected_updated_at: expectedUpdatedAt })
         : action === 'approve'
-          ? await stockTransferApi.approve(viewItem.stock_transfer_id)
-          : await stockTransferApi.cancel(viewItem.stock_transfer_id);
+          ? await stockTransferApi.approve(viewItem.stock_transfer_id, { expected_updated_at: expectedUpdatedAt })
+          : await stockTransferApi.cancel(viewItem.stock_transfer_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(next);
       setSuccess(`Stock Transfer ${action} successful`);
       await loadItems();
@@ -620,6 +635,66 @@ export default function StockTransferPage() {
     }
 
     return nextRow;
+  };
+
+  const toDetailPayload = (row: ItemForm) => ({
+    purchase_order_item_id: row.purchase_order_item_id ? Number(row.purchase_order_item_id) : null,
+    material_id: Number(row.material_id),
+    uom_id: Number(row.uom_id),
+    quantity: Number(row.quantity),
+    notes: row.notes || null,
+  });
+
+  const handleDetailRowCommitted = async (newRow: ItemForm, oldRow: ItemForm): Promise<ItemForm> => {
+    if (!editingId) {
+      return newRow;
+    }
+
+    const rowErrors = validateDetailRow(newRow, form.items.map((item) => (item.row_id === oldRow.row_id ? newRow : item)));
+    if (Object.keys(rowErrors).length > 0) {
+      return newRow;
+    }
+
+    if (!newRow.material_id || !newRow.uom_id || !newRow.quantity) {
+      return newRow;
+    }
+
+    if (newRow.stock_transfer_item_id) {
+      const detail = await stockTransferApi.updateItem(editingId, newRow.stock_transfer_item_id, {
+        ...toDetailPayload(newRow),
+        expected_updated_at: oldRow.updated_at ?? null,
+      });
+
+      const savedItem = Array.isArray(detail?.items)
+        ? detail.items.find((item: StockTransferItem) => item.stock_transfer_item_id === newRow.stock_transfer_item_id)
+        : null;
+
+      return {
+        ...newRow,
+        updated_at: savedItem?.updated_at ?? newRow.updated_at ?? null,
+      };
+    }
+
+    const detail = await stockTransferApi.addItem(editingId, toDetailPayload(newRow));
+    const createdItem = Array.isArray(detail?.items)
+      ? [...detail.items].sort((a: StockTransferItem, b: StockTransferItem) => b.stock_transfer_item_id - a.stock_transfer_item_id)[0]
+      : null;
+
+    return {
+      ...newRow,
+      stock_transfer_item_id: createdItem?.stock_transfer_item_id,
+      updated_at: createdItem?.updated_at ?? null,
+    };
+  };
+
+  const handleDetailRowDelete = async (row: ItemForm): Promise<void> => {
+    if (!editingId || !row.stock_transfer_item_id) {
+      return;
+    }
+
+    await stockTransferApi.deleteItem(editingId, row.stock_transfer_item_id, {
+      expected_updated_at: row.updated_at ?? null,
+    });
   };
 
   return (
@@ -850,6 +925,8 @@ export default function StockTransferPage() {
               createRow={emptyItem}
               getRowId={(row) => row.row_id}
               processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+              onRowUpdateCommitted={handleDetailRowCommitted}
+              onRowDelete={handleDetailRowDelete}
               validateRow={validateDetailRow}
               shouldConfirmDelete={(row) => Boolean(row.stock_transfer_item_id)}
               getDeleteConfirmMessage={() => 'Delete this saved detail row?'}

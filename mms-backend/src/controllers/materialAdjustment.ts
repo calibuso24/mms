@@ -89,6 +89,7 @@ export class MaterialAdjustmentController {
           requested_at: req.body.requested_at ?? undefined,
           adjustment_reason_id: req.body.adjustment_reason_id !== undefined ? (req.body.adjustment_reason_id ? Number(req.body.adjustment_reason_id) : null) : undefined,
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
                 material_id: Number(item.material_id),
@@ -101,6 +102,90 @@ export class MaterialAdjustmentController {
               }))
             : undefined,
         },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addMaterialAdjustmentItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid material adjustment ID');
+      }
+
+      const result = await this.service.addMaterialAdjustmentItem(
+        id,
+        {
+          material_id: Number(req.body.material_id),
+          material_brand_id: req.body.material_brand_id ? Number(req.body.material_brand_id) : null,
+          uom_id: Number(req.body.uom_id),
+          system_quantity: Number(req.body.system_quantity),
+          adjustment_quantity: Number(req.body.adjustment_quantity),
+          resulting_quantity: Number(req.body.resulting_quantity),
+          notes: req.body.notes ?? null,
+        },
+        req.accountId
+      );
+
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMaterialAdjustmentItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid material adjustment ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid material adjustment item ID');
+      }
+
+      const result = await this.service.updateMaterialAdjustmentItem(
+        id,
+        itemId,
+        {
+          material_id: Number(req.body.material_id),
+          material_brand_id: req.body.material_brand_id ? Number(req.body.material_brand_id) : null,
+          uom_id: Number(req.body.uom_id),
+          system_quantity: Number(req.body.system_quantity),
+          adjustment_quantity: Number(req.body.adjustment_quantity),
+          resulting_quantity: Number(req.body.resulting_quantity),
+          notes: req.body.notes ?? null,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
+        },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteMaterialAdjustmentItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid material adjustment ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid material adjustment item ID');
+      }
+
+      const result = await this.service.deleteMaterialAdjustmentItem(
+        id,
+        itemId,
+        req.body?.expected_updated_at ?? undefined,
         req.accountId
       );
 
@@ -131,7 +216,7 @@ export class MaterialAdjustmentController {
         throw new ValidationError('Invalid material adjustment ID');
       }
 
-      res.json(await this.service.approveMaterialAdjustment(id, req.accountId));
+      res.json(await this.service.approveMaterialAdjustment(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -144,7 +229,7 @@ export class MaterialAdjustmentController {
         throw new ValidationError('Invalid material adjustment ID');
       }
 
-      res.json(await this.service.rejectMaterialAdjustment(id, req.accountId));
+      res.json(await this.service.rejectMaterialAdjustment(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -157,7 +242,7 @@ export class MaterialAdjustmentController {
         throw new ValidationError('Invalid material adjustment ID');
       }
 
-      res.json(await this.service.completeMaterialAdjustment(id, req.accountId));
+      res.json(await this.service.completeMaterialAdjustment(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }

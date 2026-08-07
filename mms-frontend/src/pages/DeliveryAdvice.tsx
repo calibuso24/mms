@@ -82,6 +82,7 @@ interface DeliveryAdviceListItem {
   notes: string | null;
   item_count: number;
   created_at: string | null;
+  updated_at: string | null;
 }
 
 interface DeliveryAdviceItem {
@@ -95,6 +96,7 @@ interface DeliveryAdviceItem {
   advised_quantity: string;
   received_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 interface DeliveryAdviceDetail extends DeliveryAdviceListItem {
@@ -104,6 +106,7 @@ interface DeliveryAdviceDetail extends DeliveryAdviceListItem {
 interface AdviceItemForm {
   row_id: string;
   delivery_advice_item_id?: number;
+  updated_at?: string | null;
   purchase_order_item_id: string;
   material_label: string;
   uom_label: string;
@@ -183,6 +186,7 @@ export default function DeliveryAdvicePage() {
   const [deleteItem, setDeleteItem] = useState<DeliveryAdviceListItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [poItems, setPoItems] = useState<PurchaseOrderDetailItem[]>([]);
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Delivery Advice:VIEW');
@@ -214,6 +218,7 @@ export default function DeliveryAdvicePage() {
   useEffect(() => {
     if (routeMode === 'new') {
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setError('');
       return;
@@ -226,6 +231,7 @@ export default function DeliveryAdvicePage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -290,6 +296,7 @@ export default function DeliveryAdvicePage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     setForm(emptyForm());
     navigate(`${baseRoute}/new`);
   };
@@ -298,6 +305,7 @@ export default function DeliveryAdvicePage() {
     setEditingId(deliveryAdviceId);
     try {
       const detail: DeliveryAdviceDetail = await deliveryAdviceApi.get(deliveryAdviceId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         purchase_order_id: detail.purchase_order_id.toString(),
         reference_code: detail.reference_code,
@@ -308,6 +316,7 @@ export default function DeliveryAdvicePage() {
           ? detail.items.map((row) => ({
               row_id: `${Date.now()}-${row.delivery_advice_item_id}`,
               delivery_advice_item_id: row.delivery_advice_item_id,
+              updated_at: row.updated_at ?? null,
               purchase_order_item_id: row.purchase_order_item_id ? row.purchase_order_item_id.toString() : '',
               material_label: `${row.material_code} - ${row.material_name}`,
               uom_label: row.uom_abbreviation,
@@ -371,24 +380,31 @@ export default function DeliveryAdvicePage() {
   };
 
   const submitForm = async () => {
-    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
-    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
-    if (firstError) {
-      setError(Object.values(firstError)[0]);
-      return;
+    if (!editingId) {
+      const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+      const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+      if (firstError) {
+        setError(Object.values(firstError)[0]);
+        return;
+      }
     }
 
     setSaving(true);
     setError('');
 
     try {
-      const payload = {
+      const payload: any = {
         purchase_order_id: Number(form.purchase_order_id),
         reference_code: form.reference_code.trim(),
         issued_at: form.issued_at || null,
         received_at: form.received_at || null,
         notes: form.notes.trim() || null,
-        items: form.items
+      };
+
+      if (editingId) {
+        payload.expected_updated_at = editingVersion ?? undefined;
+      } else {
+        payload.items = form.items
           .filter((item) => item.purchase_order_item_id && item.advised_quantity)
           .map((item) => {
             const poItem = poItems.find((row) => row.purchase_order_item_id === Number(item.purchase_order_item_id));
@@ -400,11 +416,12 @@ export default function DeliveryAdvicePage() {
               received_quantity: item.received_quantity === '' ? 0 : Number(item.received_quantity),
               notes: item.notes || null,
             };
-          }),
-      };
+          });
+      }
 
       if (editingId) {
-        await deliveryAdviceApi.update(editingId, payload);
+        const updated = await deliveryAdviceApi.update(editingId, payload);
+        setEditingVersion(updated?.updated_at ?? editingVersion);
         setSuccess('Delivery Advice updated');
       } else {
         await deliveryAdviceApi.create(payload);
@@ -412,6 +429,7 @@ export default function DeliveryAdvicePage() {
       }
 
       setEditingId(null);
+  setEditingVersion(null);
       setForm(emptyForm());
       navigate(baseRoute);
       await loadItems();
@@ -443,11 +461,13 @@ export default function DeliveryAdvicePage() {
     if (!viewItem) return;
 
     try {
+      const latest = await deliveryAdviceApi.get(viewItem.delivery_advice_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const next = action === 'submit'
-        ? await deliveryAdviceApi.submit(viewItem.delivery_advice_id)
+        ? await deliveryAdviceApi.submit(viewItem.delivery_advice_id, { expected_updated_at: expectedUpdatedAt })
         : action === 'complete'
-          ? await deliveryAdviceApi.complete(viewItem.delivery_advice_id)
-          : await deliveryAdviceApi.cancel(viewItem.delivery_advice_id);
+          ? await deliveryAdviceApi.complete(viewItem.delivery_advice_id, { expected_updated_at: expectedUpdatedAt })
+          : await deliveryAdviceApi.cancel(viewItem.delivery_advice_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(next);
       setSuccess(`Delivery Advice ${action} successful`);
       await loadItems();
@@ -514,6 +534,73 @@ export default function DeliveryAdvicePage() {
       nextRow.uom_label = '';
     }
     return nextRow;
+  };
+
+  const toDetailPayload = (row: AdviceItemForm) => {
+    const poItem = poItems.find((item) => item.purchase_order_item_id === Number(row.purchase_order_item_id));
+    return {
+      purchase_order_item_id: row.purchase_order_item_id ? Number(row.purchase_order_item_id) : null,
+      material_id: Number(poItem?.material_id),
+      uom_id: Number(poItem?.uom_id),
+      advised_quantity: Number(row.advised_quantity),
+      received_quantity: row.received_quantity === '' ? 0 : Number(row.received_quantity),
+      notes: row.notes || null,
+    };
+  };
+
+  const handleDetailRowCommitted = async (newRow: AdviceItemForm, oldRow: AdviceItemForm): Promise<AdviceItemForm> => {
+    if (!editingId) {
+      return newRow;
+    }
+
+    const rowErrors = validateDetailRow(newRow, form.items.map((item) => (item.row_id === oldRow.row_id ? newRow : item)));
+    if (Object.keys(rowErrors).length > 0) {
+      return newRow;
+    }
+
+    if (!newRow.purchase_order_item_id || !newRow.advised_quantity) {
+      return newRow;
+    }
+
+    const poItem = poItems.find((item) => item.purchase_order_item_id === Number(newRow.purchase_order_item_id));
+    if (!poItem) {
+      return newRow;
+    }
+
+    if (newRow.delivery_advice_item_id) {
+      const detail = await deliveryAdviceApi.updateItem(editingId, newRow.delivery_advice_item_id, {
+        ...toDetailPayload(newRow),
+        expected_updated_at: oldRow.updated_at ?? null,
+      });
+      const savedItem = Array.isArray(detail?.items)
+        ? detail.items.find((item: DeliveryAdviceItem) => item.delivery_advice_item_id === newRow.delivery_advice_item_id)
+        : null;
+      return {
+        ...newRow,
+        updated_at: savedItem?.updated_at ?? newRow.updated_at ?? null,
+      };
+    }
+
+    const detail = await deliveryAdviceApi.addItem(editingId, toDetailPayload(newRow));
+    const createdItem = Array.isArray(detail?.items)
+      ? [...detail.items].sort((a: DeliveryAdviceItem, b: DeliveryAdviceItem) => b.delivery_advice_item_id - a.delivery_advice_item_id)[0]
+      : null;
+
+    return {
+      ...newRow,
+      delivery_advice_item_id: createdItem?.delivery_advice_item_id,
+      updated_at: createdItem?.updated_at ?? null,
+    };
+  };
+
+  const handleDetailRowDelete = async (row: AdviceItemForm): Promise<void> => {
+    if (!editingId || !row.delivery_advice_item_id) {
+      return;
+    }
+
+    await deliveryAdviceApi.deleteItem(editingId, row.delivery_advice_item_id, {
+      expected_updated_at: row.updated_at ?? null,
+    });
   };
 
   return (
@@ -773,6 +860,8 @@ export default function DeliveryAdvicePage() {
             createRow={emptyItem}
             getRowId={(row) => row.row_id}
             processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+            onRowUpdateCommitted={handleDetailRowCommitted}
+            onRowDelete={handleDetailRowDelete}
             validateRow={validateDetailRow}
             shouldConfirmDelete={(row) => Boolean(row.delivery_advice_item_id)}
             getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
