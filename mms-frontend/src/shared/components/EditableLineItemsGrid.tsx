@@ -68,20 +68,29 @@ function SingleSelectAutocompleteEditCell(params: GridRenderEditCellParams) {
   const options = normalizeSingleSelectOptions(singleSelectColDef.valueOptions);
   const selected = options.find((option) => option.value === String(params.value ?? '')) || null;
 
+  const commitSelection = async (option: SingleSelectOption | null) => {
+    await params.api.setEditCellValue({
+      id: params.id,
+      field: params.field,
+      value: option ? option.value : '',
+    });
+
+    // Defer stop edit mode to avoid race conditions with popper click/focus handling.
+    requestAnimationFrame(() => {
+      params.api.stopCellEditMode({ id: params.id, field: params.field });
+    });
+  };
+
   return (
     <Autocomplete
       size="small"
       options={options}
+      disablePortal
       value={selected}
       isOptionEqualToValue={(option, value) => option.value === value.value}
       getOptionLabel={(option) => option.label}
-      onChange={async (_, option) => {
-        await params.api.setEditCellValue({
-          id: params.id,
-          field: params.field,
-          value: option ? option.value : '',
-        });
-        params.api.stopCellEditMode({ id: params.id, field: params.field });
+      onChange={(_, option) => {
+        void commitSelection(option);
       }}
       renderInput={(inputParams) => (
         <TextField

@@ -297,6 +297,15 @@ function formatNumber(value: string | number | null | undefined): string {
   return Number.isNaN(parsed) ? String(value) : parsed.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function getGridCellValue(valueOrParams: unknown): string {
+  if (valueOrParams && typeof valueOrParams === 'object' && 'value' in (valueOrParams as Record<string, unknown>)) {
+    const params = valueOrParams as { value?: unknown };
+    return String(params.value ?? '');
+  }
+
+  return String(valueOrParams ?? '');
+}
+
 export default function SupplierDeliveryPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -936,7 +945,10 @@ export default function SupplierDeliveryPage() {
       editable: true,
       type: 'singleSelect',
       valueOptions: materialOptions,
-      valueFormatter: (value) => materialOptions.find((option) => option.value === String(value))?.label ?? '',
+      valueFormatter: (valueOrParams) => {
+        const cellValue = getGridCellValue(valueOrParams);
+        return materialOptions.find((option) => option.value === cellValue)?.label ?? '';
+      },
     },
     {
       field: 'uom_id',
@@ -946,7 +958,10 @@ export default function SupplierDeliveryPage() {
       editable: true,
       type: 'singleSelect',
       valueOptions: uomOptions,
-      valueFormatter: (value) => uomOptions.find((option) => option.value === String(value))?.label ?? '',
+      valueFormatter: (valueOrParams) => {
+        const cellValue = getGridCellValue(valueOrParams);
+        return uomOptions.find((option) => option.value === cellValue)?.label ?? '';
+      },
     },
     { field: 'source_summary', headerName: 'Source References', minWidth: 280, flex: 1.4 },
     { field: 'delivered_quantity', headerName: 'Delivered', minWidth: 110, flex: 0.6, editable: true },
@@ -1368,72 +1383,57 @@ export default function SupplierDeliveryPage() {
             </Grid>
 
             <Grid item xs={12} md={4} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Purchase Orders</Typography>
-                <Select
-                  multiple
-                  value={form.purchase_order_ids}
-                  onChange={(event) => {
-                    const value = event.target.value as string[];
-                    setForm((current) => ({ ...current, purchase_order_ids: value }));
-                  }}
-                  renderValue={(selected) => selected
-                    .map((id) => purchaseOrders.find((po) => po.purchase_order_id === Number(id))?.po_number ?? id)
-                    .join(', ')}
-                >
-                  {purchaseOrders.map((po) => (
-                    <MenuItem key={po.purchase_order_id} value={po.purchase_order_id.toString()}>
-                      {po.po_number}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                size="small"
+                options={purchaseOrders}
+                value={purchaseOrders.filter((po) => form.purchase_order_ids.includes(String(po.purchase_order_id)))}
+                onChange={(_, values) => {
+                  setForm((current) => ({
+                    ...current,
+                    purchase_order_ids: values.map((item) => String(item.purchase_order_id)),
+                  }));
+                }}
+                isOptionEqualToValue={(option, value) => option.purchase_order_id === value.purchase_order_id}
+                getOptionLabel={(option) => option.po_number}
+                renderInput={(params) => <TextField {...params} label="Purchase Orders" />}
+              />
             </Grid>
 
             <Grid item xs={12} md={4} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Delivery Advices</Typography>
-                <Select
-                  multiple
-                  value={form.delivery_advice_ids}
-                  onChange={(event) => {
-                    const value = event.target.value as string[];
-                    setForm((current) => ({ ...current, delivery_advice_ids: value }));
-                  }}
-                  renderValue={(selected) => selected
-                    .map((id) => deliveryAdvices.find((da) => da.delivery_advice_id === Number(id))?.da_number ?? id)
-                    .join(', ')}
-                >
-                  {deliveryAdvices.map((da) => (
-                    <MenuItem key={da.delivery_advice_id} value={da.delivery_advice_id.toString()}>
-                      {da.da_number}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                size="small"
+                options={deliveryAdvices}
+                value={deliveryAdvices.filter((da) => form.delivery_advice_ids.includes(String(da.delivery_advice_id)))}
+                onChange={(_, values) => {
+                  setForm((current) => ({
+                    ...current,
+                    delivery_advice_ids: values.map((item) => String(item.delivery_advice_id)),
+                  }));
+                }}
+                isOptionEqualToValue={(option, value) => option.delivery_advice_id === value.delivery_advice_id}
+                getOptionLabel={(option) => option.da_number}
+                renderInput={(params) => <TextField {...params} label="Delivery Advices" />}
+              />
             </Grid>
 
             <Grid item xs={12} md={4} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Material Requests</Typography>
-                <Select
-                  multiple
-                  value={form.material_request_ids}
-                  onChange={(event) => {
-                    const value = event.target.value as string[];
-                    setForm((current) => ({ ...current, material_request_ids: value }));
-                  }}
-                  renderValue={(selected) => selected
-                    .map((id) => materialRequests.find((mr) => mr.material_request_id === Number(id))?.mr_number ?? id)
-                    .join(', ')}
-                >
-                  {materialRequests.map((mr) => (
-                    <MenuItem key={mr.material_request_id} value={mr.material_request_id.toString()}>
-                      {mr.mr_number}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                size="small"
+                options={materialRequests}
+                value={materialRequests.filter((mr) => form.material_request_ids.includes(String(mr.material_request_id)))}
+                onChange={(_, values) => {
+                  setForm((current) => ({
+                    ...current,
+                    material_request_ids: values.map((item) => String(item.material_request_id)),
+                  }));
+                }}
+                isOptionEqualToValue={(option, value) => option.material_request_id === value.material_request_id}
+                getOptionLabel={(option) => option.mr_number}
+                renderInput={(params) => <TextField {...params} label="Material Requests" />}
+              />
             </Grid>
 
             <Grid item xs={12}>

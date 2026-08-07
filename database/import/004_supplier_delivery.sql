@@ -115,6 +115,18 @@ FROM source.tbldelivery_detail d
 WHERE d.supplier_delivery_item_id IS NOT NULL   
 ;
 
+SELECT 
+CASE WHEN 0 = (SELECT count(*) FROM supplier_delivery) then setval('supplier_delivery_id_seq', 1, false)
+ELSE setval('supplier_delivery_id_seq',(SELECT max(supplier_delivery_id) FROM supplier_delivery))
+END
+;
+
+SELECT 
+CASE WHEN 0 = (SELECT count(*) FROM supplier_delivery_item) then setval('supplier_delivery_item_id_seq', 1, false)
+ELSE setval('supplier_delivery_item_id_seq',(SELECT max(supplier_delivery_item_id) FROM supplier_delivery_item))
+END
+;
+
 --ENABLE TRIGGER
 SET session_replication_role to origin;
 
