@@ -76,7 +76,7 @@ Current migration files in database/migrations:
 | 041_site_purchase.sql | site_purchase |
 | 042_physical_count.sql | physical_count, physical_count_item |
 | 043_material_adjustment.sql | material_adjustment, material_adjustment_item |
-| 044_supplier_delivery.sql | supplier_delivery, supplier_delivery_item, supplier_delivery_advice, posting/validation functions |
+| 044_supplier_delivery.sql | supplier_delivery, supplier_delivery_item, initial posting/validation functions |
 | 046_report_catalog.sql | report_catalog |
 | 047_report_parameter.sql | report_parameter |
 | 048_report_history.sql | report_history |
@@ -87,6 +87,7 @@ Current migration files in database/migrations:
 | 053_system_settings.sql | system_setting_category, system_setting |
 | 054_delivery_advice_status.sql | delivery_advice_status lookups |
 | 055_stock_transfer_lookups.sql | stock_transfer_status lookups, stock_transfer_type alignment |
+| 056_supplier_delivery_multi_source.sql | supplier_delivery source-link tables, item-reference table, posting/validation refactor |
 | 999_rename_sequence.sql | sequence naming maintenance |
 
 ## Core Schema Notes
@@ -134,7 +135,9 @@ Important convention:
 - purchase_order_status lookup drives PO workflow states (Draft, Approved, Partially Delivered, Delivered, Cancelled)
 - delivery_advice and delivery_advice_item
 - delivery_receipt and delivery_receipt_item
-- supplier_delivery, supplier_delivery_item, supplier_delivery_advice
+- supplier_delivery, supplier_delivery_item
+- supplier_delivery_purchase_order, supplier_delivery_delivery_advice, supplier_delivery_material_request
+- supplier_delivery_item_reference
 - job_order, job_order_item, stock_transfer_job_order
 - site_purchase
 - physical_count, physical_count_item
@@ -165,7 +168,7 @@ Important convention:
 | File | Function |
 |---|---|
 | database/functions/016_stock_movement_functions.sql | stock_movement_consume(...) |
-| database/migrations/044_supplier_delivery.sql | post_supplier_delivery(...), validation trigger functions |
+| database/migrations/056_supplier_delivery_multi_source.sql | post_supplier_delivery(...), validation trigger functions |
 
 stock_movement_consume handles FIFO/LIFO consumption and stock movement writes atomically.
 

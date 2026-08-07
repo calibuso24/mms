@@ -6,8 +6,6 @@ type QueryExecutor = PoolClient | typeof pool;
 export interface SupplierDeliveryListRow {
   supplier_delivery_id: number;
   supplier_delivery_number: string;
-  purchase_order_id: number;
-  po_number: string;
   supplier_id: number;
   supplier_code: string;
   supplier_name: string;
@@ -26,13 +24,15 @@ export interface SupplierDeliveryListRow {
   reference_code: string | null;
   notes: string | null;
   item_count: number;
+  purchase_order_numbers: string[];
+  delivery_advice_numbers: string[];
+  material_request_numbers: string[];
   created_at: string | null;
   updated_at: string | null;
 }
 
 export interface SupplierDeliveryItemRow {
   supplier_delivery_item_id: number;
-  purchase_order_item_id: number;
   material_id: number;
   material_code: string;
   material_name: string;
@@ -49,11 +49,36 @@ export interface SupplierDeliveryItemRow {
   updated_at: string | null;
 }
 
+export interface SupplierDeliveryItemReferenceRow {
+  supplier_delivery_item_reference_id: number;
+  supplier_delivery_item_id: number;
+  reference_type_lookup_id: number;
+  reference_type_code: string;
+  reference_type_name: string;
+  reference_id: number;
+  reference_line_id: number;
+  quantity: string;
+  reference_number: string;
+  reference_line_number: string;
+}
+
+export interface SupplierDeliveryPurchaseOrderRow {
+  supplier_delivery_purchase_order_id: number;
+  purchase_order_id: number;
+  po_number: string;
+}
+
 export interface SupplierDeliveryAdviceRow {
-  supplier_delivery_advice_id: number;
+  supplier_delivery_delivery_advice_id: number;
   delivery_advice_id: number;
   da_number: string;
   notes: string | null;
+}
+
+export interface SupplierDeliveryMaterialRequestRow {
+  supplier_delivery_material_request_id: number;
+  material_request_id: number;
+  mr_number: string;
 }
 
 export class SupplierDeliveryRepository {
@@ -66,8 +91,6 @@ export class SupplierDeliveryRepository {
       `SELECT
         sd.supplier_delivery_id,
         sd.supplier_delivery_number,
-        sd.purchase_order_id,
-        po.po_number,
         sd.supplier_id,
         s.party_code AS supplier_code,
         s.party_name AS supplier_name,
@@ -91,10 +114,30 @@ export class SupplierDeliveryRepository {
           WHERE sdi.supplier_delivery_id = sd.supplier_delivery_id
             AND sdi.is_deleted = false
         ) AS item_count,
+        COALESCE((
+          SELECT ARRAY_AGG(po.po_number ORDER BY po.po_number)
+          FROM supplier_delivery_purchase_order sdpo
+          JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id AND po.is_deleted = false
+          WHERE sdpo.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdpo.is_deleted = false
+        ), ARRAY[]::TEXT[]) AS purchase_order_numbers,
+        COALESCE((
+          SELECT ARRAY_AGG(da.da_number ORDER BY da.da_number)
+          FROM supplier_delivery_delivery_advice sdda
+          JOIN delivery_advice da ON da.delivery_advice_id = sdda.delivery_advice_id AND da.is_deleted = false
+          WHERE sdda.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdda.is_deleted = false
+        ), ARRAY[]::TEXT[]) AS delivery_advice_numbers,
+        COALESCE((
+          SELECT ARRAY_AGG(mr.mr_number ORDER BY mr.mr_number)
+          FROM supplier_delivery_material_request sdmr
+          JOIN material_request mr ON mr.material_request_id = sdmr.material_request_id AND mr.is_deleted = false
+          WHERE sdmr.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdmr.is_deleted = false
+        ), ARRAY[]::TEXT[]) AS material_request_numbers,
         sd.log_date_created AS created_at,
         sd.log_date_updated AS updated_at
       FROM supplier_delivery sd
-      JOIN purchase_order po ON po.purchase_order_id = sd.purchase_order_id AND po.is_deleted = false
       JOIN party s ON s.party_id = sd.supplier_id AND s.is_deleted = false
       JOIN party p ON p.party_id = sd.project_id AND p.is_deleted = false
       JOIN look_up st ON st.look_up_id = sd.status_id AND st.is_deleted = false
@@ -127,19 +170,48 @@ export class SupplierDeliveryRepository {
       queryParams.push(`%${params.search.trim()}%`);
       where.push(`(
         sd.supplier_delivery_number ILIKE $${queryParams.length}
-        OR po.po_number ILIKE $${queryParams.length}
         OR s.party_code ILIKE $${queryParams.length}
         OR s.party_name ILIKE $${queryParams.length}
         OR p.party_code ILIKE $${queryParams.length}
         OR p.party_name ILIKE $${queryParams.length}
         OR sd.reference_code ILIKE $${queryParams.length}
         OR sd.notes ILIKE $${queryParams.length}
+        OR EXISTS (
+          SELECT 1
+          FROM supplier_delivery_purchase_order sdpo
+          JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id AND po.is_deleted = false
+          WHERE sdpo.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdpo.is_deleted = false
+            AND po.po_number ILIKE $${queryParams.length}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM supplier_delivery_delivery_advice sdda
+          JOIN delivery_advice da ON da.delivery_advice_id = sdda.delivery_advice_id AND da.is_deleted = false
+          WHERE sdda.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdda.is_deleted = false
+            AND da.da_number ILIKE $${queryParams.length}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM supplier_delivery_material_request sdmr
+          JOIN material_request mr ON mr.material_request_id = sdmr.material_request_id AND mr.is_deleted = false
+          WHERE sdmr.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdmr.is_deleted = false
+            AND mr.mr_number ILIKE $${queryParams.length}
+        )
       )`);
     }
 
     if (params.purchaseOrderId) {
       queryParams.push(params.purchaseOrderId);
-      where.push(`sd.purchase_order_id = $${queryParams.length}`);
+      where.push(`EXISTS (
+        SELECT 1
+        FROM supplier_delivery_purchase_order sdpo
+        WHERE sdpo.supplier_delivery_id = sd.supplier_delivery_id
+          AND sdpo.purchase_order_id = $${queryParams.length}
+          AND sdpo.is_deleted = false
+      )`);
     }
 
     if (params.supplierId) {
@@ -160,7 +232,6 @@ export class SupplierDeliveryRepository {
     const countResult = await executor.query(
       `SELECT COUNT(*)::INT AS total
        FROM supplier_delivery sd
-       JOIN purchase_order po ON po.purchase_order_id = sd.purchase_order_id AND po.is_deleted = false
        JOIN party s ON s.party_id = sd.supplier_id AND s.is_deleted = false
        JOIN party p ON p.party_id = sd.project_id AND p.is_deleted = false
        WHERE ${where.join(' AND ')}`,
@@ -169,7 +240,6 @@ export class SupplierDeliveryRepository {
 
     const sortFields: Record<string, string> = {
       supplier_delivery_number: 'sd.supplier_delivery_number',
-      po_number: 'po.po_number',
       supplier_code: 's.party_code',
       supplier_name: 's.party_name',
       project_code: 'p.party_code',
@@ -187,8 +257,6 @@ export class SupplierDeliveryRepository {
       `SELECT
         sd.supplier_delivery_id,
         sd.supplier_delivery_number,
-        sd.purchase_order_id,
-        po.po_number,
         sd.supplier_id,
         s.party_code AS supplier_code,
         s.party_name AS supplier_name,
@@ -212,10 +280,30 @@ export class SupplierDeliveryRepository {
           WHERE sdi.supplier_delivery_id = sd.supplier_delivery_id
             AND sdi.is_deleted = false
         ) AS item_count,
+        COALESCE((
+          SELECT ARRAY_AGG(po.po_number ORDER BY po.po_number)
+          FROM supplier_delivery_purchase_order sdpo
+          JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id AND po.is_deleted = false
+          WHERE sdpo.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdpo.is_deleted = false
+        ), ARRAY[]::TEXT[]) AS purchase_order_numbers,
+        COALESCE((
+          SELECT ARRAY_AGG(da.da_number ORDER BY da.da_number)
+          FROM supplier_delivery_delivery_advice sdda
+          JOIN delivery_advice da ON da.delivery_advice_id = sdda.delivery_advice_id AND da.is_deleted = false
+          WHERE sdda.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdda.is_deleted = false
+        ), ARRAY[]::TEXT[]) AS delivery_advice_numbers,
+        COALESCE((
+          SELECT ARRAY_AGG(mr.mr_number ORDER BY mr.mr_number)
+          FROM supplier_delivery_material_request sdmr
+          JOIN material_request mr ON mr.material_request_id = sdmr.material_request_id AND mr.is_deleted = false
+          WHERE sdmr.supplier_delivery_id = sd.supplier_delivery_id
+            AND sdmr.is_deleted = false
+        ), ARRAY[]::TEXT[]) AS material_request_numbers,
         sd.log_date_created AS created_at,
         sd.log_date_updated AS updated_at
       FROM supplier_delivery sd
-      JOIN purchase_order po ON po.purchase_order_id = sd.purchase_order_id AND po.is_deleted = false
       JOIN party s ON s.party_id = sd.supplier_id AND s.is_deleted = false
       JOIN party p ON p.party_id = sd.project_id AND p.is_deleted = false
       JOIN look_up st ON st.look_up_id = sd.status_id AND st.is_deleted = false
@@ -238,7 +326,6 @@ export class SupplierDeliveryRepository {
     const result = await this.getExecutor(client).query(
       `SELECT
         sdi.supplier_delivery_item_id,
-        sdi.purchase_order_item_id,
         sdi.material_id,
         m.product_code AS material_code,
         m.product_name AS material_name,
@@ -267,18 +354,93 @@ export class SupplierDeliveryRepository {
     return result.rows;
   }
 
+  async findItemReferencesByDeliveryId(deliveryId: number, client?: PoolClient): Promise<SupplierDeliveryItemReferenceRow[]> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        sdir.supplier_delivery_item_reference_id,
+        sdir.supplier_delivery_item_id,
+        sdir.reference_type_lookup_id,
+        rt.code AS reference_type_code,
+        rt.name AS reference_type_name,
+        sdir.reference_id,
+        sdir.reference_line_id,
+        sdir.quantity::TEXT AS quantity,
+        CASE
+          WHEN rt.code = 'po' THEN COALESCE(po.po_number, CONCAT('PO#', sdir.reference_id::TEXT))
+          WHEN rt.code = 'delivery_advice' THEN COALESCE(da.da_number, CONCAT('DA#', sdir.reference_id::TEXT))
+          WHEN rt.code = 'material_request' THEN COALESCE(mr.mr_number, CONCAT('MR#', sdir.reference_id::TEXT))
+          ELSE sdir.reference_id::TEXT
+        END AS reference_number,
+        CASE
+          WHEN rt.code = 'po' THEN COALESCE(poi.purchase_order_item_id::TEXT, sdir.reference_line_id::TEXT)
+          WHEN rt.code = 'delivery_advice' THEN COALESCE(dai.delivery_advice_item_id::TEXT, sdir.reference_line_id::TEXT)
+          WHEN rt.code = 'material_request' THEN COALESCE(mri.material_request_item_id::TEXT, sdir.reference_line_id::TEXT)
+          ELSE sdir.reference_line_id::TEXT
+        END AS reference_line_number
+      FROM supplier_delivery_item_reference sdir
+      JOIN supplier_delivery_item sdi ON sdi.supplier_delivery_item_id = sdir.supplier_delivery_item_id AND sdi.is_deleted = false
+      JOIN look_up rt ON rt.look_up_id = sdir.reference_type_lookup_id AND rt.is_deleted = false
+      LEFT JOIN purchase_order po ON rt.code = 'po' AND po.purchase_order_id = sdir.reference_id AND po.is_deleted = false
+      LEFT JOIN delivery_advice da ON rt.code = 'delivery_advice' AND da.delivery_advice_id = sdir.reference_id AND da.is_deleted = false
+      LEFT JOIN material_request mr ON rt.code = 'material_request' AND mr.material_request_id = sdir.reference_id AND mr.is_deleted = false
+      LEFT JOIN purchase_order_item poi ON rt.code = 'po' AND poi.purchase_order_item_id = sdir.reference_line_id AND poi.is_deleted = false
+      LEFT JOIN delivery_advice_item dai ON rt.code = 'delivery_advice' AND dai.delivery_advice_item_id = sdir.reference_line_id AND dai.is_deleted = false
+      LEFT JOIN material_request_item mri ON rt.code = 'material_request' AND mri.material_request_item_id = sdir.reference_line_id AND mri.is_deleted = false
+      WHERE sdi.supplier_delivery_id = $1
+        AND sdir.is_deleted = false
+      ORDER BY sdir.supplier_delivery_item_reference_id ASC`,
+      [deliveryId]
+    );
+
+    return result.rows;
+  }
+
+  async findPurchaseOrdersByDeliveryId(deliveryId: number, client?: PoolClient): Promise<SupplierDeliveryPurchaseOrderRow[]> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        sdpo.supplier_delivery_purchase_order_id,
+        sdpo.purchase_order_id,
+        po.po_number
+      FROM supplier_delivery_purchase_order sdpo
+      JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id AND po.is_deleted = false
+      WHERE sdpo.supplier_delivery_id = $1
+        AND sdpo.is_deleted = false
+      ORDER BY sdpo.supplier_delivery_purchase_order_id ASC`,
+      [deliveryId]
+    );
+
+    return result.rows;
+  }
+
   async findAdviceByDeliveryId(deliveryId: number, client?: PoolClient): Promise<SupplierDeliveryAdviceRow[]> {
     const result = await this.getExecutor(client).query(
       `SELECT
-        sda.supplier_delivery_advice_id,
-        sda.delivery_advice_id,
+        sdda.supplier_delivery_delivery_advice_id,
+        sdda.delivery_advice_id,
         da.da_number,
-        sda.notes
-      FROM supplier_delivery_advice sda
-      JOIN delivery_advice da ON da.delivery_advice_id = sda.delivery_advice_id AND da.is_deleted = false
-      WHERE sda.supplier_delivery_id = $1
-        AND sda.is_deleted = false
-      ORDER BY sda.supplier_delivery_advice_id ASC`,
+        sdda.notes
+      FROM supplier_delivery_delivery_advice sdda
+      JOIN delivery_advice da ON da.delivery_advice_id = sdda.delivery_advice_id AND da.is_deleted = false
+      WHERE sdda.supplier_delivery_id = $1
+        AND sdda.is_deleted = false
+      ORDER BY sdda.supplier_delivery_delivery_advice_id ASC`,
+      [deliveryId]
+    );
+
+    return result.rows;
+  }
+
+  async findMaterialRequestsByDeliveryId(deliveryId: number, client?: PoolClient): Promise<SupplierDeliveryMaterialRequestRow[]> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        sdmr.supplier_delivery_material_request_id,
+        sdmr.material_request_id,
+        mr.mr_number
+      FROM supplier_delivery_material_request sdmr
+      JOIN material_request mr ON mr.material_request_id = sdmr.material_request_id AND mr.is_deleted = false
+      WHERE sdmr.supplier_delivery_id = $1
+        AND sdmr.is_deleted = false
+      ORDER BY sdmr.supplier_delivery_material_request_id ASC`,
       [deliveryId]
     );
 
@@ -302,7 +464,6 @@ export class SupplierDeliveryRepository {
 
   async createHeader(data: {
     supplier_delivery_number: string;
-    purchase_order_id: number;
     supplier_id: number;
     project_id: number;
     received_by_account_id?: number | null;
@@ -314,7 +475,6 @@ export class SupplierDeliveryRepository {
     const result = await this.getExecutor(client).query(
       `INSERT INTO supplier_delivery (
         supplier_delivery_number,
-        purchase_order_id,
         supplier_id,
         project_id,
         received_by_account_id,
@@ -325,11 +485,10 @@ export class SupplierDeliveryRepository {
         log_date_created,
         log_created_by_account_id,
         log_module_created
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
       RETURNING supplier_delivery_id, supplier_delivery_number`,
       [
         data.supplier_delivery_number,
-        data.purchase_order_id,
         data.supplier_id,
         data.project_id,
         data.received_by_account_id ?? null,
@@ -346,7 +505,6 @@ export class SupplierDeliveryRepository {
   }
 
   async updateHeader(id: number, data: {
-    purchase_order_id?: number;
     supplier_id?: number;
     project_id?: number;
     received_by_account_id?: number | null;
@@ -365,7 +523,6 @@ export class SupplierDeliveryRepository {
       }
     };
 
-    setField('purchase_order_id', data.purchase_order_id);
     setField('supplier_id', data.supplier_id);
     setField('project_id', data.project_id);
     setField('received_by_account_id', data.received_by_account_id);
@@ -389,7 +546,6 @@ export class SupplierDeliveryRepository {
   }
 
   async replaceItems(deliveryId: number, items: Array<{
-    purchase_order_item_id: number;
     material_id: number;
     material_brand_id?: number | null;
     uom_id: number;
@@ -397,7 +553,31 @@ export class SupplierDeliveryRepository {
     accepted_quantity: number;
     rejected_quantity: number;
     notes?: string | null;
+    references: Array<{
+      reference_type_lookup_id: number;
+      reference_id: number;
+      reference_line_id: number;
+      quantity: number;
+    }>;
   }>, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_item_reference sdir
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE sdir.supplier_delivery_item_id IN (
+         SELECT supplier_delivery_item_id
+         FROM supplier_delivery_item
+         WHERE supplier_delivery_id = $1
+           AND is_deleted = false
+       )
+         AND sdir.is_deleted = false`,
+      [deliveryId, actorAccountId, moduleName]
+    );
+
     await this.getExecutor(client).query(
       `UPDATE supplier_delivery_item
        SET is_deleted = true,
@@ -412,10 +592,9 @@ export class SupplierDeliveryRepository {
     );
 
     for (const item of items) {
-      await this.getExecutor(client).query(
+      const itemResult = await this.getExecutor(client).query(
         `INSERT INTO supplier_delivery_item (
           supplier_delivery_id,
-          purchase_order_item_id,
           material_id,
           material_brand_id,
           uom_id,
@@ -426,10 +605,10 @@ export class SupplierDeliveryRepository {
           log_date_created,
           log_created_by_account_id,
           log_module_created
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
+        RETURNING supplier_delivery_item_id`,
         [
           deliveryId,
-          item.purchase_order_item_id,
           item.material_id,
           item.material_brand_id ?? null,
           item.uom_id,
@@ -441,6 +620,31 @@ export class SupplierDeliveryRepository {
           moduleName,
         ]
       );
+
+      const supplierDeliveryItemId = itemResult.rows[0].supplier_delivery_item_id as number;
+      for (const reference of item.references) {
+        await this.getExecutor(client).query(
+          `INSERT INTO supplier_delivery_item_reference (
+            supplier_delivery_item_id,
+            reference_type_lookup_id,
+            reference_id,
+            reference_line_id,
+            quantity,
+            log_date_created,
+            log_created_by_account_id,
+            log_module_created
+          ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+          [
+            supplierDeliveryItemId,
+            reference.reference_type_lookup_id,
+            reference.reference_id,
+            reference.reference_line_id,
+            reference.quantity,
+            actorAccountId,
+            moduleName,
+          ]
+        );
+      }
     }
   }
 
@@ -448,7 +652,6 @@ export class SupplierDeliveryRepository {
     const result = await this.getExecutor(client).query(
       `SELECT
         sdi.supplier_delivery_item_id,
-        sdi.purchase_order_item_id,
         sdi.material_id,
         m.product_code AS material_code,
         m.product_name AS material_name,
@@ -477,7 +680,6 @@ export class SupplierDeliveryRepository {
   }
 
   async createItem(deliveryId: number, item: {
-    purchase_order_item_id: number;
     material_id: number;
     material_brand_id?: number | null;
     uom_id: number;
@@ -485,11 +687,16 @@ export class SupplierDeliveryRepository {
     accepted_quantity: number;
     rejected_quantity: number;
     notes?: string | null;
+    references: Array<{
+      reference_type_lookup_id: number;
+      reference_id: number;
+      reference_line_id: number;
+      quantity: number;
+    }>;
   }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<{ supplier_delivery_item_id: number }> {
     const result = await this.getExecutor(client).query(
       `INSERT INTO supplier_delivery_item (
         supplier_delivery_id,
-        purchase_order_item_id,
         material_id,
         material_brand_id,
         uom_id,
@@ -500,11 +707,10 @@ export class SupplierDeliveryRepository {
         log_date_created,
         log_created_by_account_id,
         log_module_created
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
       RETURNING supplier_delivery_item_id`,
       [
         deliveryId,
-        item.purchase_order_item_id,
         item.material_id,
         item.material_brand_id ?? null,
         item.uom_id,
@@ -517,11 +723,35 @@ export class SupplierDeliveryRepository {
       ]
     );
 
+    const supplierDeliveryItemId = result.rows[0].supplier_delivery_item_id as number;
+    for (const reference of item.references) {
+      await this.getExecutor(client).query(
+        `INSERT INTO supplier_delivery_item_reference (
+          supplier_delivery_item_id,
+          reference_type_lookup_id,
+          reference_id,
+          reference_line_id,
+          quantity,
+          log_date_created,
+          log_created_by_account_id,
+          log_module_created
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+        [
+          supplierDeliveryItemId,
+          reference.reference_type_lookup_id,
+          reference.reference_id,
+          reference.reference_line_id,
+          reference.quantity,
+          actorAccountId,
+          moduleName,
+        ]
+      );
+    }
+
     return result.rows[0];
   }
 
   async updateItem(itemId: number, item: {
-    purchase_order_item_id: number;
     material_id: number;
     material_brand_id?: number | null;
     uom_id: number;
@@ -529,25 +759,29 @@ export class SupplierDeliveryRepository {
     accepted_quantity: number;
     rejected_quantity: number;
     notes?: string | null;
+    references: Array<{
+      reference_type_lookup_id: number;
+      reference_id: number;
+      reference_line_id: number;
+      quantity: number;
+    }>;
   }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
     await this.getExecutor(client).query(
       `UPDATE supplier_delivery_item
-       SET purchase_order_item_id = $2,
-           material_id = $3,
-           material_brand_id = $4,
-           uom_id = $5,
-           delivered_quantity = $6,
-           accepted_quantity = $7,
-           rejected_quantity = $8,
-           notes = $9,
+       SET material_id = $2,
+           material_brand_id = $3,
+           uom_id = $4,
+           delivered_quantity = $5,
+           accepted_quantity = $6,
+           rejected_quantity = $7,
+           notes = $8,
            log_date_updated = NOW(),
-           log_updated_by_account_id = $10,
-           log_module_updated = $11
+           log_updated_by_account_id = $9,
+           log_module_updated = $10
        WHERE supplier_delivery_item_id = $1
          AND is_deleted = false`,
       [
         itemId,
-        item.purchase_order_item_id,
         item.material_id,
         item.material_brand_id ?? null,
         item.uom_id,
@@ -559,9 +793,59 @@ export class SupplierDeliveryRepository {
         moduleName,
       ]
     );
+
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_item_reference
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE supplier_delivery_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
+
+    for (const reference of item.references) {
+      await this.getExecutor(client).query(
+        `INSERT INTO supplier_delivery_item_reference (
+          supplier_delivery_item_id,
+          reference_type_lookup_id,
+          reference_id,
+          reference_line_id,
+          quantity,
+          log_date_created,
+          log_created_by_account_id,
+          log_module_created
+        ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+        [
+          itemId,
+          reference.reference_type_lookup_id,
+          reference.reference_id,
+          reference.reference_line_id,
+          reference.quantity,
+          actorAccountId,
+          moduleName,
+        ]
+      );
+    }
   }
 
   async softDeleteItem(itemId: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_item_reference
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE supplier_delivery_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
+
     await this.getExecutor(client).query(
       `UPDATE supplier_delivery_item
        SET is_deleted = true,
@@ -576,9 +860,37 @@ export class SupplierDeliveryRepository {
     );
   }
 
+  async replacePurchaseOrders(deliveryId: number, purchaseOrderIds: number[], actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_purchase_order
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE supplier_delivery_id = $1
+         AND is_deleted = false`,
+      [deliveryId, actorAccountId, moduleName]
+    );
+
+    for (const purchaseOrderId of purchaseOrderIds) {
+      await this.getExecutor(client).query(
+        `INSERT INTO supplier_delivery_purchase_order (
+          supplier_delivery_id,
+          purchase_order_id,
+          log_date_created,
+          log_created_by_account_id,
+          log_module_created
+        ) VALUES ($1, $2, NOW(), $3, $4)`,
+        [deliveryId, purchaseOrderId, actorAccountId, moduleName]
+      );
+    }
+  }
+
   async replaceAdvices(deliveryId: number, deliveryAdviceIds: number[], actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
     await this.getExecutor(client).query(
-      `UPDATE supplier_delivery_advice
+      `UPDATE supplier_delivery_delivery_advice
        SET is_deleted = true,
            log_date_deleted = NOW(),
            log_deleted_by_account_id = $2,
@@ -592,7 +904,7 @@ export class SupplierDeliveryRepository {
 
     for (const deliveryAdviceId of deliveryAdviceIds) {
       await this.getExecutor(client).query(
-        `INSERT INTO supplier_delivery_advice (
+        `INSERT INTO supplier_delivery_delivery_advice (
           supplier_delivery_id,
           delivery_advice_id,
           log_date_created,
@@ -600,6 +912,34 @@ export class SupplierDeliveryRepository {
           log_module_created
         ) VALUES ($1, $2, NOW(), $3, $4)`,
         [deliveryId, deliveryAdviceId, actorAccountId, moduleName]
+      );
+    }
+  }
+
+  async replaceMaterialRequests(deliveryId: number, materialRequestIds: number[], actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_material_request
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE supplier_delivery_id = $1
+         AND is_deleted = false`,
+      [deliveryId, actorAccountId, moduleName]
+    );
+
+    for (const materialRequestId of materialRequestIds) {
+      await this.getExecutor(client).query(
+        `INSERT INTO supplier_delivery_material_request (
+          supplier_delivery_id,
+          material_request_id,
+          log_date_created,
+          log_created_by_account_id,
+          log_module_created
+        ) VALUES ($1, $2, NOW(), $3, $4)`,
+        [deliveryId, materialRequestId, actorAccountId, moduleName]
       );
     }
   }
@@ -619,6 +959,24 @@ export class SupplierDeliveryRepository {
     );
 
     await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_item_reference sdir
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2,
+           log_module_updated = $3
+       WHERE sdir.supplier_delivery_item_id IN (
+         SELECT supplier_delivery_item_id
+         FROM supplier_delivery_item
+         WHERE supplier_delivery_id = $1
+           AND is_deleted = false
+       )
+         AND sdir.is_deleted = false`,
+      [id, actorAccountId, moduleName]
+    );
+
+    await this.getExecutor(client).query(
       `UPDATE supplier_delivery_item
        SET is_deleted = true,
            log_date_deleted = NOW(),
@@ -632,7 +990,33 @@ export class SupplierDeliveryRepository {
     );
 
     await this.getExecutor(client).query(
-      `UPDATE supplier_delivery_advice
+      `UPDATE supplier_delivery_purchase_order
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2,
+           log_module_updated = $3
+       WHERE supplier_delivery_id = $1
+         AND is_deleted = false`,
+      [id, actorAccountId, moduleName]
+    );
+
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_delivery_advice
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2,
+           log_module_updated = $3
+       WHERE supplier_delivery_id = $1
+         AND is_deleted = false`,
+      [id, actorAccountId, moduleName]
+    );
+
+    await this.getExecutor(client).query(
+      `UPDATE supplier_delivery_material_request
        SET is_deleted = true,
            log_date_deleted = NOW(),
            log_deleted_by_account_id = $2,

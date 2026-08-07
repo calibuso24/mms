@@ -70,7 +70,41 @@ export class WorkflowSeeder {
     const seedLike = 'SEED-%';
 
     await context.client.query(
-      `DELETE FROM supplier_delivery_advice
+      `DELETE FROM supplier_delivery_item_reference
+       WHERE supplier_delivery_item_id IN (
+         SELECT supplier_delivery_item_id
+         FROM supplier_delivery_item
+         WHERE supplier_delivery_id IN (
+           SELECT supplier_delivery_id
+           FROM supplier_delivery
+           WHERE supplier_delivery_number LIKE $1
+         )
+       )`,
+      [seedLike]
+    );
+
+    await context.client.query(
+      `DELETE FROM supplier_delivery_delivery_advice
+       WHERE supplier_delivery_id IN (
+         SELECT supplier_delivery_id
+         FROM supplier_delivery
+         WHERE supplier_delivery_number LIKE $1
+       )`,
+      [seedLike]
+    );
+
+    await context.client.query(
+      `DELETE FROM supplier_delivery_purchase_order
+       WHERE supplier_delivery_id IN (
+         SELECT supplier_delivery_id
+         FROM supplier_delivery
+         WHERE supplier_delivery_number LIKE $1
+       )`,
+      [seedLike]
+    );
+
+    await context.client.query(
+      `DELETE FROM supplier_delivery_material_request
        WHERE supplier_delivery_id IN (
          SELECT supplier_delivery_id
          FROM supplier_delivery
@@ -887,6 +921,7 @@ export class WorkflowSeeder {
 
   private async seedSupplierDeliveries(context: SeedRunContext, deliveryAdvices: DeliveryAdviceSeed[]): Promise<void> {
     const draftStatusId = requireLookupId(context, 'supplier_delivery_status', 'draft');
+    const poReferenceTypeId = requireLookupId(context, 'supplier_delivery_reference_type', 'po');
 
     const count = Math.min(context.config.counts.supplierDeliveries, deliveryAdvices.length);
     const selectedAdvices = context.random.pickManyUnique(deliveryAdvices, count);
@@ -898,7 +933,6 @@ export class WorkflowSeeder {
       const headerResult = await context.client.query<{ supplier_delivery_id: number }>(
         `INSERT INTO supplier_delivery (
           supplier_delivery_number,
-          purchase_order_id,
           supplier_id,
           project_id,
           received_by_account_id,
@@ -916,20 +950,18 @@ export class WorkflowSeeder {
           $2,
           $3,
           $4,
-          $5,
-          NOW() - ($6 || ' days')::interval,
+          NOW() - ($5 || ' days')::interval,
+          $6,
           $7,
-          $8,
           'Supplier delivery seeded for posting function flow.',
           FALSE,
           NOW(),
-          $5,
+          $4,
           'seed_mms'
         )
         RETURNING supplier_delivery_id`,
         [
           supplierDeliveryNumber,
-          advice.purchase_order_id,
           advice.supplier_id,
           advice.project_id,
           context.actorAccountId,
@@ -939,6 +971,19 @@ export class WorkflowSeeder {
         ]
       );
 
+      await context.client.query(
+        `INSERT INTO supplier_delivery_purchase_order (
+          supplier_delivery_id,
+          purchase_order_id,
+          is_deleted,
+          log_date_created,
+          log_created_by_account_id,
+          log_module_created
+        )
+        VALUES ($1, $2, FALSE, NOW(), $3, 'seed_mms')`,
+        [headerResult.rows[0].supplier_delivery_id, advice.purchase_order_id, context.actorAccountId]
+      );
+
       for (const adviceItem of advice.items) {
         const deliveredQuantity = adviceItem.advised_quantity;
         const rejectedQuantity = deliveredQuantity > 2 && context.random.bool(0.15)
@@ -946,10 +991,9 @@ export class WorkflowSeeder {
           : 0;
         const acceptedQuantity = Number((deliveredQuantity - rejectedQuantity).toFixed(2));
 
-        await context.client.query(
+        const supplierDeliveryItemResult = await context.client.query<{ supplier_delivery_item_id: number }>(
           `INSERT INTO supplier_delivery_item (
             supplier_delivery_id,
-            purchase_order_item_id,
             material_id,
             material_brand_id,
             uom_id,
@@ -970,16 +1014,15 @@ export class WorkflowSeeder {
             $5,
             $6,
             $7,
-            $8,
             'Posted through seed flow using post_supplier_delivery function.',
             FALSE,
             NOW(),
-            $9,
+            $8,
             'seed_mms'
-          )`,
+          )
+          RETURNING supplier_delivery_item_id`,
           [
             headerResult.rows[0].supplier_delivery_id,
-            adviceItem.purchase_order_item_id,
             adviceItem.material_id,
             adviceItem.material_brand_id,
             adviceItem.uom_id,
@@ -989,10 +1032,43 @@ export class WorkflowSeeder {
             context.actorAccountId,
           ]
         );
+
+        await context.client.query(
+          `INSERT INTO supplier_delivery_item_reference (
+            supplier_delivery_item_id,
+            reference_type_lookup_id,
+            reference_id,
+            reference_line_id,
+            quantity,
+            is_deleted,
+            log_date_created,
+            log_created_by_account_id,
+            log_module_created
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            FALSE,
+            NOW(),
+            $6,
+            'seed_mms'
+          )`,
+          [
+            supplierDeliveryItemResult.rows[0].supplier_delivery_item_id,
+            poReferenceTypeId,
+            advice.purchase_order_id,
+            adviceItem.purchase_order_item_id,
+            acceptedQuantity,
+            context.actorAccountId,
+          ]
+        );
       }
 
       await context.client.query(
-        `INSERT INTO supplier_delivery_advice (
+        `INSERT INTO supplier_delivery_delivery_advice (
           supplier_delivery_id,
           delivery_advice_id,
           notes,

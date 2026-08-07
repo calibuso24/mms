@@ -43,12 +43,25 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import { accountApi, lookupApi, projectApi, purchaseOrderApi, supplierApi, supplierDeliveryApi } from '../shared/api/client.js';
+import {
+  accountApi,
+  deliveryAdviceApi,
+  lookupApi,
+  materialApi,
+  materialRequestApi,
+  projectApi,
+  purchaseOrderApi,
+  supplierApi,
+  supplierDeliveryApi,
+  uomApi,
+} from '../shared/api/client.js';
 import { useAuth } from '../shared/contexts/auth.js';
 import EditableLineItemsGrid from '../shared/components/EditableLineItemsGrid.js';
 
-type SortField = 'supplier_delivery_number' | 'po_number' | 'supplier_name' | 'project_name' | 'status_name' | 'delivery_date' | 'created_at' | 'item_count';
+type SortField = 'supplier_delivery_number' | 'supplier_name' | 'project_name' | 'status_name' | 'delivery_date' | 'created_at' | 'item_count';
 type SortDir = 'asc' | 'desc';
+
+type ReferenceTypeCode = 'po' | 'delivery_advice' | 'material_request';
 
 interface LookupItem {
   look_up_id: number;
@@ -60,6 +73,19 @@ interface PartyItem {
   party_id: number;
   party_code: string;
   party_name: string;
+}
+
+interface MaterialItem {
+  material_id: number;
+  product_code: string;
+  product_name: string;
+  stock_uom_id?: number | null;
+}
+
+interface UomItem {
+  uom_id: number;
+  uom_name: string;
+  abbreviation: string;
 }
 
 interface PurchaseOrderItem {
@@ -77,6 +103,7 @@ interface PurchaseOrderDetailItem {
   material_id: number;
   material_code: string;
   material_name: string;
+  material_brand_id?: number | null;
   uom_id: number;
   uom_name: string;
   uom_abbreviation: string;
@@ -84,11 +111,61 @@ interface PurchaseOrderDetailItem {
   received_quantity: string;
 }
 
+interface DeliveryAdviceListItem {
+  delivery_advice_id: number;
+  purchase_order_id: number;
+  da_number: string;
+  status_code: string;
+}
+
+interface DeliveryAdviceDetailItem {
+  delivery_advice_item_id: number;
+  material_id: number;
+  material_code: string;
+  material_name: string;
+  material_brand_id?: number | null;
+  uom_id: number;
+  uom_abbreviation: string;
+  advised_quantity: string;
+  received_quantity: string;
+}
+
+interface DeliveryAdviceDetail {
+  delivery_advice_id: number;
+  purchase_order_id: number;
+  da_number: string;
+  items: DeliveryAdviceDetailItem[];
+}
+
+interface MaterialRequestListItem {
+  material_request_id: number;
+  mr_number: string;
+  project_id: number;
+  project_name: string;
+  status_code: string;
+}
+
+interface MaterialRequestDetailItem {
+  material_request_item_id: number;
+  material_id: number;
+  material_code: string;
+  material_name: string;
+  uom_id: number;
+  uom_abbreviation: string;
+  requested_quantity: string;
+  approved_quantity: string | null;
+}
+
+interface MaterialRequestDetail {
+  material_request_id: number;
+  mr_number: string;
+  project_id: number;
+  items: MaterialRequestDetailItem[];
+}
+
 interface SupplierDeliveryListItem {
   supplier_delivery_id: number;
   supplier_delivery_number: string;
-  purchase_order_id: number;
-  po_number: string;
   supplier_id: number;
   supplier_code: string;
   supplier_name: string;
@@ -105,16 +182,27 @@ interface SupplierDeliveryListItem {
   reference_code: string | null;
   notes: string | null;
   item_count: number;
+  purchase_order_numbers: string[];
+  delivery_advice_numbers: string[];
+  material_request_numbers: string[];
   created_at: string | null;
   updated_at: string | null;
 }
 
+interface SupplierDeliveryReference {
+  reference_type_code: ReferenceTypeCode;
+  reference_id: number;
+  reference_line_id: number;
+  quantity: string;
+  reference_number?: string;
+}
+
 interface SupplierDeliveryItem {
   supplier_delivery_item_id: number;
-  purchase_order_item_id: number;
   material_id: number;
   material_code: string;
   material_name: string;
+  material_brand_id: number | null;
   uom_id: number;
   uom_name: string;
   uom_abbreviation: string;
@@ -122,62 +210,78 @@ interface SupplierDeliveryItem {
   accepted_quantity: string;
   rejected_quantity: string;
   notes: string | null;
+  references: Array<{
+    reference_type_code: ReferenceTypeCode;
+    reference_id: number;
+    reference_line_id: number;
+    quantity: string;
+    reference_number: string;
+  }>;
   updated_at: string | null;
 }
 
 interface SupplierDeliveryDetail extends SupplierDeliveryListItem {
   items: SupplierDeliveryItem[];
+  purchase_orders: Array<{ purchase_order_id: number; po_number: string }>;
   advices: Array<{ delivery_advice_id: number; da_number: string }>;
+  material_requests: Array<{ material_request_id: number; mr_number: string }>;
 }
 
 interface DeliveryItemForm {
   row_id: string;
   supplier_delivery_item_id?: number;
   updated_at?: string | null;
-  purchase_order_item_id: string;
+  material_id: string;
   material_label: string;
+  material_brand_id: string;
+  uom_id: string;
   uom_label: string;
-  ordered_quantity: string;
-  received_quantity: string;
+  source_summary: string;
   delivered_quantity: string;
   accepted_quantity: string;
   rejected_quantity: string;
   notes: string;
+  references: SupplierDeliveryReference[];
 }
 
 interface FormState {
-  purchase_order_id: string;
   supplier_id: string;
   project_id: string;
   delivery_date: string;
   reference_code: string;
   notes: string;
-  delivery_advice_ids: string;
+  purchase_order_ids: string[];
+  delivery_advice_ids: string[];
+  material_request_ids: string[];
   items: DeliveryItemForm[];
 }
 
 const emptyItem = (): DeliveryItemForm => ({
   row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   supplier_delivery_item_id: undefined,
-  purchase_order_item_id: '',
+  updated_at: null,
+  material_id: '',
   material_label: '',
+  material_brand_id: '',
+  uom_id: '',
   uom_label: '',
-  ordered_quantity: '',
-  received_quantity: '',
+  source_summary: 'Direct Receipt',
   delivered_quantity: '',
   accepted_quantity: '',
   rejected_quantity: '',
   notes: '',
+  references: [],
 });
 
 const emptyForm = (): FormState => ({
-  purchase_order_id: '',
   supplier_id: '',
   project_id: '',
   delivery_date: new Date().toISOString().slice(0, 10),
   reference_code: '',
   notes: '',
-  delivery_advice_ids: '',
+  purchase_order_ids: [],
+  delivery_advice_ids: [],
+  material_request_ids: [],
   items: [emptyItem()],
 });
 
@@ -220,13 +324,16 @@ export default function SupplierDeliveryPage() {
   const [filters, setFilters] = useState({
     purchase_order_id: '',
     supplier_id: '',
-    project_id: '',
     status_id: '',
   });
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
+  const [deliveryAdvices, setDeliveryAdvices] = useState<DeliveryAdviceListItem[]>([]);
+  const [materialRequests, setMaterialRequests] = useState<MaterialRequestListItem[]>([]);
   const [suppliers, setSuppliers] = useState<PartyItem[]>([]);
   const [projects, setProjects] = useState<PartyItem[]>([]);
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [uoms, setUoms] = useState<UomItem[]>([]);
   const [supplierQuery, setSupplierQuery] = useState('');
   const [projectQuery, setProjectQuery] = useState('');
   const [statuses, setStatuses] = useState<LookupItem[]>([]);
@@ -240,14 +347,15 @@ export default function SupplierDeliveryPage() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
-  const [poItems, setPoItems] = useState<PurchaseOrderDetailItem[]>([]);
-
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Supplier Delivery:VIEW');
   const canCreate = permissionSet.has('Supplier Delivery:CREATE');
   const canUpdate = permissionSet.has('Supplier Delivery:UPDATE');
   const canDelete = permissionSet.has('Supplier Delivery:DELETE');
   const canApprove = permissionSet.has('Supplier Delivery:APPROVE');
+
+  const materialOptions = useMemo(() => materials.map((row) => ({ value: row.material_id.toString(), label: `${row.product_code} - ${row.product_name}` })), [materials]);
+  const uomOptions = useMemo(() => uoms.map((row) => ({ value: row.uom_id.toString(), label: row.abbreviation || row.uom_name })), [uoms]);
 
   useEffect(() => {
     void loadLookups();
@@ -259,15 +367,7 @@ export default function SupplierDeliveryPage() {
 
   useEffect(() => {
     void loadItems();
-  }, [canView, page, rowsPerPage, search, sortBy, sortDir, filters.purchase_order_id, filters.supplier_id, filters.project_id, filters.status_id]);
-
-  useEffect(() => {
-    if (!form.purchase_order_id) {
-      setPoItems([]);
-      return;
-    }
-    void loadPurchaseOrderItems(Number(form.purchase_order_id));
-  }, [form.purchase_order_id]);
+  }, [canView, page, rowsPerPage, search, sortBy, sortDir, filters.purchase_order_id, filters.supplier_id, filters.status_id]);
 
   useEffect(() => {
     if (routeMode === 'new') {
@@ -327,16 +427,33 @@ export default function SupplierDeliveryPage() {
 
   const loadLookups = async () => {
     try {
-      const [purchaseOrderData, supplierData, projectData, statusData] = await Promise.all([
-        purchaseOrderApi.list(200, 0).catch(() => ({ items: [] })),
-        supplierApi.list(200, 0).catch(() => ({ items: [] })),
-        projectApi.list(200, 0).catch(() => ({ items: [] })),
+      const [
+        purchaseOrderData,
+        deliveryAdviceData,
+        materialRequestData,
+        supplierData,
+        projectData,
+        materialData,
+        uomData,
+        statusData,
+      ] = await Promise.all([
+        purchaseOrderApi.list(300, 0).catch(() => ({ items: [] })),
+        deliveryAdviceApi.list(300, 0).catch(() => ({ items: [] })),
+        materialRequestApi.list(300, 0).catch(() => ({ items: [] })),
+        supplierApi.list(300, 0).catch(() => ({ items: [] })),
+        projectApi.list(300, 0).catch(() => ({ items: [] })),
+        materialApi.list(500, 0).catch(() => ({ items: [] })),
+        uomApi.list(200, 0).catch(() => []),
         lookupApi.listByType('supplier_delivery_status', 100),
       ]);
 
       setPurchaseOrders(Array.isArray(purchaseOrderData?.items) ? purchaseOrderData.items : []);
+      setDeliveryAdvices(Array.isArray(deliveryAdviceData?.items) ? deliveryAdviceData.items : []);
+      setMaterialRequests(Array.isArray(materialRequestData?.items) ? materialRequestData.items : []);
       setSuppliers(Array.isArray(supplierData?.items) ? supplierData.items : []);
       setProjects(Array.isArray(projectData?.items) ? projectData.items : []);
+      setMaterials(Array.isArray(materialData) ? materialData : Array.isArray(materialData?.items) ? materialData.items : []);
+      setUoms(Array.isArray(uomData) ? uomData : []);
       setStatuses(Array.isArray(statusData) ? statusData : []);
     } catch (err: any) {
       setError(err.message || 'Failed to load lookup values');
@@ -353,7 +470,6 @@ export default function SupplierDeliveryPage() {
         search: search || undefined,
         purchase_order_id: filters.purchase_order_id ? Number(filters.purchase_order_id) : undefined,
         supplier_id: filters.supplier_id ? Number(filters.supplier_id) : undefined,
-        project_id: filters.project_id ? Number(filters.project_id) : undefined,
         status_id: filters.status_id ? Number(filters.status_id) : undefined,
         sort_by: sortBy,
         sort_dir: sortDir,
@@ -365,15 +481,6 @@ export default function SupplierDeliveryPage() {
       setError(err.message || 'Failed to load supplier deliveries');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadPurchaseOrderItems = async (purchaseOrderId: number) => {
-    try {
-      const detail = await purchaseOrderApi.get(purchaseOrderId);
-      setPoItems(Array.isArray(detail?.items) ? detail.items : []);
-    } catch {
-      setPoItems([]);
     }
   };
 
@@ -390,27 +497,36 @@ export default function SupplierDeliveryPage() {
       const detail: SupplierDeliveryDetail = await supplierDeliveryApi.get(supplierDeliveryId);
       setEditingVersion(detail.updated_at ?? null);
       setForm({
-        purchase_order_id: detail.purchase_order_id.toString(),
         supplier_id: detail.supplier_id.toString(),
         project_id: detail.project_id.toString(),
         delivery_date: detail.delivery_date ? detail.delivery_date.slice(0, 10) : '',
         reference_code: detail.reference_code || '',
         notes: detail.notes || '',
-        delivery_advice_ids: detail.advices.map((advice) => advice.delivery_advice_id).join(', '),
+        purchase_order_ids: detail.purchase_orders.map((row) => String(row.purchase_order_id)),
+        delivery_advice_ids: detail.advices.map((row) => String(row.delivery_advice_id)),
+        material_request_ids: detail.material_requests.map((row) => String(row.material_request_id)),
         items: detail.items.length > 0
           ? detail.items.map((row) => ({
               row_id: `${Date.now()}-${row.supplier_delivery_item_id}`,
               supplier_delivery_item_id: row.supplier_delivery_item_id,
               updated_at: row.updated_at ?? null,
-              purchase_order_item_id: row.purchase_order_item_id.toString(),
+              material_id: String(row.material_id),
               material_label: `${row.material_code} - ${row.material_name}`,
+              material_brand_id: row.material_brand_id ? String(row.material_brand_id) : '',
+              uom_id: String(row.uom_id),
               uom_label: row.uom_abbreviation,
-              ordered_quantity: '',
-              received_quantity: '',
+              source_summary: row.references.length > 0 ? row.references.map((ref) => `${ref.reference_number} (${formatNumber(ref.quantity)})`).join(', ') : 'Direct Receipt',
               delivered_quantity: row.delivered_quantity,
               accepted_quantity: row.accepted_quantity,
               rejected_quantity: row.rejected_quantity,
               notes: row.notes || '',
+              references: row.references.map((ref) => ({
+                reference_type_code: ref.reference_type_code,
+                reference_id: ref.reference_id,
+                reference_line_id: ref.reference_line_id,
+                quantity: ref.quantity,
+                reference_number: ref.reference_number,
+              })),
             }))
           : [emptyItem()],
       });
@@ -451,19 +567,6 @@ export default function SupplierDeliveryPage() {
     setPage(0);
   };
 
-  const syncFromPurchaseOrder = (purchaseOrderId: string) => {
-    const selectedPo = purchaseOrders.find((po) => po.purchase_order_id === Number(purchaseOrderId));
-    if (!selectedPo) return;
-
-    setForm((current) => ({
-      ...current,
-      purchase_order_id: purchaseOrderId,
-      supplier_id: selectedPo.supplier_party_id ? selectedPo.supplier_party_id.toString() : current.supplier_id,
-      project_id: selectedPo.project_id ? selectedPo.project_id.toString() : current.project_id,
-      items: [emptyItem()],
-    }));
-  };
-
   const updateItem = (index: number, field: keyof DeliveryItemForm, value: string) => {
     setForm((current) => {
       const nextItems = current.items.map((item, itemIndex) => {
@@ -472,10 +575,13 @@ export default function SupplierDeliveryPage() {
         }
 
         const next = { ...item, [field]: value };
-        if (field === 'purchase_order_item_id') {
-          next.delivered_quantity = '';
-          next.accepted_quantity = '';
-          next.rejected_quantity = '';
+        if (field === 'delivered_quantity' && !next.accepted_quantity) {
+          next.accepted_quantity = value;
+        }
+        if (field === 'delivered_quantity' || field === 'accepted_quantity') {
+          const delivered = Number(next.delivered_quantity) || 0;
+          const accepted = Number(next.accepted_quantity) || 0;
+          next.rejected_quantity = delivered > 0 ? String(Math.max(delivered - accepted, 0)) : '';
         }
         return next;
       });
@@ -498,24 +604,252 @@ export default function SupplierDeliveryPage() {
     });
   };
 
-  const parseDeliveryAdviceIds = (rawValue: string): number[] | undefined => {
-    if (!rawValue.trim()) return undefined;
-    return rawValue
-      .split(',')
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0)
-      .map((part) => Number(part))
-      .filter((value) => Number.isInteger(value) && value > 0);
+  const syncHeaderFromSources = () => {
+    const selectedPoIds = new Set(form.purchase_order_ids.map((id) => Number(id)));
+    const selectedDaIds = new Set(form.delivery_advice_ids.map((id) => Number(id)));
+    const selectedMrIds = new Set(form.material_request_ids.map((id) => Number(id)));
+
+    const selectedPos = purchaseOrders.filter((po) => selectedPoIds.has(po.purchase_order_id));
+    const selectedDas = deliveryAdvices.filter((da) => selectedDaIds.has(da.delivery_advice_id));
+    const selectedMrs = materialRequests.filter((mr) => selectedMrIds.has(mr.material_request_id));
+
+    const supplierCandidates = new Set<number>();
+    const projectCandidates = new Set<number>();
+
+    selectedPos.forEach((po) => {
+      if (po.supplier_party_id) supplierCandidates.add(po.supplier_party_id);
+      if (po.project_id) projectCandidates.add(po.project_id);
+    });
+
+    selectedDas.forEach((da) => {
+      const po = purchaseOrders.find((row) => row.purchase_order_id === da.purchase_order_id);
+      if (po?.supplier_party_id) supplierCandidates.add(po.supplier_party_id);
+      if (po?.project_id) projectCandidates.add(po.project_id);
+    });
+
+    selectedMrs.forEach((mr) => {
+      if (mr.project_id) projectCandidates.add(mr.project_id);
+    });
+
+    setForm((current) => ({
+      ...current,
+      supplier_id: supplierCandidates.size === 1 ? String([...supplierCandidates][0]) : current.supplier_id,
+      project_id: projectCandidates.size === 1 ? String([...projectCandidates][0]) : current.project_id,
+    }));
+  };
+
+  const loadMergedSourceItems = async () => {
+    setSaving(true);
+    setError('');
+
+    try {
+      const poDetails = await Promise.all(
+        form.purchase_order_ids.map((id) => purchaseOrderApi.get(Number(id)).catch(() => null))
+      );
+      const daDetails = await Promise.all(
+        form.delivery_advice_ids.map((id) => deliveryAdviceApi.get(Number(id)).catch(() => null))
+      );
+      const mrDetails = await Promise.all(
+        form.material_request_ids.map((id) => materialRequestApi.get(Number(id)).catch(() => null))
+      );
+
+      const merged = new Map<string, DeliveryItemForm>();
+
+      const appendReference = (
+        key: string,
+        base: { material_id: number; material_label: string; material_brand_id?: number | null; uom_id: number; uom_label: string },
+        reference: SupplierDeliveryReference
+      ) => {
+        const current = merged.get(key) ?? {
+          row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          material_id: String(base.material_id),
+          material_label: base.material_label,
+          material_brand_id: base.material_brand_id ? String(base.material_brand_id) : '',
+          uom_id: String(base.uom_id),
+          uom_label: base.uom_label,
+          source_summary: '',
+          delivered_quantity: '0',
+          accepted_quantity: '0',
+          rejected_quantity: '0',
+          notes: '',
+          references: [],
+        };
+
+        current.references.push(reference);
+        const refQty = Number(reference.quantity) || 0;
+        const nextDelivered = (Number(current.delivered_quantity) || 0) + refQty;
+        current.delivered_quantity = String(nextDelivered);
+        current.accepted_quantity = String(nextDelivered);
+        current.rejected_quantity = '0';
+        current.source_summary = current.references.map((entry) => `${entry.reference_number ?? `${entry.reference_type_code.toUpperCase()}-${entry.reference_id}`} (${formatNumber(entry.quantity)})`).join(', ');
+        merged.set(key, current);
+      };
+
+      poDetails.forEach((detail: any, index) => {
+        if (!detail || !Array.isArray(detail.items)) return;
+        const poId = Number(form.purchase_order_ids[index]);
+        const poNumber = detail.po_number ?? `PO-${poId}`;
+
+        detail.items.forEach((item: PurchaseOrderDetailItem) => {
+          const remaining = Math.max((Number(item.ordered_quantity) || 0) - (Number(item.received_quantity) || 0), 0);
+          if (remaining <= 0) return;
+
+          const materialLabel = `${item.material_code} - ${item.material_name}`;
+          const key = `m-${item.material_id}|b-${item.material_brand_id ?? 0}|u-${item.uom_id}`;
+          appendReference(
+            key,
+            {
+              material_id: item.material_id,
+              material_label: materialLabel,
+              material_brand_id: item.material_brand_id ?? null,
+              uom_id: item.uom_id,
+              uom_label: item.uom_abbreviation,
+            },
+            {
+              reference_type_code: 'po',
+              reference_id: poId,
+              reference_line_id: item.purchase_order_item_id,
+              quantity: String(remaining),
+              reference_number: `${poNumber}#${item.purchase_order_item_id}`,
+            }
+          );
+        });
+      });
+
+      daDetails.forEach((detail: any, index) => {
+        if (!detail || !Array.isArray(detail.items)) return;
+        const daId = Number(form.delivery_advice_ids[index]);
+        const daNumber = detail.da_number ?? `DA-${daId}`;
+
+        detail.items.forEach((item: DeliveryAdviceDetailItem) => {
+          const remaining = Math.max((Number(item.advised_quantity) || 0) - (Number(item.received_quantity) || 0), 0);
+          if (remaining <= 0) return;
+
+          const materialLabel = `${item.material_code} - ${item.material_name}`;
+          const key = `m-${item.material_id}|b-${item.material_brand_id ?? 0}|u-${item.uom_id}`;
+          appendReference(
+            key,
+            {
+              material_id: item.material_id,
+              material_label: materialLabel,
+              material_brand_id: item.material_brand_id ?? null,
+              uom_id: item.uom_id,
+              uom_label: item.uom_abbreviation,
+            },
+            {
+              reference_type_code: 'delivery_advice',
+              reference_id: daId,
+              reference_line_id: item.delivery_advice_item_id,
+              quantity: String(remaining),
+              reference_number: `${daNumber}#${item.delivery_advice_item_id}`,
+            }
+          );
+        });
+      });
+
+      mrDetails.forEach((detail: any, index) => {
+        if (!detail || !Array.isArray(detail.items)) return;
+        const mrId = Number(form.material_request_ids[index]);
+        const mrNumber = detail.mr_number ?? `MR-${mrId}`;
+
+        detail.items.forEach((item: MaterialRequestDetailItem) => {
+          const sourceQuantity = Number(item.approved_quantity ?? item.requested_quantity ?? 0);
+          if (sourceQuantity <= 0) return;
+
+          const materialLabel = `${item.material_code} - ${item.material_name}`;
+          const key = `m-${item.material_id}|b-0|u-${item.uom_id}`;
+          appendReference(
+            key,
+            {
+              material_id: item.material_id,
+              material_label: materialLabel,
+              material_brand_id: null,
+              uom_id: item.uom_id,
+              uom_label: item.uom_abbreviation,
+            },
+            {
+              reference_type_code: 'material_request',
+              reference_id: mrId,
+              reference_line_id: item.material_request_item_id,
+              quantity: String(sourceQuantity),
+              reference_number: `${mrNumber}#${item.material_request_item_id}`,
+            }
+          );
+        });
+      });
+
+      const mergedRows = [...merged.values()];
+      setForm((current) => ({
+        ...current,
+        items: mergedRows.length > 0 ? mergedRows : current.items,
+      }));
+      if (mergedRows.length === 0) {
+        setSuccess('No remaining source quantities found.');
+      } else {
+        setSuccess('Source lines merged into receipt items.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load source document lines');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const scaleReferencesToAccepted = (references: SupplierDeliveryReference[], acceptedQuantity: number) => {
+    if (references.length === 0) return [];
+    const currentTotal = references.reduce((sum, reference) => sum + (Number(reference.quantity) || 0), 0);
+    if (currentTotal <= 0) {
+      return references;
+    }
+    if (Math.abs(currentTotal - acceptedQuantity) <= 0.000001) {
+      return references;
+    }
+
+    const scaled = references.map((reference) => ({
+      ...reference,
+      quantity: String((Number(reference.quantity) || 0) * (acceptedQuantity / currentTotal)),
+    }));
+
+    const scaledTotal = scaled.reduce((sum, reference) => sum + (Number(reference.quantity) || 0), 0);
+    const delta = acceptedQuantity - scaledTotal;
+    if (scaled.length > 0) {
+      const last = scaled[scaled.length - 1];
+      last.quantity = String((Number(last.quantity) || 0) + delta);
+    }
+
+    return scaled;
+  };
+
+  const toDetailPayload = (row: DeliveryItemForm) => {
+    const delivered = Number(row.delivered_quantity);
+    const accepted = Number(row.accepted_quantity);
+    const rejected = row.rejected_quantity === '' ? delivered - accepted : Number(row.rejected_quantity);
+
+    const references = scaleReferencesToAccepted(row.references, accepted).map((reference) => ({
+      reference_type_code: reference.reference_type_code,
+      reference_id: Number(reference.reference_id),
+      reference_line_id: Number(reference.reference_line_id),
+      quantity: Number(reference.quantity),
+    }));
+
+    return {
+      material_id: Number(row.material_id),
+      material_brand_id: row.material_brand_id ? Number(row.material_brand_id) : null,
+      uom_id: Number(row.uom_id),
+      delivered_quantity: delivered,
+      accepted_quantity: accepted,
+      rejected_quantity: rejected,
+      notes: row.notes.trim() || null,
+      references,
+    };
   };
 
   const submitForm = async () => {
-    if (!editingId) {
-      const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
-      const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
-      if (firstError) {
-        setError(Object.values(firstError)[0]);
-        return;
-      }
+    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+    if (firstError) {
+      setError(Object.values(firstError)[0]);
+      return;
     }
 
     setSaving(true);
@@ -523,36 +857,19 @@ export default function SupplierDeliveryPage() {
 
     try {
       const payload: any = {
-        purchase_order_id: Number(form.purchase_order_id),
         supplier_id: Number(form.supplier_id),
         project_id: Number(form.project_id),
         delivery_date: form.delivery_date || null,
         reference_code: form.reference_code.trim() || null,
         notes: form.notes.trim() || null,
-        delivery_advice_ids: parseDeliveryAdviceIds(form.delivery_advice_ids),
+        purchase_order_ids: form.purchase_order_ids.map((id) => Number(id)),
+        delivery_advice_ids: form.delivery_advice_ids.map((id) => Number(id)),
+        material_request_ids: form.material_request_ids.map((id) => Number(id)),
+        items: form.items.map((row) => toDetailPayload(row)),
       };
 
       if (editingId) {
         payload.expected_updated_at = editingVersion ?? undefined;
-      } else {
-        payload.items = form.items
-          .filter((item) => item.purchase_order_item_id && item.delivered_quantity && item.accepted_quantity)
-          .map((item) => {
-            const poItem = poItems.find((row) => row.purchase_order_item_id === Number(item.purchase_order_item_id));
-            const delivered = Number(item.delivered_quantity);
-            const accepted = Number(item.accepted_quantity);
-            const rejected = item.rejected_quantity === '' ? delivered - accepted : Number(item.rejected_quantity);
-
-            return {
-              purchase_order_item_id: Number(item.purchase_order_item_id),
-              material_id: Number(poItem?.material_id),
-              uom_id: Number(poItem?.uom_id),
-              delivered_quantity: delivered,
-              accepted_quantity: accepted,
-              rejected_quantity: rejected,
-              notes: item.notes.trim() || null,
-            };
-          });
       }
 
       if (editingId) {
@@ -565,7 +882,7 @@ export default function SupplierDeliveryPage() {
       }
 
       setEditingId(null);
-  setEditingVersion(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       navigate(baseRoute);
       await loadItems();
@@ -610,30 +927,33 @@ export default function SupplierDeliveryPage() {
     }
   };
 
-  const getPoItemById = (id: string) => poItems.find((item) => item.purchase_order_item_id === Number(id));
-
-  const detailColumns = useMemo<GridColDef<DeliveryItemForm>[]>(() => {
-    const poItemOptions = poItems.map((row) => ({ value: row.purchase_order_item_id.toString(), label: `#${row.purchase_order_item_id} - ${row.material_code}` }));
-    return [
-      {
-        field: 'purchase_order_item_id',
-        headerName: 'PO Item',
-        minWidth: 210,
-        flex: 0.9,
-        editable: true,
-        type: 'singleSelect',
-        valueOptions: poItemOptions,
-      },
-      { field: 'material_label', headerName: 'Material', minWidth: 230, flex: 1.05 },
-      { field: 'uom_label', headerName: 'UOM', minWidth: 100, flex: 0.55 },
-      { field: 'ordered_quantity', headerName: 'Ordered', minWidth: 105, flex: 0.6 },
-      { field: 'received_quantity', headerName: 'Received', minWidth: 105, flex: 0.6 },
-      { field: 'delivered_quantity', headerName: 'Quantity', minWidth: 105, flex: 0.6, editable: true },
-      { field: 'accepted_quantity', headerName: 'Accepted', minWidth: 105, flex: 0.6, editable: true },
-      { field: 'rejected_quantity', headerName: 'Rejected', minWidth: 105, flex: 0.6, editable: true },
-      { field: 'notes', headerName: 'Remarks', minWidth: 180, flex: 0.9, editable: true },
-    ];
-  }, [poItems]);
+  const detailColumns = useMemo<GridColDef<DeliveryItemForm>[]>(() => [
+    {
+      field: 'material_id',
+      headerName: 'Material',
+      minWidth: 260,
+      flex: 1.2,
+      editable: true,
+      type: 'singleSelect',
+      valueOptions: materialOptions,
+      valueFormatter: (value) => materialOptions.find((option) => option.value === String(value))?.label ?? '',
+    },
+    {
+      field: 'uom_id',
+      headerName: 'UOM',
+      minWidth: 120,
+      flex: 0.6,
+      editable: true,
+      type: 'singleSelect',
+      valueOptions: uomOptions,
+      valueFormatter: (value) => uomOptions.find((option) => option.value === String(value))?.label ?? '',
+    },
+    { field: 'source_summary', headerName: 'Source References', minWidth: 280, flex: 1.4 },
+    { field: 'delivered_quantity', headerName: 'Delivered', minWidth: 110, flex: 0.6, editable: true },
+    { field: 'accepted_quantity', headerName: 'Accepted', minWidth: 110, flex: 0.6, editable: true },
+    { field: 'rejected_quantity', headerName: 'Rejected', minWidth: 110, flex: 0.6, editable: true },
+    { field: 'notes', headerName: 'Remarks', minWidth: 200, flex: 1, editable: true },
+  ], [materialOptions, uomOptions]);
 
   const detailTotals = useMemo(() => {
     const totalQuantity = form.items.reduce((sum, row) => sum + (Number(row.delivered_quantity) || 0), 0);
@@ -649,11 +969,14 @@ export default function SupplierDeliveryPage() {
     const delivered = Number(row.delivered_quantity);
     const accepted = Number(row.accepted_quantity);
 
-    if (!row.purchase_order_item_id) {
-      errors.purchase_order_item_id = 'PO item is required';
+    if (!row.material_id) {
+      errors.material_id = 'Material is required';
+    }
+    if (!row.uom_id) {
+      errors.uom_id = 'UOM is required';
     }
     if (!row.delivered_quantity || Number.isNaN(delivered) || delivered <= 0) {
-      errors.delivered_quantity = 'Quantity must be greater than zero';
+      errors.delivered_quantity = 'Delivered quantity must be greater than zero';
     }
     if (!row.accepted_quantity || Number.isNaN(accepted) || accepted < 0) {
       errors.accepted_quantity = 'Accepted quantity is required';
@@ -662,9 +985,9 @@ export default function SupplierDeliveryPage() {
       errors.accepted_quantity = 'Accepted quantity cannot exceed delivered quantity';
     }
 
-    const duplicateCount = rows.filter((candidate) => candidate.purchase_order_item_id && candidate.purchase_order_item_id === row.purchase_order_item_id).length;
-    if (row.purchase_order_item_id && duplicateCount > 1) {
-      errors.purchase_order_item_id = 'Duplicate PO item is not allowed';
+    const duplicateCount = rows.filter((candidate) => candidate.material_id && candidate.uom_id && candidate.material_id === row.material_id && candidate.uom_id === row.uom_id).length;
+    if (row.material_id && row.uom_id && duplicateCount > 1) {
+      errors.material_id = 'Duplicate material and UOM combination is not allowed';
     }
 
     return errors;
@@ -672,19 +995,17 @@ export default function SupplierDeliveryPage() {
 
   const processDetailRowUpdate = (newRow: DeliveryItemForm): DeliveryItemForm => {
     const nextRow = { ...newRow };
-    const poItem = getPoItemById(nextRow.purchase_order_item_id);
 
-    if (poItem) {
-      nextRow.material_label = `${poItem.material_code} - ${poItem.material_name}`;
-      nextRow.uom_label = poItem.uom_abbreviation;
-      nextRow.ordered_quantity = poItem.ordered_quantity;
-      nextRow.received_quantity = poItem.received_quantity;
-    } else {
-      nextRow.material_label = '';
-      nextRow.uom_label = '';
-      nextRow.ordered_quantity = '';
-      nextRow.received_quantity = '';
+    const material = materials.find((item) => item.material_id === Number(nextRow.material_id));
+    if (material) {
+      nextRow.material_label = `${material.product_code} - ${material.product_name}`;
+      if (!nextRow.uom_id && material.stock_uom_id) {
+        nextRow.uom_id = String(material.stock_uom_id);
+      }
     }
+
+    const uom = uoms.find((item) => item.uom_id === Number(nextRow.uom_id));
+    nextRow.uom_label = uom ? (uom.abbreviation || uom.uom_name) : '';
 
     if (nextRow.delivered_quantity && nextRow.accepted_quantity === '') {
       nextRow.accepted_quantity = nextRow.delivered_quantity;
@@ -692,27 +1013,10 @@ export default function SupplierDeliveryPage() {
     if (nextRow.delivered_quantity && nextRow.accepted_quantity) {
       const delivered = Number(nextRow.delivered_quantity) || 0;
       const accepted = Number(nextRow.accepted_quantity) || 0;
-      nextRow.rejected_quantity = (delivered - accepted).toString();
+      nextRow.rejected_quantity = String(Math.max(delivered - accepted, 0));
     }
 
     return nextRow;
-  };
-
-  const toDetailPayload = (row: DeliveryItemForm) => {
-    const poItem = poItems.find((item) => item.purchase_order_item_id === Number(row.purchase_order_item_id));
-    const delivered = Number(row.delivered_quantity);
-    const accepted = Number(row.accepted_quantity);
-    const rejected = row.rejected_quantity === '' ? delivered - accepted : Number(row.rejected_quantity);
-
-    return {
-      purchase_order_item_id: Number(row.purchase_order_item_id),
-      material_id: Number(poItem?.material_id),
-      uom_id: Number(poItem?.uom_id),
-      delivered_quantity: delivered,
-      accepted_quantity: accepted,
-      rejected_quantity: rejected,
-      notes: row.notes.trim() || null,
-    };
   };
 
   const handleDetailRowCommitted = async (newRow: DeliveryItemForm, oldRow: DeliveryItemForm): Promise<DeliveryItemForm> => {
@@ -725,12 +1029,7 @@ export default function SupplierDeliveryPage() {
       return newRow;
     }
 
-    if (!newRow.purchase_order_item_id || !newRow.delivered_quantity || !newRow.accepted_quantity) {
-      return newRow;
-    }
-
-    const poItem = poItems.find((item) => item.purchase_order_item_id === Number(newRow.purchase_order_item_id));
-    if (!poItem) {
+    if (!newRow.material_id || !newRow.uom_id || !newRow.delivered_quantity || !newRow.accepted_quantity) {
       return newRow;
     }
 
@@ -791,7 +1090,7 @@ export default function SupplierDeliveryPage() {
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="Search SD No., PO, supplier, project"
+                  placeholder="Search SD No., source docs, supplier, project"
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   onKeyDown={(event) => {
@@ -873,7 +1172,7 @@ export default function SupplierDeliveryPage() {
                     onClick={() => {
                       setSearchInput('');
                       setSearch('');
-                      setFilters({ purchase_order_id: '', supplier_id: '', project_id: '', status_id: '' });
+                      setFilters({ purchase_order_id: '', supplier_id: '', status_id: '' });
                       setPage(0);
                     }}
                   >
@@ -904,9 +1203,7 @@ export default function SupplierDeliveryPage() {
                       <TableCell>
                         <TableSortLabel active={sortBy === 'supplier_delivery_number'} direction={sortDir} onClick={() => handleSort('supplier_delivery_number')}>SD Number</TableSortLabel>
                       </TableCell>
-                      <TableCell>
-                        <TableSortLabel active={sortBy === 'po_number'} direction={sortDir} onClick={() => handleSort('po_number')}>PO Number</TableSortLabel>
-                      </TableCell>
+                      <TableCell>Source Documents</TableCell>
                       <TableCell>
                         <TableSortLabel active={sortBy === 'supplier_name'} direction={sortDir} onClick={() => handleSort('supplier_name')}>Supplier</TableSortLabel>
                       </TableCell>
@@ -937,7 +1234,11 @@ export default function SupplierDeliveryPage() {
                       items.map((row) => (
                         <TableRow key={row.supplier_delivery_id} hover>
                           <TableCell>{row.supplier_delivery_number}</TableCell>
-                          <TableCell>{row.po_number}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2">PO: {row.purchase_order_numbers.length > 0 ? row.purchase_order_numbers.join(', ') : '-'}</Typography>
+                            <Typography variant="caption" color="text.secondary">DA: {row.delivery_advice_numbers.length > 0 ? row.delivery_advice_numbers.join(', ') : '-'}</Typography>
+                            <Typography variant="caption" color="text.secondary" display="block">MR: {row.material_request_numbers.length > 0 ? row.material_request_numbers.join(', ') : '-'}</Typography>
+                          </TableCell>
                           <TableCell>{row.supplier_code} - {row.supplier_name}</TableCell>
                           <TableCell>{row.project_code} - {row.project_name}</TableCell>
                           <TableCell>{formatDate(row.delivery_date)}</TableCell>
@@ -999,23 +1300,6 @@ export default function SupplierDeliveryPage() {
         <DialogContent dividers>
           <Grid container spacing={2} sx={{ mt: 0 }}>
             <Grid item xs={12} md={6} lg={4}>
-              <FormControl fullWidth size="small">
-                <Typography variant="caption" color="text.secondary">Purchase Order</Typography>
-                <Select
-                  value={form.purchase_order_id}
-                  onChange={(event) => syncFromPurchaseOrder(event.target.value as string)}
-                >
-                  <MenuItem value="">Select purchase order</MenuItem>
-                  {purchaseOrders.map((po) => (
-                    <MenuItem key={po.purchase_order_id} value={po.purchase_order_id.toString()}>
-                      {po.po_number}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={6} lg={4}>
               <Autocomplete
                 options={suppliers}
                 value={suppliers.find((supplier) => String(supplier.party_id) === String(form.supplier_id)) || null}
@@ -1067,17 +1351,6 @@ export default function SupplierDeliveryPage() {
               />
             </Grid>
 
-            <Grid item xs={12} md={6} lg={4}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Delivery Advice IDs"
-                helperText="Optional comma-separated IDs"
-                value={form.delivery_advice_ids}
-                onChange={(event) => setForm((current) => ({ ...current, delivery_advice_ids: event.target.value }))}
-              />
-            </Grid>
-
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -1088,6 +1361,93 @@ export default function SupplierDeliveryPage() {
                 value={form.notes}
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
               />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Source Documents (Optional)</Typography>
+            </Grid>
+
+            <Grid item xs={12} md={4} lg={4}>
+              <FormControl fullWidth size="small">
+                <Typography variant="caption" color="text.secondary">Purchase Orders</Typography>
+                <Select
+                  multiple
+                  value={form.purchase_order_ids}
+                  onChange={(event) => {
+                    const value = event.target.value as string[];
+                    setForm((current) => ({ ...current, purchase_order_ids: value }));
+                  }}
+                  renderValue={(selected) => selected
+                    .map((id) => purchaseOrders.find((po) => po.purchase_order_id === Number(id))?.po_number ?? id)
+                    .join(', ')}
+                >
+                  {purchaseOrders.map((po) => (
+                    <MenuItem key={po.purchase_order_id} value={po.purchase_order_id.toString()}>
+                      {po.po_number}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={4} lg={4}>
+              <FormControl fullWidth size="small">
+                <Typography variant="caption" color="text.secondary">Delivery Advices</Typography>
+                <Select
+                  multiple
+                  value={form.delivery_advice_ids}
+                  onChange={(event) => {
+                    const value = event.target.value as string[];
+                    setForm((current) => ({ ...current, delivery_advice_ids: value }));
+                  }}
+                  renderValue={(selected) => selected
+                    .map((id) => deliveryAdvices.find((da) => da.delivery_advice_id === Number(id))?.da_number ?? id)
+                    .join(', ')}
+                >
+                  {deliveryAdvices.map((da) => (
+                    <MenuItem key={da.delivery_advice_id} value={da.delivery_advice_id.toString()}>
+                      {da.da_number}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={4} lg={4}>
+              <FormControl fullWidth size="small">
+                <Typography variant="caption" color="text.secondary">Material Requests</Typography>
+                <Select
+                  multiple
+                  value={form.material_request_ids}
+                  onChange={(event) => {
+                    const value = event.target.value as string[];
+                    setForm((current) => ({ ...current, material_request_ids: value }));
+                  }}
+                  renderValue={(selected) => selected
+                    .map((id) => materialRequests.find((mr) => mr.material_request_id === Number(id))?.mr_number ?? id)
+                    .join(', ')}
+                >
+                  {materialRequests.map((mr) => (
+                    <MenuItem key={mr.material_request_id} value={mr.material_request_id.toString()}>
+                      {mr.mr_number}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <Button variant="outlined" onClick={syncHeaderFromSources} disabled={saving}>Sync Supplier/Project From Sources</Button>
+                <Button variant="contained" onClick={loadMergedSourceItems} disabled={saving}>Load and Merge Source Lines</Button>
+                <Button
+                  variant="text"
+                  onClick={() => setForm((current) => ({ ...current, items: [emptyItem()] }))}
+                  disabled={saving}
+                >
+                  Use Direct Receipt
+                </Button>
+              </Stack>
             </Grid>
           </Grid>
 
@@ -1110,7 +1470,7 @@ export default function SupplierDeliveryPage() {
             shouldConfirmDelete={(row) => Boolean(row.supplier_delivery_item_id)}
             getDeleteConfirmMessage={() => 'Delete this saved detail row?'}
             addRowLabel="Add Row"
-            focusField="purchase_order_item_id"
+            focusField="material_id"
             totals={detailTotals}
             disabled={saving}
           />
@@ -1143,20 +1503,18 @@ export default function SupplierDeliveryPage() {
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{viewItem.status_name}</Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <Typography variant="caption" color="text.secondary">Purchase Order</Typography>
-                  <Typography variant="body2">{viewItem.po_number}</Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="caption" color="text.secondary">Delivery Date</Typography>
-                  <Typography variant="body2">{formatDate(viewItem.delivery_date)}</Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
                   <Typography variant="caption" color="text.secondary">Supplier</Typography>
                   <Typography variant="body2">{viewItem.supplier_code} - {viewItem.supplier_name}</Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="caption" color="text.secondary">Project</Typography>
                   <Typography variant="body2">{viewItem.project_code} - {viewItem.project_name}</Typography>
+                </Grid>
+                <Grid item xs={12} md={12}>
+                  <Typography variant="caption" color="text.secondary">Source Documents</Typography>
+                  <Typography variant="body2">PO: {viewItem.purchase_order_numbers.length > 0 ? viewItem.purchase_order_numbers.join(', ') : '-'}</Typography>
+                  <Typography variant="body2">DA: {viewItem.delivery_advice_numbers.length > 0 ? viewItem.delivery_advice_numbers.join(', ') : '-'}</Typography>
+                  <Typography variant="body2">MR: {viewItem.material_request_numbers.length > 0 ? viewItem.material_request_numbers.join(', ') : '-'}</Typography>
                 </Grid>
               </Grid>
 
@@ -1168,6 +1526,7 @@ export default function SupplierDeliveryPage() {
                     <TableRow>
                       <TableCell>Material</TableCell>
                       <TableCell>UOM</TableCell>
+                      <TableCell>References</TableCell>
                       <TableCell align="right">Delivered</TableCell>
                       <TableCell align="right">Accepted</TableCell>
                       <TableCell align="right">Rejected</TableCell>
@@ -1178,6 +1537,7 @@ export default function SupplierDeliveryPage() {
                       <TableRow key={item.supplier_delivery_item_id}>
                         <TableCell>{item.material_code} - {item.material_name}</TableCell>
                         <TableCell>{item.uom_abbreviation}</TableCell>
+                        <TableCell>{item.references.length > 0 ? item.references.map((row) => `${row.reference_number} (${formatNumber(row.quantity)})`).join(', ') : 'Direct Receipt'}</TableCell>
                         <TableCell align="right">{formatNumber(item.delivered_quantity)}</TableCell>
                         <TableCell align="right">{formatNumber(item.accepted_quantity)}</TableCell>
                         <TableCell align="right">{formatNumber(item.rejected_quantity)}</TableCell>

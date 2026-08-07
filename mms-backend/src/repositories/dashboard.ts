@@ -293,7 +293,7 @@ export class DashboardRepository {
   }
 
   private async supplierPerformance(): Promise<Array<{ label: string; value: number }>> {
-    const rows = await this.rows(`SELECT sp.party_name AS label, ROUND(100 * AVG(CASE WHEN po.expected_delivery_date IS NULL OR sd.delivery_date <= po.expected_delivery_date THEN 1 ELSE 0 END))::int AS value FROM supplier_delivery sd JOIN purchase_order po ON po.purchase_order_id = sd.purchase_order_id JOIN party sp ON sp.party_id = sd.supplier_id WHERE sd.is_deleted = false AND po.is_deleted = false GROUP BY sp.party_name ORDER BY value DESC LIMIT 10`);
+    const rows = await this.rows(`SELECT sp.party_name AS label, ROUND(100 * AVG(CASE WHEN po.expected_delivery_date IS NULL OR sd.delivery_date <= po.expected_delivery_date THEN 1 ELSE 0 END))::int AS value FROM supplier_delivery sd JOIN supplier_delivery_purchase_order sdpo ON sdpo.supplier_delivery_id = sd.supplier_delivery_id AND sdpo.is_deleted = false JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id AND po.is_deleted = false JOIN party sp ON sp.party_id = sd.supplier_id WHERE sd.is_deleted = false GROUP BY sp.party_name ORDER BY value DESC LIMIT 10`);
     return rows.map((x) => ({ label: x.label as string, value: Number(x.value ?? 0) }));
   }
 
@@ -304,7 +304,7 @@ export class DashboardRepository {
   }
 
   private async lateSuppliers(query: DashboardWidgetQuery): Promise<ListResult<Record<string, unknown>>> {
-    const rows = await this.rows(`SELECT sd.supplier_delivery_id, po.po_number, p.party_name AS supplier_name, po.expected_delivery_date, sd.delivery_date, COUNT(*) OVER()::int AS total_count FROM supplier_delivery sd JOIN purchase_order po ON po.purchase_order_id = sd.purchase_order_id JOIN party p ON p.party_id = sd.supplier_id WHERE sd.is_deleted=false AND po.is_deleted=false AND po.expected_delivery_date IS NOT NULL AND sd.delivery_date > po.expected_delivery_date ORDER BY sd.delivery_date DESC LIMIT $1 OFFSET $2`, [query.limit, query.offset]);
+    const rows = await this.rows(`SELECT sd.supplier_delivery_id, po.po_number, p.party_name AS supplier_name, po.expected_delivery_date, sd.delivery_date, COUNT(*) OVER()::int AS total_count FROM supplier_delivery sd JOIN supplier_delivery_purchase_order sdpo ON sdpo.supplier_delivery_id = sd.supplier_delivery_id AND sdpo.is_deleted = false JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id JOIN party p ON p.party_id = sd.supplier_id WHERE sd.is_deleted=false AND po.is_deleted=false AND po.expected_delivery_date IS NOT NULL AND sd.delivery_date > po.expected_delivery_date ORDER BY sd.delivery_date DESC LIMIT $1 OFFSET $2`, [query.limit, query.offset]);
     const total = rows[0] ? Number(rows[0].total_count) : 0;
     return { items: rows.map((x) => ({ id: x.supplier_delivery_id, po_number: x.po_number, supplier: x.supplier_name, expected_delivery_date: x.expected_delivery_date, actual_delivery_date: x.delivery_date })), total };
   }
@@ -470,7 +470,7 @@ export class DashboardRepository {
     }
 
     if (dashboardType === 'purchasing' || dashboardType === 'administrator') {
-      items.push({ title: 'Late Supplier Deliveries', severity: 'error', value: await this.scalar(`SELECT COUNT(*) FROM supplier_delivery sd JOIN purchase_order po ON po.purchase_order_id = sd.purchase_order_id WHERE sd.is_deleted = false AND po.is_deleted = false AND po.expected_delivery_date IS NOT NULL AND sd.delivery_date > po.expected_delivery_date`) });
+      items.push({ title: 'Late Supplier Deliveries', severity: 'error', value: await this.scalar(`SELECT COUNT(DISTINCT sd.supplier_delivery_id) FROM supplier_delivery sd JOIN supplier_delivery_purchase_order sdpo ON sdpo.supplier_delivery_id = sd.supplier_delivery_id AND sdpo.is_deleted = false JOIN purchase_order po ON po.purchase_order_id = sdpo.purchase_order_id WHERE sd.is_deleted = false AND po.is_deleted = false AND po.expected_delivery_date IS NOT NULL AND sd.delivery_date > po.expected_delivery_date`) });
     }
 
     if (dashboardType === 'inventory' || dashboardType === 'administrator') {

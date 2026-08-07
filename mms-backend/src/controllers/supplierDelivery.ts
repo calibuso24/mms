@@ -52,7 +52,6 @@ export class SupplierDeliveryController {
     try {
       const result = await this.service.createSupplierDelivery(
         {
-          purchase_order_id: Number(req.body.purchase_order_id),
           supplier_id: Number(req.body.supplier_id),
           project_id: Number(req.body.project_id),
           received_by_account_id:
@@ -62,9 +61,17 @@ export class SupplierDeliveryController {
           delivery_date: req.body.delivery_date ?? null,
           reference_code: req.body.reference_code ?? null,
           notes: req.body.notes ?? null,
+          purchase_order_ids: Array.isArray(req.body.purchase_order_ids)
+            ? req.body.purchase_order_ids.map((id: any) => Number(id))
+            : undefined,
+          delivery_advice_ids: Array.isArray(req.body.delivery_advice_ids)
+            ? req.body.delivery_advice_ids.map((id: any) => Number(id))
+            : undefined,
+          material_request_ids: Array.isArray(req.body.material_request_ids)
+            ? req.body.material_request_ids.map((id: any) => Number(id))
+            : undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
-                purchase_order_item_id: Number(item.purchase_order_item_id),
                 material_id: Number(item.material_id),
                 material_brand_id:
                   item.material_brand_id === undefined || item.material_brand_id === null || item.material_brand_id === ''
@@ -78,11 +85,16 @@ export class SupplierDeliveryController {
                     ? undefined
                     : Number(item.rejected_quantity),
                 notes: item.notes ?? null,
+                references: Array.isArray(item.references)
+                  ? item.references.map((reference: any) => ({
+                      reference_type_code: reference.reference_type_code,
+                      reference_id: Number(reference.reference_id),
+                      reference_line_id: Number(reference.reference_line_id),
+                      quantity: Number(reference.quantity),
+                    }))
+                  : undefined,
               }))
             : [],
-          delivery_advice_ids: Array.isArray(req.body.delivery_advice_ids)
-            ? req.body.delivery_advice_ids.map((id: any) => Number(id))
-            : undefined,
         },
         req.accountId
       );
@@ -103,7 +115,6 @@ export class SupplierDeliveryController {
       const result = await this.service.updateSupplierDelivery(
         id,
         {
-          purchase_order_id: req.body.purchase_order_id !== undefined ? Number(req.body.purchase_order_id) : undefined,
           supplier_id: req.body.supplier_id !== undefined ? Number(req.body.supplier_id) : undefined,
           project_id: req.body.project_id !== undefined ? Number(req.body.project_id) : undefined,
           received_by_account_id:
@@ -115,10 +126,18 @@ export class SupplierDeliveryController {
           delivery_date: req.body.delivery_date ?? undefined,
           reference_code: req.body.reference_code !== undefined ? req.body.reference_code ?? null : undefined,
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          purchase_order_ids: Array.isArray(req.body.purchase_order_ids)
+            ? req.body.purchase_order_ids.map((id: any) => Number(id))
+            : undefined,
+          delivery_advice_ids: Array.isArray(req.body.delivery_advice_ids)
+            ? req.body.delivery_advice_ids.map((adviceId: any) => Number(adviceId))
+            : undefined,
+          material_request_ids: Array.isArray(req.body.material_request_ids)
+            ? req.body.material_request_ids.map((requestId: any) => Number(requestId))
+            : undefined,
           expected_updated_at: req.body.expected_updated_at ?? undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
-                purchase_order_item_id: Number(item.purchase_order_item_id),
                 material_id: Number(item.material_id),
                 material_brand_id:
                   item.material_brand_id === undefined || item.material_brand_id === null || item.material_brand_id === ''
@@ -132,10 +151,15 @@ export class SupplierDeliveryController {
                     ? undefined
                     : Number(item.rejected_quantity),
                 notes: item.notes ?? null,
+                references: Array.isArray(item.references)
+                  ? item.references.map((reference: any) => ({
+                      reference_type_code: reference.reference_type_code,
+                      reference_id: Number(reference.reference_id),
+                      reference_line_id: Number(reference.reference_line_id),
+                      quantity: Number(reference.quantity),
+                    }))
+                  : undefined,
               }))
-            : undefined,
-          delivery_advice_ids: Array.isArray(req.body.delivery_advice_ids)
-            ? req.body.delivery_advice_ids.map((adviceId: any) => Number(adviceId))
             : undefined,
         },
         req.accountId
@@ -157,7 +181,6 @@ export class SupplierDeliveryController {
       const result = await this.service.addSupplierDeliveryItem(
         id,
         {
-          purchase_order_item_id: Number(req.body.purchase_order_item_id),
           material_id: Number(req.body.material_id),
           material_brand_id:
             req.body.material_brand_id === undefined || req.body.material_brand_id === null || req.body.material_brand_id === ''
@@ -171,6 +194,14 @@ export class SupplierDeliveryController {
               ? undefined
               : Number(req.body.rejected_quantity),
           notes: req.body.notes ?? null,
+          references: Array.isArray(req.body.references)
+            ? req.body.references.map((reference: any) => ({
+                reference_type_code: reference.reference_type_code,
+                reference_id: Number(reference.reference_id),
+                reference_line_id: Number(reference.reference_line_id),
+                quantity: Number(reference.quantity),
+              }))
+            : undefined,
         },
         req.accountId
       );
@@ -196,7 +227,6 @@ export class SupplierDeliveryController {
         id,
         itemId,
         {
-          purchase_order_item_id: Number(req.body.purchase_order_item_id),
           material_id: Number(req.body.material_id),
           material_brand_id:
             req.body.material_brand_id === undefined || req.body.material_brand_id === null || req.body.material_brand_id === ''
@@ -210,6 +240,14 @@ export class SupplierDeliveryController {
               ? undefined
               : Number(req.body.rejected_quantity),
           notes: req.body.notes ?? null,
+          references: Array.isArray(req.body.references)
+            ? req.body.references.map((reference: any) => ({
+                reference_type_code: reference.reference_type_code,
+                reference_id: Number(reference.reference_id),
+                reference_line_id: Number(reference.reference_line_id),
+                quantity: Number(reference.quantity),
+              }))
+            : undefined,
           expected_updated_at: req.body.expected_updated_at ?? undefined,
         },
         req.accountId

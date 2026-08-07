@@ -1,5 +1,11 @@
+export interface SupplierDeliveryItemReferenceDto {
+  reference_type_code: 'po' | 'delivery_advice' | 'material_request';
+  reference_id: number;
+  reference_line_id: number;
+  quantity: number;
+}
+
 export interface SupplierDeliveryItemDto {
-  purchase_order_item_id: number;
   material_id: number;
   material_brand_id?: number | null;
   uom_id: number;
@@ -7,6 +13,7 @@ export interface SupplierDeliveryItemDto {
   accepted_quantity: number;
   rejected_quantity?: number;
   notes?: string | null;
+  references?: SupplierDeliveryItemReferenceDto[];
 }
 
 export interface SupplierDeliveryItemMutationDto extends SupplierDeliveryItemDto {
@@ -14,28 +21,30 @@ export interface SupplierDeliveryItemMutationDto extends SupplierDeliveryItemDto
 }
 
 export interface CreateSupplierDeliveryDto {
-  purchase_order_id: number;
   supplier_id: number;
   project_id: number;
   received_by_account_id?: number | null;
   delivery_date?: string | null;
   reference_code?: string | null;
   notes?: string | null;
-  items: SupplierDeliveryItemDto[];
+  purchase_order_ids?: number[];
   delivery_advice_ids?: number[];
+  material_request_ids?: number[];
+  items: SupplierDeliveryItemDto[];
 }
 
 export interface UpdateSupplierDeliveryDto {
-  purchase_order_id?: number;
   supplier_id?: number;
   project_id?: number;
   received_by_account_id?: number | null;
   delivery_date?: string | null;
   reference_code?: string | null;
   notes?: string | null;
+  purchase_order_ids?: number[];
+  delivery_advice_ids?: number[];
+  material_request_ids?: number[];
   expected_updated_at?: string | null;
   items?: SupplierDeliveryItemDto[];
-  delivery_advice_ids?: number[];
 }
 
 export interface SupplierDeliveryListQuery {

@@ -31,10 +31,12 @@ export class ApiClient {
 
   static async request(endpoint: string, options: RequestOptions = {}): Promise<any> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const method = options.method || 'GET';
     const requestOptions: RequestInit = {
-      method: options.method || 'GET',
+      method,
       headers: this.getHeaders(),
       credentials: 'include',
+      cache: method === 'GET' ? 'no-store' : 'default',
     };
 
     if (options.body !== undefined) {
@@ -66,6 +68,7 @@ export class ApiClient {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      cache: 'no-store',
     };
 
     const response = await fetch(url, requestOptions);

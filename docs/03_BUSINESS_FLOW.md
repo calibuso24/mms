@@ -94,17 +94,18 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
 
 ### 8. Supplier delivery flow
 
-1. Supplier deliveries are created against an approved purchase order with one or more line items.
-2. Supplier and PO validation is enforced by both service checks and database trigger validation.
+1. Supplier deliveries can be created from any combination of source documents: purchase orders, delivery advices, and material requests, or as a direct receipt with no source.
+2. Source-document links are stored in dedicated reference tables and line-level traceability is stored in `supplier_delivery_item_reference`.
 3. Draft records can be edited, cancelled, or posted.
 4. Posting is executed through `post_supplier_delivery(...)`, which:
   - writes stock movements for accepted quantities,
   - updates stock balance and stock layers,
-  - updates PO line received quantities,
-  - transitions PO status to Partially Delivered or Delivered,
+  - updates source line received quantities (PO and Delivery Advice references),
+  - updates source document workflow status when fully received,
   - marks supplier delivery as Posted.
-5. Audit logs record create, update, delete, post, and cancel operations.
-6. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/supplier-deliveries/:id/items...`) to support draft autosave and concurrent editing.
+5. Source documents remain the origin of planning/procurement intent while inventory movements are driven only by supplier delivery posting.
+6. Audit logs record create, update, delete, post, and cancel operations.
+7. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/supplier-deliveries/:id/items...`) to support draft autosave and concurrent editing.
 
 ### 9. Delivery advice flow
 
