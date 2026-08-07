@@ -72,7 +72,8 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
 
 1. Material Control records are created per project with a control code, budget, estimated cost, and workflow status.
 2. Status transitions use lookup-driven values from material_control_status.
-3. Review metadata is recorded when the record reaches a terminal status.
+3. Line items are persisted through item-level endpoints and can be edited or removed independently without replacing the full item set.
+4. Review metadata is recorded when the record reaches a terminal status.
 
 ### 6. Material request flow
 
@@ -80,6 +81,7 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
 2. Request numbers are generated automatically in MR-YYYY-000001 format.
 3. Status transitions use lookup-driven values from material_request_status.
 4. Approval metadata is recorded when the request reaches a terminal status.
+5. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/material-requests/:id/items...`) to support draft autosave and collaborative editing.
 
 ### 7. Purchase order flow
 
@@ -88,6 +90,7 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
 3. Orders can optionally be linked back to a material request for procurement traceability.
 4. Status transitions use lookup-driven values from purchase_order_status.
 5. Approval and cancellation are tracked as workflow actions on the order header.
+6. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/purchase-orders/:id/items...`) to support draft autosave and concurrent editing.
 
 ### 8. Supplier delivery flow
 
@@ -101,12 +104,14 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
   - transitions PO status to Partially Delivered or Delivered,
   - marks supplier delivery as Posted.
 5. Audit logs record create, update, delete, post, and cancel operations.
+6. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/supplier-deliveries/:id/items...`) to support draft autosave and concurrent editing.
 
 ### 9. Delivery advice flow
 
 1. Delivery advice records are created for a purchase order with one or more delivery_advice_item rows.
 2. DA numbers are generated in DA-YYYY-000001 format.
 3. reference_code is required and must be unique.
+4. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/delivery-advices/:id/items...`) to support draft autosave and concurrent editing.
 4. Workflow transitions are draft -> submitted -> completed, with cancel supported from draft/submitted.
 5. Audit logs record create, update, delete, submit, complete, and cancel actions.
 
@@ -115,16 +120,18 @@ Dashboard support now uses role-aware, database-driven widgets for Coordinating,
 1. Stock transfers are created between source and destination parties with one or more stock_transfer_item rows.
 2. ST numbers are generated in ST-YYYY-000001 format.
 3. Optional purchase_order links are validated when provided.
-4. Workflow transitions are draft -> submitted -> approved, with cancel supported from draft/submitted.
-5. Audit logs record create, update, delete, submit, approve, and cancel actions.
+4. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/stock-transfers/:id/items...`) to support draft autosave and concurrent editing.
+5. Workflow transitions are draft -> submitted -> approved, with cancel supported from draft/submitted.
+6. Audit logs record create, update, delete, submit, approve, and cancel actions.
 
 ### 11. Material adjustment flow
 
 1. Material adjustments are created per project with one or more material_adjustment_item rows.
 2. MA numbers are generated in MA-YYYY-000001 format.
-3. Workflow statuses use material_adjustment_status lookups: pending, approved, rejected, completed.
-4. Transitions enforce pending -> approved/rejected and approved -> completed.
-5. Audit logs record create, update, delete, approve, reject, and complete actions.
+3. Line items can now be persisted immediately through item-level endpoints (`POST/PUT/DELETE /api/material-adjustments/:id/items...`) to support draft-style autosave and concurrent editing.
+4. Workflow statuses use material_adjustment_status lookups: pending, approved, rejected, completed.
+5. Transitions enforce pending -> approved/rejected and approved -> completed.
+6. Audit logs record create, update, delete, approve, reject, and complete actions.
 
 ### 12. System settings flow
 
@@ -212,6 +219,7 @@ Practical implication:
 | Permission checks by module/code | requirePermission middleware |
 | Lookup-backed status/type values | FK to look_up |
 | Soft deletes for mutable records | is_deleted flags |
+| Optimistic concurrency on transaction updates/actions | `expected_updated_at` request token validated against latest persisted `updated_at`, returns `409` on mismatch |
 | Supplier schedule day/time validation | supplier_business_hours constraints |
 | Report access by per-report permission | Report Catalog + REPORT_<code> |
 | Report execution state tracking | report_history + REPORT_STATUS lookups |
@@ -227,5 +235,8 @@ Practical implication:
 
 | Date | Author | Summary |
 |---|---|---|
+| 2026-08-07 | Copilot | Added supplier-delivery immediate line-item persistence behavior and item-level endpoint workflow notes. |
+| 2026-08-07 | Copilot | Added delivery-advice immediate line-item persistence behavior and item-level endpoint workflow notes. |
+| 2026-08-07 | Copilot | Added purchase-order immediate line-item persistence behavior and item-level endpoint workflow notes. |
 | 2026-08-01 | Copilot | Reworked workflow documentation to distinguish implemented modules from seeded placeholders, and aligned navigation/report flow details with actual frontend and backend behavior. |
 | 2026-08-01 | Copilot | Added purchase order as an implemented workflow and documented its procurement lifecycle. |

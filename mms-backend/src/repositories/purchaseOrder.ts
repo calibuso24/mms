@@ -45,6 +45,7 @@ export interface PurchaseOrderItemRow {
   line_total: string | null;
   supplier_reference: string | null;
   notes: string | null;
+  updated_at: string | null;
 }
 
 type QueryExecutor = PoolClient | typeof pool;
@@ -248,7 +249,8 @@ export class PurchaseOrderRepository {
         poi.unit_price::TEXT AS unit_price,
         poi.line_total::TEXT AS line_total,
         poi.supplier_reference,
-        poi.notes
+        poi.notes,
+        poi.log_date_updated AS updated_at
       FROM purchase_order_item poi
       JOIN material m ON m.material_id = poi.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = poi.uom_id AND u.is_deleted = false
@@ -432,6 +434,149 @@ export class PurchaseOrderRepository {
         ]
       );
     }
+  }
+
+  async findItemById(itemId: number, client?: PoolClient): Promise<PurchaseOrderItemRow | null> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        poi.purchase_order_item_id,
+        poi.material_request_item_id,
+        poi.material_id,
+        m.product_code AS material_code,
+        m.product_name AS material_name,
+        poi.requested_quantity::TEXT AS requested_quantity,
+        poi.ordered_quantity::TEXT AS ordered_quantity,
+        poi.received_quantity::TEXT AS received_quantity,
+        poi.uom_id,
+        u.uom_name,
+        u.abbreviation AS uom_abbreviation,
+        poi.unit_price::TEXT AS unit_price,
+        poi.line_total::TEXT AS line_total,
+        poi.supplier_reference,
+        poi.notes,
+        poi.log_date_updated AS updated_at
+      FROM purchase_order_item poi
+      JOIN material m ON m.material_id = poi.material_id AND m.is_deleted = false
+      JOIN unit_of_measure u ON u.uom_id = poi.uom_id AND u.is_deleted = false
+      WHERE poi.purchase_order_item_id = $1
+        AND poi.is_deleted = false`,
+      [itemId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async createItem(orderId: number, item: {
+    material_request_item_id?: number | null;
+    material_id: number;
+    requested_quantity: number;
+    ordered_quantity: number;
+    received_quantity?: number;
+    uom_id: number;
+    unit_price?: number | null;
+    line_total?: number | null;
+    supplier_reference?: string | null;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<{ purchase_order_item_id: number }> {
+    const result = await this.getExecutor(client).query(
+      `INSERT INTO purchase_order_item (
+        purchase_order_id,
+        material_request_item_id,
+        material_id,
+        requested_quantity,
+        ordered_quantity,
+        received_quantity,
+        uom_id,
+        unit_price,
+        line_total,
+        supplier_reference,
+        notes,
+        log_date_created,
+        log_created_by_account_id,
+        log_module_created
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13
+      ) RETURNING purchase_order_item_id`,
+      [
+        orderId,
+        item.material_request_item_id ?? null,
+        item.material_id,
+        item.requested_quantity,
+        item.ordered_quantity,
+        item.received_quantity ?? 0,
+        item.uom_id,
+        item.unit_price ?? null,
+        item.line_total ?? null,
+        item.supplier_reference ?? null,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  async updateItem(itemId: number, item: {
+    material_request_item_id?: number | null;
+    material_id: number;
+    requested_quantity: number;
+    ordered_quantity: number;
+    received_quantity?: number;
+    uom_id: number;
+    unit_price?: number | null;
+    line_total?: number | null;
+    supplier_reference?: string | null;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE purchase_order_item
+       SET material_request_item_id = $2,
+           material_id = $3,
+           requested_quantity = $4,
+           ordered_quantity = $5,
+           received_quantity = $6,
+           uom_id = $7,
+           unit_price = $8,
+           line_total = $9,
+           supplier_reference = $10,
+           notes = $11,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $12,
+           log_module_updated = $13
+       WHERE purchase_order_item_id = $1
+         AND is_deleted = false`,
+      [
+        itemId,
+        item.material_request_item_id ?? null,
+        item.material_id,
+        item.requested_quantity,
+        item.ordered_quantity,
+        item.received_quantity ?? 0,
+        item.uom_id,
+        item.unit_price ?? null,
+        item.line_total ?? null,
+        item.supplier_reference ?? null,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+  }
+
+  async softDeleteItem(itemId: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE purchase_order_item
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE purchase_order_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
   }
 
   async softDelete(id: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {

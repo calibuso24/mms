@@ -49,6 +49,7 @@ export interface StockTransferItemRow {
   uom_abbreviation: string;
   quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export class StockTransferRepository {
@@ -161,7 +162,8 @@ export class StockTransferRepository {
         u.uom_name,
         u.abbreviation AS uom_abbreviation,
         sti.quantity::TEXT AS quantity,
-        sti.notes
+        sti.notes,
+        sti.log_date_updated AS updated_at
       FROM stock_transfer_item sti
       JOIN material m ON m.material_id = sti.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = sti.uom_id AND u.is_deleted = false
@@ -357,6 +359,130 @@ export class StockTransferRepository {
         ]
       );
     }
+  }
+
+  async findItemById(itemId: number, client?: PoolClient): Promise<StockTransferItemRow | null> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        sti.stock_transfer_item_id,
+        sti.purchase_order_item_id,
+        sti.material_request_item_id,
+        sti.material_id,
+        m.product_code AS material_code,
+        m.product_name AS material_name,
+        sti.material_brand_id,
+        b.brand_name AS material_brand_name,
+        sti.uom_id,
+        u.uom_name,
+        u.abbreviation AS uom_abbreviation,
+        sti.quantity::TEXT AS quantity,
+        sti.notes,
+        sti.log_date_updated AS updated_at
+      FROM stock_transfer_item sti
+      JOIN material m ON m.material_id = sti.material_id AND m.is_deleted = false
+      JOIN unit_of_measure u ON u.uom_id = sti.uom_id AND u.is_deleted = false
+      LEFT JOIN material_brand mb ON mb.material_brand_id = sti.material_brand_id AND mb.is_deleted = false
+      LEFT JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
+      WHERE sti.stock_transfer_item_id = $1
+        AND sti.is_deleted = false`,
+      [itemId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async createItem(stockTransferId: number, item: {
+    purchase_order_item_id?: number | null;
+    material_request_item_id?: number | null;
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    quantity: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<{ stock_transfer_item_id: number }> {
+    const result = await this.getExecutor(client).query(
+      `INSERT INTO stock_transfer_item (
+        stock_transfer_id,
+        purchase_order_item_id,
+        material_request_item_id,
+        material_id,
+        material_brand_id,
+        uom_id,
+        quantity,
+        notes,
+        log_date_created,
+        log_created_by_account_id,
+        log_module_created
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
+      RETURNING stock_transfer_item_id`,
+      [
+        stockTransferId,
+        item.purchase_order_item_id ?? null,
+        item.material_request_item_id ?? null,
+        item.material_id,
+        item.material_brand_id ?? null,
+        item.uom_id,
+        item.quantity,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  async updateItem(itemId: number, item: {
+    purchase_order_item_id?: number | null;
+    material_request_item_id?: number | null;
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    quantity: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE stock_transfer_item
+       SET purchase_order_item_id = $2,
+           material_request_item_id = $3,
+           material_id = $4,
+           material_brand_id = $5,
+           uom_id = $6,
+           quantity = $7,
+           notes = $8,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $9,
+           log_module_updated = $10
+       WHERE stock_transfer_item_id = $1
+         AND is_deleted = false`,
+      [
+        itemId,
+        item.purchase_order_item_id ?? null,
+        item.material_request_item_id ?? null,
+        item.material_id,
+        item.material_brand_id ?? null,
+        item.uom_id,
+        item.quantity,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+  }
+
+  async softDeleteItem(itemId: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE stock_transfer_item
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE stock_transfer_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
   }
 
   async softDelete(id: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {

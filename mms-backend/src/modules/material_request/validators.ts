@@ -1,6 +1,39 @@
 import { ValidationError } from '../../utils/errors.js';
 
 export class MaterialRequestValidator {
+  static validateItem(data: {
+    material_id: number;
+    requested_quantity: number;
+    approved_quantity?: number | null;
+    estimated_quantity?: number | null;
+    area_usage?: string | null;
+    remarks?: string | null;
+    uom_id: number;
+    notes?: string | null;
+  }) {
+    const errors: string[] = [];
+
+    if (!Number.isInteger(data.material_id) || data.material_id <= 0) {
+      errors.push('Material is required');
+    }
+    if (!Number.isInteger(data.uom_id) || data.uom_id <= 0) {
+      errors.push('Unit of measure is required');
+    }
+    if (!Number.isFinite(data.requested_quantity) || data.requested_quantity <= 0) {
+      errors.push('Requested quantity must be greater than zero');
+    }
+    if (data.approved_quantity !== undefined && data.approved_quantity !== null && (!Number.isFinite(data.approved_quantity) || data.approved_quantity < 0)) {
+      errors.push('Approved quantity must be a non-negative number');
+    }
+    if (data.estimated_quantity !== undefined && data.estimated_quantity !== null && (!Number.isFinite(data.estimated_quantity) || data.estimated_quantity < 0)) {
+      errors.push('Estimated quantity must be a non-negative number');
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationError(errors.join('; '));
+    }
+  }
+
   static validateCreate(data: {
     project_id: number;
     status_id?: number;

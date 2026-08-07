@@ -107,6 +107,7 @@ export class StockTransferController {
           transfer_date: req.body.transfer_date ?? undefined,
           reference_code: req.body.reference_code !== undefined ? req.body.reference_code ?? null : undefined,
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
                 purchase_order_item_id: item.purchase_order_item_id ? Number(item.purchase_order_item_id) : null,
@@ -119,6 +120,90 @@ export class StockTransferController {
               }))
             : undefined,
         },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addStockTransferItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid stock transfer ID');
+      }
+
+      const result = await this.service.addStockTransferItem(
+        id,
+        {
+          purchase_order_item_id: req.body.purchase_order_item_id ? Number(req.body.purchase_order_item_id) : null,
+          material_request_item_id: req.body.material_request_item_id ? Number(req.body.material_request_item_id) : null,
+          material_id: Number(req.body.material_id),
+          material_brand_id: req.body.material_brand_id ? Number(req.body.material_brand_id) : null,
+          uom_id: Number(req.body.uom_id),
+          quantity: Number(req.body.quantity),
+          notes: req.body.notes ?? null,
+        },
+        req.accountId
+      );
+
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateStockTransferItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid stock transfer ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid stock transfer item ID');
+      }
+
+      const result = await this.service.updateStockTransferItem(
+        id,
+        itemId,
+        {
+          purchase_order_item_id: req.body.purchase_order_item_id ? Number(req.body.purchase_order_item_id) : null,
+          material_request_item_id: req.body.material_request_item_id ? Number(req.body.material_request_item_id) : null,
+          material_id: Number(req.body.material_id),
+          material_brand_id: req.body.material_brand_id ? Number(req.body.material_brand_id) : null,
+          uom_id: Number(req.body.uom_id),
+          quantity: Number(req.body.quantity),
+          notes: req.body.notes ?? null,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
+        },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteStockTransferItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid stock transfer ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid stock transfer item ID');
+      }
+
+      const result = await this.service.deleteStockTransferItem(
+        id,
+        itemId,
+        req.body?.expected_updated_at ?? undefined,
         req.accountId
       );
 
@@ -149,7 +234,7 @@ export class StockTransferController {
         throw new ValidationError('Invalid stock transfer ID');
       }
 
-      res.json(await this.service.submitStockTransfer(id, req.accountId));
+      res.json(await this.service.submitStockTransfer(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -162,7 +247,7 @@ export class StockTransferController {
         throw new ValidationError('Invalid stock transfer ID');
       }
 
-      res.json(await this.service.approveStockTransfer(id, req.accountId));
+      res.json(await this.service.approveStockTransfer(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -175,7 +260,7 @@ export class StockTransferController {
         throw new ValidationError('Invalid stock transfer ID');
       }
 
-      res.json(await this.service.cancelStockTransfer(id, req.accountId));
+      res.json(await this.service.cancelStockTransfer(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }

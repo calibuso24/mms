@@ -343,7 +343,7 @@ export const materialControlItemApi = {
   get: (id: number) => ApiClient.get(`/material-controls/items/${id}`),
   create: (data: any) => ApiClient.post('/material-controls/items', data),
   update: (id: number, data: any) => ApiClient.put(`/material-controls/items/${id}`, data),
-  delete: (id: number) => ApiClient.delete(`/material-controls/items/${id}`),
+  delete: (id: number, data?: any) => ApiClient.request(`/material-controls/items/${id}`, { method: 'DELETE', body: data ?? {} }),
   previewImport: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -372,12 +372,15 @@ export const materialRequestApi = {
   get: (id: number) => ApiClient.get(`/material-requests/${id}`),
   create: (data: any) => ApiClient.post('/material-requests', data),
   update: (id: number, data: any) => ApiClient.put(`/material-requests/${id}`, data),
+  addItem: (id: number, data: any) => ApiClient.post(`/material-requests/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => ApiClient.put(`/material-requests/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number, data?: any) => ApiClient.request(`/material-requests/${id}/items/${itemId}`, { method: 'DELETE', body: data ?? {} }),
   delete: (id: number) => ApiClient.delete(`/material-requests/${id}`),
-  submit: (id: number) => ApiClient.post(`/material-requests/${id}/submit`, {}),
-  approve: (id: number) => ApiClient.post(`/material-requests/${id}/approve`, {}),
-  reject: (id: number) => ApiClient.post(`/material-requests/${id}/reject`, {}),
-  cancel: (id: number) => ApiClient.post(`/material-requests/${id}/cancel`, {}),
-  close: (id: number) => ApiClient.post(`/material-requests/${id}/close`, {}),
+  submit: (id: number, body: any = {}) => ApiClient.post(`/material-requests/${id}/submit`, body),
+  approve: (id: number, body: any = {}) => ApiClient.post(`/material-requests/${id}/approve`, body),
+  reject: (id: number, body: any = {}) => ApiClient.post(`/material-requests/${id}/reject`, body),
+  cancel: (id: number, body: any = {}) => ApiClient.post(`/material-requests/${id}/cancel`, body),
+  close: (id: number, body: any = {}) => ApiClient.post(`/material-requests/${id}/close`, body),
 };
 
 // Purchase Order API
@@ -398,9 +401,12 @@ export const purchaseOrderApi = {
   get: (id: number) => ApiClient.get(`/purchase-orders/${id}`),
   create: (data: any) => ApiClient.post('/purchase-orders', data),
   update: (id: number, data: any) => ApiClient.put(`/purchase-orders/${id}`, data),
+  addItem: (id: number, data: any) => ApiClient.post(`/purchase-orders/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => ApiClient.put(`/purchase-orders/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number, data?: any) => ApiClient.request(`/purchase-orders/${id}/items/${itemId}`, { method: 'DELETE', body: data ?? {} }),
   delete: (id: number) => ApiClient.delete(`/purchase-orders/${id}`),
-  approve: (id: number) => ApiClient.post(`/purchase-orders/${id}/approve`, {}),
-  cancel: (id: number) => ApiClient.post(`/purchase-orders/${id}/cancel`, {}),
+  approve: (id: number, body: any = {}) => ApiClient.post(`/purchase-orders/${id}/approve`, body),
+  cancel: (id: number, body: any = {}) => ApiClient.post(`/purchase-orders/${id}/cancel`, body),
 };
 
 // Supplier Delivery API
@@ -421,9 +427,12 @@ export const supplierDeliveryApi = {
   get: (id: number) => ApiClient.get(`/supplier-deliveries/${id}`),
   create: (data: any) => ApiClient.post('/supplier-deliveries', data),
   update: (id: number, data: any) => ApiClient.put(`/supplier-deliveries/${id}`, data),
+  addItem: (id: number, data: any) => ApiClient.post(`/supplier-deliveries/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => ApiClient.put(`/supplier-deliveries/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number, data?: any) => ApiClient.request(`/supplier-deliveries/${id}/items/${itemId}`, { method: 'DELETE', body: data ?? {} }),
   delete: (id: number) => ApiClient.delete(`/supplier-deliveries/${id}`),
-  post: (id: number) => ApiClient.post(`/supplier-deliveries/${id}/post`, {}),
-  cancel: (id: number) => ApiClient.post(`/supplier-deliveries/${id}/cancel`, {}),
+  post: (id: number, body: any = {}) => ApiClient.post(`/supplier-deliveries/${id}/post`, body),
+  cancel: (id: number, body: any = {}) => ApiClient.post(`/supplier-deliveries/${id}/cancel`, body),
 };
 
 // Delivery Advice API
@@ -442,10 +451,13 @@ export const deliveryAdviceApi = {
   get: (id: number) => ApiClient.get(`/delivery-advices/${id}`),
   create: (data: any) => ApiClient.post('/delivery-advices', data),
   update: (id: number, data: any) => ApiClient.put(`/delivery-advices/${id}`, data),
+  addItem: (id: number, data: any) => ApiClient.post(`/delivery-advices/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => ApiClient.put(`/delivery-advices/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number, data?: any) => ApiClient.request(`/delivery-advices/${id}/items/${itemId}`, { method: 'DELETE', body: data ?? {} }),
   delete: (id: number) => ApiClient.delete(`/delivery-advices/${id}`),
-  submit: (id: number) => ApiClient.post(`/delivery-advices/${id}/submit`, {}),
-  complete: (id: number) => ApiClient.post(`/delivery-advices/${id}/complete`, {}),
-  cancel: (id: number) => ApiClient.post(`/delivery-advices/${id}/cancel`, {}),
+  submit: (id: number, body: any = {}) => ApiClient.post(`/delivery-advices/${id}/submit`, body),
+  complete: (id: number, body: any = {}) => ApiClient.post(`/delivery-advices/${id}/complete`, body),
+  cancel: (id: number, body: any = {}) => ApiClient.post(`/delivery-advices/${id}/cancel`, body),
 };
 
 // Stock Transfer API
@@ -466,10 +478,13 @@ export const stockTransferApi = {
   get: (id: number) => ApiClient.get(`/stock-transfers/${id}`),
   create: (data: any) => ApiClient.post('/stock-transfers', data),
   update: (id: number, data: any) => ApiClient.put(`/stock-transfers/${id}`, data),
+  addItem: (id: number, data: any) => ApiClient.post(`/stock-transfers/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => ApiClient.put(`/stock-transfers/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number, data?: any) => ApiClient.request(`/stock-transfers/${id}/items/${itemId}`, { method: 'DELETE', body: data ?? {} }),
   delete: (id: number) => ApiClient.delete(`/stock-transfers/${id}`),
-  submit: (id: number) => ApiClient.post(`/stock-transfers/${id}/submit`, {}),
-  approve: (id: number) => ApiClient.post(`/stock-transfers/${id}/approve`, {}),
-  cancel: (id: number) => ApiClient.post(`/stock-transfers/${id}/cancel`, {}),
+  submit: (id: number, body: any = {}) => ApiClient.post(`/stock-transfers/${id}/submit`, body),
+  approve: (id: number, body: any = {}) => ApiClient.post(`/stock-transfers/${id}/approve`, body),
+  cancel: (id: number, body: any = {}) => ApiClient.post(`/stock-transfers/${id}/cancel`, body),
 };
 
 // Material Adjustment API
@@ -489,10 +504,13 @@ export const materialAdjustmentApi = {
   get: (id: number) => ApiClient.get(`/material-adjustments/${id}`),
   create: (data: any) => ApiClient.post('/material-adjustments', data),
   update: (id: number, data: any) => ApiClient.put(`/material-adjustments/${id}`, data),
+  addItem: (id: number, data: any) => ApiClient.post(`/material-adjustments/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => ApiClient.put(`/material-adjustments/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number, data?: any) => ApiClient.request(`/material-adjustments/${id}/items/${itemId}`, { method: 'DELETE', body: data ?? {} }),
   delete: (id: number) => ApiClient.delete(`/material-adjustments/${id}`),
-  approve: (id: number) => ApiClient.post(`/material-adjustments/${id}/approve`, {}),
-  reject: (id: number) => ApiClient.post(`/material-adjustments/${id}/reject`, {}),
-  complete: (id: number) => ApiClient.post(`/material-adjustments/${id}/complete`, {}),
+  approve: (id: number, body: any = {}) => ApiClient.post(`/material-adjustments/${id}/approve`, body),
+  reject: (id: number, body: any = {}) => ApiClient.post(`/material-adjustments/${id}/reject`, body),
+  complete: (id: number, body: any = {}) => ApiClient.post(`/material-adjustments/${id}/complete`, body),
 };
 
 // Project Management API

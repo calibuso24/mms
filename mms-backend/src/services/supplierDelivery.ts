@@ -7,6 +7,7 @@ import { PurchaseOrderRepository } from '../repositories/purchaseOrder.js';
 import { SupplierDeliveryRepository } from '../repositories/supplierDelivery.js';
 import {
   CreateSupplierDeliveryDto,
+  SupplierDeliveryItemMutationDto,
   SupplierDeliveryItemDto,
   SupplierDeliveryListQuery,
   UpdateSupplierDeliveryDto,
@@ -18,6 +19,8 @@ import {
   SupplierDeliveryListViewModel,
 } from '../modules/supplier_delivery/viewModels.js';
 import { SupplierDeliveryValidator } from '../modules/supplier_delivery/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
+import { TransactionLifecycleManager } from '../shared/transaction/lifecycle.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'supplier_delivery';
@@ -28,6 +31,12 @@ const STATUS_LOOKUP_TYPE = 'supplier_delivery_status';
 const DRAFT_STATUS_CODE = 'draft';
 const POSTED_STATUS_CODE = 'posted';
 const CANCELLED_STATUS_CODE = 'cancelled';
+const lifecycleManager = new TransactionLifecycleManager({
+  moduleName: 'Supplier Delivery',
+  transitions: {
+    draft: ['posted', 'cancelled'],
+  },
+});
 
 export class SupplierDeliveryService {
   private repository = new SupplierDeliveryRepository();
@@ -155,6 +164,8 @@ export class SupplierDeliveryService {
     if (!existing) {
       throw new NotFoundError('Supplier Delivery not found');
     }
+
+    assertOptimisticConcurrency('Supplier Delivery', dto.expected_updated_at, existing.updated_at);
 
     if (existing.status_code !== DRAFT_STATUS_CODE) {
       throw new ConflictError('Only draft supplier deliveries can be updated');
@@ -288,15 +299,14 @@ export class SupplierDeliveryService {
     }
   }
 
-  async postSupplierDelivery(id: number, actorAccountId?: number): Promise<SupplierDeliveryDetailViewModel> {
+  async postSupplierDelivery(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<SupplierDeliveryDetailViewModel> {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundError('Supplier Delivery not found');
     }
 
-    if (existing.status_code !== DRAFT_STATUS_CODE) {
-      throw new ConflictError('Only draft supplier deliveries can be posted');
-    }
+    assertOptimisticConcurrency('Supplier Delivery', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, POSTED_STATUS_CODE);
 
     const client = await pool.connect();
     const transactionId = randomUUID();
@@ -330,15 +340,14 @@ export class SupplierDeliveryService {
     }
   }
 
-  async cancelSupplierDelivery(id: number, actorAccountId?: number): Promise<SupplierDeliveryDetailViewModel> {
+  async cancelSupplierDelivery(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<SupplierDeliveryDetailViewModel> {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundError('Supplier Delivery not found');
     }
 
-    if (existing.status_code !== DRAFT_STATUS_CODE) {
-      throw new ConflictError('Only draft supplier deliveries can be cancelled');
-    }
+    assertOptimisticConcurrency('Supplier Delivery', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, CANCELLED_STATUS_CODE);
 
     const cancelledStatus = await this.requireLookupByCode(STATUS_LOOKUP_TYPE, CANCELLED_STATUS_CODE, 'status_id');
     const client = await pool.connect();
@@ -376,6 +385,186 @@ export class SupplierDeliveryService {
     }
   }
 
+  async addSupplierDeliveryItem(
+    deliveryId: number,
+    dto: SupplierDeliveryItemMutationDto,
+    actorAccountId?: number
+  ): Promise<SupplierDeliveryDetailViewModel> {
+    SupplierDeliveryValidator.validateItem(dto);
+
+    const delivery = await this.repository.findById(deliveryId);
+    if (!delivery) {
+      throw new NotFoundError('Supplier Delivery not found');
+    }
+    this.assertDeliveryMutable(delivery.status_code);
+
+    const [normalized] = await this.validateAndNormalizeItems(delivery.purchase_order_id, [dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      const created = await this.repository.createItem(deliveryId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'supplier_delivery',
+          entityId: deliveryId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'ADD',
+            supplier_delivery_item_id: created.supplier_delivery_item_id,
+            purchase_order_item_id: normalized.purchase_order_item_id,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Supplier Delivery item added',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getSupplierDelivery(deliveryId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateSupplierDeliveryItem(
+    deliveryId: number,
+    itemId: number,
+    dto: SupplierDeliveryItemMutationDto,
+    actorAccountId?: number
+  ): Promise<SupplierDeliveryDetailViewModel> {
+    SupplierDeliveryValidator.validateItem(dto);
+
+    const delivery = await this.repository.findById(deliveryId);
+    if (!delivery) {
+      throw new NotFoundError('Supplier Delivery not found');
+    }
+    this.assertDeliveryMutable(delivery.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Supplier Delivery item not found');
+    }
+
+    const items = await this.repository.findItemsByDeliveryId(deliveryId);
+    const belongsToDelivery = items.some((row) => row.supplier_delivery_item_id === itemId);
+    if (!belongsToDelivery) {
+      throw new ConflictError('Item does not belong to the supplier delivery');
+    }
+
+    assertOptimisticConcurrency('Supplier Delivery item', dto.expected_updated_at, item.updated_at);
+
+    const [normalized] = await this.validateAndNormalizeItems(delivery.purchase_order_id, [dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.updateItem(itemId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'supplier_delivery',
+          entityId: deliveryId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'UPDATE',
+            supplier_delivery_item_id: itemId,
+            purchase_order_item_id: normalized.purchase_order_item_id,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Supplier Delivery item updated',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getSupplierDelivery(deliveryId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteSupplierDeliveryItem(
+    deliveryId: number,
+    itemId: number,
+    expectedUpdatedAt: string | null | undefined,
+    actorAccountId?: number
+  ): Promise<SupplierDeliveryDetailViewModel> {
+    const delivery = await this.repository.findById(deliveryId);
+    if (!delivery) {
+      throw new NotFoundError('Supplier Delivery not found');
+    }
+    this.assertDeliveryMutable(delivery.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Supplier Delivery item not found');
+    }
+
+    const items = await this.repository.findItemsByDeliveryId(deliveryId);
+    const belongsToDelivery = items.some((row) => row.supplier_delivery_item_id === itemId);
+    if (!belongsToDelivery) {
+      throw new ConflictError('Item does not belong to the supplier delivery');
+    }
+
+    assertOptimisticConcurrency('Supplier Delivery item', expectedUpdatedAt, item.updated_at);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.softDeleteItem(itemId, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'supplier_delivery',
+          entityId: deliveryId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'DELETE',
+            supplier_delivery_item_id: itemId,
+            purchase_order_item_id: item.purchase_order_item_id,
+            material_id: item.material_id,
+          },
+          transactionId,
+          notes: 'Supplier Delivery item deleted',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getSupplierDelivery(deliveryId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   private async validateAndNormalizeItems(purchaseOrderId: number, items: SupplierDeliveryItemDto[]) {
     const poItems = await this.purchaseOrderRepository.findItemsByOrderId(purchaseOrderId);
     const poItemMap = new Map(poItems.map((item) => [item.purchase_order_item_id, item]));
@@ -405,6 +594,12 @@ export class SupplierDeliveryService {
         notes: item.notes ?? null,
       };
     });
+  }
+
+  private assertDeliveryMutable(statusCode: string): void {
+    if (statusCode !== DRAFT_STATUS_CODE) {
+      throw new ConflictError('Only draft supplier deliveries can be modified');
+    }
   }
 
   private async requireLookupByCode(lookupType: string, code: string, fieldName: string) {
@@ -474,6 +669,7 @@ export class SupplierDeliveryService {
       rejected_quantity: row.rejected_quantity,
       stock_movement_id: row.stock_movement_id,
       notes: row.notes,
+      updated_at: row.updated_at ?? null,
     };
   }
 }

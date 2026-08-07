@@ -36,6 +36,7 @@ export interface MaterialAdjustmentItemViewModel {
   adjustment_quantity: string;
   resulting_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export interface MaterialAdjustmentDetailViewModel extends MaterialAdjustmentListItemViewModel {

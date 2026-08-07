@@ -128,6 +128,7 @@ export class PurchaseOrderController {
                 ? null
                 : Number(req.body.total_amount),
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
           items: Array.isArray(req.body.items)
             ? req.body.items.map((item: any) => ({
                 material_request_item_id:
@@ -164,6 +165,120 @@ export class PurchaseOrderController {
     }
   }
 
+  async addPurchaseOrderItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid purchase order ID');
+      }
+
+      const result = await this.service.addPurchaseOrderItem(
+        id,
+        {
+          material_request_item_id:
+            req.body.material_request_item_id === undefined || req.body.material_request_item_id === null || req.body.material_request_item_id === ''
+              ? null
+              : Number(req.body.material_request_item_id),
+          material_id: Number(req.body.material_id),
+          requested_quantity: Number(req.body.requested_quantity),
+          ordered_quantity: Number(req.body.ordered_quantity),
+          received_quantity:
+            req.body.received_quantity === undefined || req.body.received_quantity === null || req.body.received_quantity === ''
+              ? 0
+              : Number(req.body.received_quantity),
+          uom_id: Number(req.body.uom_id),
+          unit_price:
+            req.body.unit_price === undefined || req.body.unit_price === null || req.body.unit_price === ''
+              ? null
+              : Number(req.body.unit_price),
+          line_total:
+            req.body.line_total === undefined || req.body.line_total === null || req.body.line_total === ''
+              ? null
+              : Number(req.body.line_total),
+          supplier_reference: req.body.supplier_reference ?? null,
+          notes: req.body.notes ?? null,
+        },
+        req.accountId
+      );
+
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePurchaseOrderItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid purchase order ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid purchase order item ID');
+      }
+
+      const result = await this.service.updatePurchaseOrderItem(
+        id,
+        itemId,
+        {
+          material_request_item_id:
+            req.body.material_request_item_id === undefined || req.body.material_request_item_id === null || req.body.material_request_item_id === ''
+              ? null
+              : Number(req.body.material_request_item_id),
+          material_id: Number(req.body.material_id),
+          requested_quantity: Number(req.body.requested_quantity),
+          ordered_quantity: Number(req.body.ordered_quantity),
+          received_quantity:
+            req.body.received_quantity === undefined || req.body.received_quantity === null || req.body.received_quantity === ''
+              ? 0
+              : Number(req.body.received_quantity),
+          uom_id: Number(req.body.uom_id),
+          unit_price:
+            req.body.unit_price === undefined || req.body.unit_price === null || req.body.unit_price === ''
+              ? null
+              : Number(req.body.unit_price),
+          line_total:
+            req.body.line_total === undefined || req.body.line_total === null || req.body.line_total === ''
+              ? null
+              : Number(req.body.line_total),
+          supplier_reference: req.body.supplier_reference ?? null,
+          notes: req.body.notes ?? null,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
+        },
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deletePurchaseOrderItem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (Number.isNaN(id)) {
+        throw new ValidationError('Invalid purchase order ID');
+      }
+      if (Number.isNaN(itemId)) {
+        throw new ValidationError('Invalid purchase order item ID');
+      }
+
+      const result = await this.service.deletePurchaseOrderItem(
+        id,
+        itemId,
+        req.body?.expected_updated_at ?? undefined,
+        req.accountId
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deletePurchaseOrder(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);
@@ -185,7 +300,7 @@ export class PurchaseOrderController {
         throw new ValidationError('Invalid purchase order ID');
       }
 
-      res.json(await this.service.approvePurchaseOrder(id, req.accountId));
+      res.json(await this.service.approvePurchaseOrder(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }
@@ -198,7 +313,7 @@ export class PurchaseOrderController {
         throw new ValidationError('Invalid purchase order ID');
       }
 
-      res.json(await this.service.cancelPurchaseOrder(id, req.accountId));
+      res.json(await this.service.cancelPurchaseOrder(id, req.accountId, req.body?.expected_updated_at ?? undefined));
     } catch (error) {
       next(error);
     }

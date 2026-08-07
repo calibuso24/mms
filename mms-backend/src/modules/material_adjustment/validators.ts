@@ -1,6 +1,41 @@
 import { ValidationError } from '../../utils/errors.js';
 
 export class MaterialAdjustmentValidator {
+  static validateItem(data: {
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    system_quantity: number;
+    adjustment_quantity: number;
+    resulting_quantity: number;
+    notes?: string | null;
+  }) {
+    const errors: string[] = [];
+
+    if (!Number.isInteger(data.material_id) || data.material_id <= 0) {
+      errors.push('Material is required');
+    }
+    if (data.material_brand_id !== undefined && data.material_brand_id !== null && (!Number.isInteger(data.material_brand_id) || data.material_brand_id <= 0)) {
+      errors.push('Material brand must be a positive integer');
+    }
+    if (!Number.isInteger(data.uom_id) || data.uom_id <= 0) {
+      errors.push('Unit of measure is required');
+    }
+    if (!Number.isFinite(data.system_quantity)) {
+      errors.push('System quantity is required');
+    }
+    if (!Number.isFinite(data.adjustment_quantity)) {
+      errors.push('Adjustment quantity is required');
+    }
+    if (!Number.isFinite(data.resulting_quantity)) {
+      errors.push('Resulting quantity is required');
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationError(errors.join('; '));
+    }
+  }
+
   static validateCreate(data: {
     project_id: number;
     requested_at?: string | null;

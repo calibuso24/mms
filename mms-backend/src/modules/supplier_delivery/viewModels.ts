@@ -41,6 +41,7 @@ export interface SupplierDeliveryItemViewModel {
   rejected_quantity: string;
   stock_movement_id: number | null;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export interface SupplierDeliveryAdviceViewModel {

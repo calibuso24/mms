@@ -93,6 +93,7 @@ export class MaterialControlController {
                 : Number(req.body.total_estimated_cost),
           status_id: req.body.status_id !== undefined ? Number(req.body.status_id) : undefined,
           notes: req.body.notes !== undefined ? req.body.notes ?? null : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
         },
         req.accountId
       );
@@ -213,6 +214,7 @@ export class MaterialControlController {
                 : Number(req.body.estimated_total_cost),
           remarks: req.body.remarks !== undefined ? req.body.remarks ?? null : undefined,
           line_no: req.body.line_no !== undefined ? Number(req.body.line_no) : undefined,
+          expected_updated_at: req.body.expected_updated_at ?? undefined,
         },
         req.accountId
       );
@@ -230,7 +232,7 @@ export class MaterialControlController {
         throw new ValidationError('Invalid material control item ID');
       }
 
-      await this.service.deleteMaterialControlItem(id, req.accountId);
+      await this.service.deleteMaterialControlItem(id, req.accountId, req.body?.expected_updated_at ?? undefined);
       res.json({ message: 'Material Control Item deleted successfully' });
     } catch (error) {
       next(error);

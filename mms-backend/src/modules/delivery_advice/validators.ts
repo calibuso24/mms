@@ -1,6 +1,38 @@
 import { ValidationError } from '../../utils/errors.js';
 
 export class DeliveryAdviceValidator {
+  static validateItem(data: {
+    purchase_order_item_id?: number | null;
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    advised_quantity: number;
+    received_quantity?: number;
+    notes?: string | null;
+  }) {
+    const errors: string[] = [];
+
+    if (data.purchase_order_item_id !== undefined && data.purchase_order_item_id !== null && (!Number.isInteger(data.purchase_order_item_id) || data.purchase_order_item_id <= 0)) {
+      errors.push('Purchase order item must be a positive integer');
+    }
+    if (!Number.isInteger(data.material_id) || data.material_id <= 0) {
+      errors.push('Material is required');
+    }
+    if (!Number.isInteger(data.uom_id) || data.uom_id <= 0) {
+      errors.push('Unit of measure is required');
+    }
+    if (!Number.isFinite(data.advised_quantity) || data.advised_quantity <= 0) {
+      errors.push('Advised quantity must be greater than zero');
+    }
+    if (data.received_quantity !== undefined && data.received_quantity !== null && (!Number.isFinite(data.received_quantity) || data.received_quantity < 0)) {
+      errors.push('Received quantity must be a non-negative number');
+    }
+
+    if (errors.length > 0) {
+      throw new ValidationError(errors.join('; '));
+    }
+  }
+
   static validateCreate(data: {
     purchase_order_id: number;
     reference_code: string;

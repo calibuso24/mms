@@ -96,6 +96,7 @@ interface MaterialAdjustmentListItem {
   adjustment_reason_name: string | null;
   notes: string | null;
   item_count: number;
+  updated_at: string | null;
 }
 
 interface MaterialAdjustmentItem {
@@ -109,6 +110,7 @@ interface MaterialAdjustmentItem {
   adjustment_quantity: string;
   resulting_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 interface MaterialAdjustmentDetail extends MaterialAdjustmentListItem {
@@ -118,6 +120,7 @@ interface MaterialAdjustmentDetail extends MaterialAdjustmentListItem {
 interface ItemForm {
   row_id: string;
   material_adjustment_item_id?: number;
+  updated_at?: string | null;
   material_id: string;
   description: string;
   specification: string;
@@ -140,6 +143,7 @@ interface FormState {
 const emptyItem = (): ItemForm => ({
   row_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   material_adjustment_item_id: undefined,
+  updated_at: null,
   material_id: '',
   description: '',
   specification: '',
@@ -204,6 +208,7 @@ export default function MaterialAdjustmentPage() {
   const [viewItem, setViewItem] = useState<MaterialAdjustmentDetail | null>(null);
   const [deleteItem, setDeleteItem] = useState<MaterialAdjustmentListItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
   const canView = permissionSet.has('Inventory Adjustment:VIEW');
@@ -238,6 +243,7 @@ export default function MaterialAdjustmentPage() {
   useEffect(() => {
     if (routeMode === 'new') {
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setError('');
       return;
@@ -250,6 +256,7 @@ export default function MaterialAdjustmentPage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -312,6 +319,7 @@ export default function MaterialAdjustmentPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     setForm(emptyForm());
     navigate(`${baseRoute}/new`);
   };
@@ -320,6 +328,7 @@ export default function MaterialAdjustmentPage() {
     setEditingId(materialAdjustmentId);
     try {
       const detail: MaterialAdjustmentDetail = await materialAdjustmentApi.get(materialAdjustmentId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         project_id: detail.project_id.toString(),
         requested_at: detail.requested_at ? detail.requested_at.slice(0, 10) : '',
@@ -329,6 +338,7 @@ export default function MaterialAdjustmentPage() {
           ? detail.items.map((row) => ({
               row_id: `${Date.now()}-${row.material_adjustment_item_id}`,
               material_adjustment_item_id: row.material_adjustment_item_id,
+              updated_at: row.updated_at ?? null,
               material_id: row.material_id.toString(),
               description: row.material_name,
               specification: '',
@@ -406,12 +416,20 @@ export default function MaterialAdjustmentPage() {
     setError('');
 
     try {
-      const payload = {
+      const payload: any = {
         project_id: Number(form.project_id),
         requested_at: form.requested_at || null,
         adjustment_reason_id: form.adjustment_reason_id ? Number(form.adjustment_reason_id) : null,
         notes: form.notes.trim() || null,
-        items: form.items
+      };
+
+      if (editingId) {
+        payload.expected_updated_at = editingVersion ?? undefined;
+        const updated = await materialAdjustmentApi.update(editingId, payload);
+        setEditingVersion(updated?.updated_at ?? editingVersion);
+        setSuccess('Material Adjustment updated');
+      } else {
+        payload.items = form.items
           .filter((item) => item.material_id && item.uom_id && item.system_quantity !== '' && item.adjustment_quantity !== '' && item.resulting_quantity !== '')
           .map((item) => ({
             material_id: Number(item.material_id),
@@ -420,18 +438,13 @@ export default function MaterialAdjustmentPage() {
             adjustment_quantity: Number(item.adjustment_quantity),
             resulting_quantity: Number(item.resulting_quantity),
             notes: item.notes || null,
-          })),
-      };
-
-      if (editingId) {
-        await materialAdjustmentApi.update(editingId, payload);
-        setSuccess('Material Adjustment updated');
-      } else {
+          }));
         await materialAdjustmentApi.create(payload);
         setSuccess('Material Adjustment created');
       }
 
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       navigate(baseRoute);
       await loadItems();
@@ -464,10 +477,10 @@ export default function MaterialAdjustmentPage() {
 
     try {
       const next = action === 'approve'
-        ? await materialAdjustmentApi.approve(viewItem.material_adjustment_id)
+        ? await materialAdjustmentApi.approve(viewItem.material_adjustment_id, { expected_updated_at: viewItem.updated_at })
         : action === 'reject'
-          ? await materialAdjustmentApi.reject(viewItem.material_adjustment_id)
-          : await materialAdjustmentApi.complete(viewItem.material_adjustment_id);
+          ? await materialAdjustmentApi.reject(viewItem.material_adjustment_id, { expected_updated_at: viewItem.updated_at })
+          : await materialAdjustmentApi.complete(viewItem.material_adjustment_id, { expected_updated_at: viewItem.updated_at });
       setViewItem(next);
       setSuccess(`Material Adjustment ${action} successful`);
       await loadItems();
@@ -558,6 +571,73 @@ export default function MaterialAdjustmentPage() {
     }
 
     return nextRow;
+  };
+
+  const toDetailPayload = (row: ItemForm) => ({
+    material_id: Number(row.material_id),
+    uom_id: Number(row.uom_id),
+    system_quantity: Number(row.system_quantity),
+    adjustment_quantity: Number(row.adjustment_quantity),
+    resulting_quantity: Number(row.resulting_quantity),
+    notes: row.notes || null,
+  });
+
+  const handleDetailRowCommitted = async (newRow: ItemForm, oldRow: ItemForm): Promise<ItemForm> => {
+    if (!editingId) {
+      return newRow;
+    }
+
+    const rowErrors = validateDetailRow(newRow, form.items.map((item) => (item.row_id === oldRow.row_id ? newRow : item)));
+    if (Object.keys(rowErrors).length > 0) {
+      return newRow;
+    }
+
+    if (
+      !newRow.material_id
+      || !newRow.uom_id
+      || newRow.system_quantity === ''
+      || newRow.adjustment_quantity === ''
+      || newRow.resulting_quantity === ''
+    ) {
+      return newRow;
+    }
+
+    if (newRow.material_adjustment_item_id) {
+      const detail = await materialAdjustmentApi.updateItem(editingId, newRow.material_adjustment_item_id, {
+        ...toDetailPayload(newRow),
+        expected_updated_at: oldRow.updated_at ?? null,
+      });
+
+      const savedItem = Array.isArray(detail?.items)
+        ? detail.items.find((item: MaterialAdjustmentItem) => item.material_adjustment_item_id === newRow.material_adjustment_item_id)
+        : null;
+
+      return {
+        ...newRow,
+        updated_at: savedItem?.updated_at ?? newRow.updated_at ?? null,
+      };
+    }
+
+    const detail = await materialAdjustmentApi.addItem(editingId, toDetailPayload(newRow));
+    const createdItem = Array.isArray(detail?.items)
+      ? [...detail.items].sort((a: MaterialAdjustmentItem, b: MaterialAdjustmentItem) => b.material_adjustment_item_id - a.material_adjustment_item_id)[0]
+      : null;
+
+    return {
+      ...newRow,
+      material_adjustment_item_id: createdItem?.material_adjustment_item_id,
+      updated_at: createdItem?.updated_at ?? null,
+    };
+  };
+
+  const handleDetailRowDelete = async (row: ItemForm): Promise<void> => {
+    if (!editingId || !row.material_adjustment_item_id) {
+      return;
+    }
+
+    await materialAdjustmentApi.deleteItem(editingId, row.material_adjustment_item_id, {
+      expected_updated_at: row.updated_at ?? null,
+    });
   };
 
   return (
@@ -769,6 +849,8 @@ export default function MaterialAdjustmentPage() {
               createRow={emptyItem}
               getRowId={(row) => row.row_id}
               processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+              onRowUpdateCommitted={handleDetailRowCommitted}
+              onRowDelete={handleDetailRowDelete}
               validateRow={validateDetailRow}
               shouldConfirmDelete={(row) => Boolean(row.material_adjustment_item_id)}
               getDeleteConfirmMessage={() => 'Delete this saved detail row?'}

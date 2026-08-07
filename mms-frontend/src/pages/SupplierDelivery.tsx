@@ -106,6 +106,7 @@ interface SupplierDeliveryListItem {
   notes: string | null;
   item_count: number;
   created_at: string | null;
+  updated_at: string | null;
 }
 
 interface SupplierDeliveryItem {
@@ -121,6 +122,7 @@ interface SupplierDeliveryItem {
   accepted_quantity: string;
   rejected_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 interface SupplierDeliveryDetail extends SupplierDeliveryListItem {
@@ -131,6 +133,7 @@ interface SupplierDeliveryDetail extends SupplierDeliveryListItem {
 interface DeliveryItemForm {
   row_id: string;
   supplier_delivery_item_id?: number;
+  updated_at?: string | null;
   purchase_order_item_id: string;
   material_label: string;
   uom_label: string;
@@ -235,6 +238,7 @@ export default function SupplierDeliveryPage() {
   const [viewItem, setViewItem] = useState<SupplierDeliveryDetail | null>(null);
   const [deleteItem, setDeleteItem] = useState<SupplierDeliveryListItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
 
   const [poItems, setPoItems] = useState<PurchaseOrderDetailItem[]>([]);
 
@@ -268,6 +272,7 @@ export default function SupplierDeliveryPage() {
   useEffect(() => {
     if (routeMode === 'new') {
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setError('');
       return;
@@ -280,6 +285,7 @@ export default function SupplierDeliveryPage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -373,6 +379,7 @@ export default function SupplierDeliveryPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditingVersion(null);
     setForm(emptyForm());
     navigate(`${baseRoute}/new`);
   };
@@ -381,6 +388,7 @@ export default function SupplierDeliveryPage() {
     setEditingId(supplierDeliveryId);
     try {
       const detail: SupplierDeliveryDetail = await supplierDeliveryApi.get(supplierDeliveryId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         purchase_order_id: detail.purchase_order_id.toString(),
         supplier_id: detail.supplier_id.toString(),
@@ -393,6 +401,7 @@ export default function SupplierDeliveryPage() {
           ? detail.items.map((row) => ({
               row_id: `${Date.now()}-${row.supplier_delivery_item_id}`,
               supplier_delivery_item_id: row.supplier_delivery_item_id,
+              updated_at: row.updated_at ?? null,
               purchase_order_item_id: row.purchase_order_item_id.toString(),
               material_label: `${row.material_code} - ${row.material_name}`,
               uom_label: row.uom_abbreviation,
@@ -500,37 +509,20 @@ export default function SupplierDeliveryPage() {
   };
 
   const submitForm = async () => {
-    const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
-    const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
-    if (firstError) {
-      setError(Object.values(firstError)[0]);
-      return;
+    if (!editingId) {
+      const rowErrors = form.items.map((row) => validateDetailRow(row, form.items));
+      const firstError = rowErrors.find((entry) => Object.keys(entry).length > 0);
+      if (firstError) {
+        setError(Object.values(firstError)[0]);
+        return;
+      }
     }
 
     setSaving(true);
     setError('');
 
     try {
-      const payloadItems = form.items
-        .filter((item) => item.purchase_order_item_id && item.delivered_quantity && item.accepted_quantity)
-        .map((item) => {
-          const poItem = poItems.find((row) => row.purchase_order_item_id === Number(item.purchase_order_item_id));
-          const delivered = Number(item.delivered_quantity);
-          const accepted = Number(item.accepted_quantity);
-          const rejected = item.rejected_quantity === '' ? delivered - accepted : Number(item.rejected_quantity);
-
-          return {
-            purchase_order_item_id: Number(item.purchase_order_item_id),
-            material_id: Number(poItem?.material_id),
-            uom_id: Number(poItem?.uom_id),
-            delivered_quantity: delivered,
-            accepted_quantity: accepted,
-            rejected_quantity: rejected,
-            notes: item.notes.trim() || null,
-          };
-        });
-
-      const payload = {
+      const payload: any = {
         purchase_order_id: Number(form.purchase_order_id),
         supplier_id: Number(form.supplier_id),
         project_id: Number(form.project_id),
@@ -538,11 +530,34 @@ export default function SupplierDeliveryPage() {
         reference_code: form.reference_code.trim() || null,
         notes: form.notes.trim() || null,
         delivery_advice_ids: parseDeliveryAdviceIds(form.delivery_advice_ids),
-        items: payloadItems,
       };
 
       if (editingId) {
-        await supplierDeliveryApi.update(editingId, payload);
+        payload.expected_updated_at = editingVersion ?? undefined;
+      } else {
+        payload.items = form.items
+          .filter((item) => item.purchase_order_item_id && item.delivered_quantity && item.accepted_quantity)
+          .map((item) => {
+            const poItem = poItems.find((row) => row.purchase_order_item_id === Number(item.purchase_order_item_id));
+            const delivered = Number(item.delivered_quantity);
+            const accepted = Number(item.accepted_quantity);
+            const rejected = item.rejected_quantity === '' ? delivered - accepted : Number(item.rejected_quantity);
+
+            return {
+              purchase_order_item_id: Number(item.purchase_order_item_id),
+              material_id: Number(poItem?.material_id),
+              uom_id: Number(poItem?.uom_id),
+              delivered_quantity: delivered,
+              accepted_quantity: accepted,
+              rejected_quantity: rejected,
+              notes: item.notes.trim() || null,
+            };
+          });
+      }
+
+      if (editingId) {
+        const updated = await supplierDeliveryApi.update(editingId, payload);
+        setEditingVersion(updated?.updated_at ?? editingVersion);
         setSuccess('Supplier Delivery updated');
       } else {
         await supplierDeliveryApi.create(payload);
@@ -550,6 +565,7 @@ export default function SupplierDeliveryPage() {
       }
 
       setEditingId(null);
+  setEditingVersion(null);
       setForm(emptyForm());
       navigate(baseRoute);
       await loadItems();
@@ -581,8 +597,8 @@ export default function SupplierDeliveryPage() {
 
     try {
       const next = action === 'post'
-        ? await supplierDeliveryApi.post(viewItem.supplier_delivery_id)
-        : await supplierDeliveryApi.cancel(viewItem.supplier_delivery_id);
+        ? await supplierDeliveryApi.post(viewItem.supplier_delivery_id, { expected_updated_at: viewItem.updated_at })
+        : await supplierDeliveryApi.cancel(viewItem.supplier_delivery_id, { expected_updated_at: viewItem.updated_at });
 
       setViewItem(next);
       setSuccess(action === 'post' ? 'Supplier Delivery posted' : 'Supplier Delivery cancelled');
@@ -678,6 +694,80 @@ export default function SupplierDeliveryPage() {
     }
 
     return nextRow;
+  };
+
+  const toDetailPayload = (row: DeliveryItemForm) => {
+    const poItem = poItems.find((item) => item.purchase_order_item_id === Number(row.purchase_order_item_id));
+    const delivered = Number(row.delivered_quantity);
+    const accepted = Number(row.accepted_quantity);
+    const rejected = row.rejected_quantity === '' ? delivered - accepted : Number(row.rejected_quantity);
+
+    return {
+      purchase_order_item_id: Number(row.purchase_order_item_id),
+      material_id: Number(poItem?.material_id),
+      uom_id: Number(poItem?.uom_id),
+      delivered_quantity: delivered,
+      accepted_quantity: accepted,
+      rejected_quantity: rejected,
+      notes: row.notes.trim() || null,
+    };
+  };
+
+  const handleDetailRowCommitted = async (newRow: DeliveryItemForm, oldRow: DeliveryItemForm): Promise<DeliveryItemForm> => {
+    if (!editingId) {
+      return newRow;
+    }
+
+    const rowErrors = validateDetailRow(newRow, form.items.map((item) => (item.row_id === oldRow.row_id ? newRow : item)));
+    if (Object.keys(rowErrors).length > 0) {
+      return newRow;
+    }
+
+    if (!newRow.purchase_order_item_id || !newRow.delivered_quantity || !newRow.accepted_quantity) {
+      return newRow;
+    }
+
+    const poItem = poItems.find((item) => item.purchase_order_item_id === Number(newRow.purchase_order_item_id));
+    if (!poItem) {
+      return newRow;
+    }
+
+    if (newRow.supplier_delivery_item_id) {
+      const detail = await supplierDeliveryApi.updateItem(editingId, newRow.supplier_delivery_item_id, {
+        ...toDetailPayload(newRow),
+        expected_updated_at: oldRow.updated_at ?? null,
+      });
+
+      const savedItem = Array.isArray(detail?.items)
+        ? detail.items.find((item: SupplierDeliveryItem) => item.supplier_delivery_item_id === newRow.supplier_delivery_item_id)
+        : null;
+
+      return {
+        ...newRow,
+        updated_at: savedItem?.updated_at ?? newRow.updated_at ?? null,
+      };
+    }
+
+    const detail = await supplierDeliveryApi.addItem(editingId, toDetailPayload(newRow));
+    const createdItem = Array.isArray(detail?.items)
+      ? [...detail.items].sort((a: SupplierDeliveryItem, b: SupplierDeliveryItem) => b.supplier_delivery_item_id - a.supplier_delivery_item_id)[0]
+      : null;
+
+    return {
+      ...newRow,
+      supplier_delivery_item_id: createdItem?.supplier_delivery_item_id,
+      updated_at: createdItem?.updated_at ?? null,
+    };
+  };
+
+  const handleDetailRowDelete = async (row: DeliveryItemForm): Promise<void> => {
+    if (!editingId || !row.supplier_delivery_item_id) {
+      return;
+    }
+
+    await supplierDeliveryApi.deleteItem(editingId, row.supplier_delivery_item_id, {
+      expected_updated_at: row.updated_at ?? null,
+    });
   };
 
   return (
@@ -1012,6 +1102,8 @@ export default function SupplierDeliveryPage() {
             createRow={emptyItem}
             getRowId={(row) => row.row_id}
             processRowUpdate={(newRow) => processDetailRowUpdate(newRow)}
+            onRowUpdateCommitted={handleDetailRowCommitted}
+            onRowDelete={handleDetailRowDelete}
             validateRow={validateDetailRow}
             shouldConfirmDelete={(row) => Boolean(row.supplier_delivery_item_id)}
             getDeleteConfirmMessage={() => 'Delete this saved detail row?'}

@@ -42,6 +42,7 @@ export interface PurchaseOrderItemViewModel {
   line_total: string | null;
   supplier_reference: string | null;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export interface PurchaseOrderDetailViewModel extends PurchaseOrderListItemViewModel {

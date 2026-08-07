@@ -21,6 +21,7 @@ import {
   MaterialControlListViewModel,
 } from '../modules/material_control/viewModels.js';
 import { MaterialControlItemValidator, MaterialControlValidator } from '../modules/material_control/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'material_control';
@@ -155,6 +156,8 @@ export class MaterialControlService {
     if (!existing) {
       throw new NotFoundError('Material Control not found');
     }
+
+    assertOptimisticConcurrency('Material Control', dto.expected_updated_at, existing.updated_at);
 
     if (dto.project_id !== undefined) {
       const project = await this.partyRepository.findById(dto.project_id);
@@ -351,6 +354,8 @@ export class MaterialControlService {
       throw new NotFoundError('Material Control Item not found');
     }
 
+    assertOptimisticConcurrency('Material Control item', dto.expected_updated_at, existing.updated_at);
+
     const client = await pool.connect();
     const transactionId = randomUUID();
 
@@ -398,11 +403,13 @@ export class MaterialControlService {
     }
   }
 
-  async deleteMaterialControlItem(id: number, deletedByAccountId?: number): Promise<void> {
+  async deleteMaterialControlItem(id: number, deletedByAccountId?: number, expectedUpdatedAt?: string | null): Promise<void> {
     const existing = await this.itemRepository.findById(id);
     if (!existing) {
       throw new NotFoundError('Material Control Item not found');
     }
+
+    assertOptimisticConcurrency('Material Control item', expectedUpdatedAt, existing.updated_at);
 
     const client = await pool.connect();
     const transactionId = randomUUID();

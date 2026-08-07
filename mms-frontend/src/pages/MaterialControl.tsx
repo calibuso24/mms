@@ -88,6 +88,7 @@ interface FormState {
 
 interface DetailRow {
   material_control_item_id?: number;
+  updated_at?: string | null;
   material_id: string;
   material_code?: string;
   material_name?: string;
@@ -170,6 +171,7 @@ export default function MaterialControlPage() {
   const [viewItem, setViewItem] = useState<MaterialControlItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<MaterialControlItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [editingVersion, setEditingVersion] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -238,6 +240,7 @@ export default function MaterialControlPage() {
   useEffect(() => {
     if (routeMode === 'new') {
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setDetailRows([]);
       resetDetailForm();
@@ -253,6 +256,7 @@ export default function MaterialControlPage() {
 
     if (routeMode === 'list') {
       setEditingId(null);
+      setEditingVersion(null);
     }
   }, [routeMode, routeEditId]);
 
@@ -352,6 +356,7 @@ export default function MaterialControlPage() {
         Array.isArray(result?.items)
           ? result.items.map((row: any) => ({
               material_control_item_id: row.material_control_item_id,
+              updated_at: row.updated_at ?? null,
               material_id: row.material_id?.toString() || '',
               material_code: row.material_code,
               material_name: row.material_name,
@@ -373,6 +378,7 @@ export default function MaterialControlPage() {
   };
 
   const openCreate = () => {
+    setEditingVersion(null);
     navigate(`${baseRoute}/new`);
   };
 
@@ -389,6 +395,7 @@ export default function MaterialControlPage() {
     resetDetailForm();
     try {
       const detail = await materialControlApi.get(materialControlId);
+      setEditingVersion(detail.updated_at ?? null);
       setForm({
         project_id: detail.project_id.toString(),
         control_code: detail.control_code,
@@ -447,7 +454,18 @@ export default function MaterialControlPage() {
     setDetailError('');
   };
 
-  const handleRemoveDetailRow = (index: number) => {
+  const handleRemoveDetailRow = async (index: number) => {
+    const rowToDelete = detailRows[index];
+    if (!rowToDelete) {
+      return;
+    }
+
+    if (editingId && rowToDelete.material_control_item_id) {
+      await materialControlItemApi.delete(rowToDelete.material_control_item_id, {
+        expected_updated_at: rowToDelete.updated_at ?? null,
+      });
+    }
+
     setDetailRows((current) => current.filter((_, itemIndex) => itemIndex !== index));
     if (editingDetailIndex === index) {
       resetDetailForm();
@@ -456,7 +474,7 @@ export default function MaterialControlPage() {
     }
   };
 
-  const handleSaveDetailRow = () => {
+  const handleSaveDetailRow = async () => {
     if (!detailForm.material_id || !detailForm.estimated_quantity || !detailForm.uom_id) {
       setDetailError('Material, quantity, and unit of measure are required');
       return;
@@ -472,6 +490,76 @@ export default function MaterialControlPage() {
       remarks: detailForm.remarks,
       line_no: normalizedLineNo,
     };
+
+    if (editingId) {
+      const payload = {
+        material_control_id: editingId,
+        material_id: Number(nextRow.material_id),
+        estimated_quantity: Number(nextRow.estimated_quantity),
+        uom_id: Number(nextRow.uom_id),
+        estimated_unit_cost: nextRow.estimated_unit_cost === '' ? null : Number(nextRow.estimated_unit_cost),
+        estimated_total_cost: nextRow.estimated_total_cost === '' ? null : Number(nextRow.estimated_total_cost),
+        remarks: nextRow.remarks.trim() || null,
+        line_no: Number(nextRow.line_no),
+      };
+
+      if (editingDetailIndex === null) {
+        const created = await materialControlItemApi.create(payload);
+        setDetailRows((current) => ([
+          ...current,
+          {
+            material_control_item_id: created.material_control_item_id,
+            updated_at: created.updated_at ?? null,
+            material_id: created.material_id?.toString() || nextRow.material_id,
+            material_code: created.material_code,
+            material_name: created.material_name,
+            estimated_quantity: created.estimated_quantity ?? nextRow.estimated_quantity,
+            uom_id: created.uom_id?.toString() || nextRow.uom_id,
+            uom_name: created.uom_name,
+            uom_abbreviation: created.uom_abbreviation,
+            estimated_unit_cost: created.estimated_unit_cost ?? nextRow.estimated_unit_cost,
+            estimated_total_cost: created.estimated_total_cost ?? nextRow.estimated_total_cost,
+            remarks: created.remarks ?? nextRow.remarks,
+            line_no: created.line_no?.toString() || nextRow.line_no,
+          },
+        ]));
+      } else {
+        const original = detailRows[editingDetailIndex];
+        if (!original?.material_control_item_id) {
+          throw new Error('Material Control item could not be identified for update');
+        }
+
+        const updated = await materialControlItemApi.update(original.material_control_item_id, {
+          ...payload,
+          expected_updated_at: original.updated_at ?? null,
+        });
+
+        setDetailRows((current) => current.map((row, index) => {
+          if (index !== editingDetailIndex) {
+            return row;
+          }
+
+          return {
+            ...row,
+            material_id: updated.material_id?.toString() || nextRow.material_id,
+            material_code: updated.material_code,
+            material_name: updated.material_name,
+            estimated_quantity: updated.estimated_quantity ?? nextRow.estimated_quantity,
+            uom_id: updated.uom_id?.toString() || nextRow.uom_id,
+            uom_name: updated.uom_name,
+            uom_abbreviation: updated.uom_abbreviation,
+            estimated_unit_cost: updated.estimated_unit_cost ?? nextRow.estimated_unit_cost,
+            estimated_total_cost: updated.estimated_total_cost ?? nextRow.estimated_total_cost,
+            remarks: updated.remarks ?? nextRow.remarks,
+            line_no: updated.line_no?.toString() || nextRow.line_no,
+            updated_at: updated.updated_at ?? row.updated_at ?? null,
+          };
+        }));
+      }
+
+      resetDetailForm();
+      return;
+    }
 
     if (editingDetailIndex === null) {
       setDetailRows((current) => [...current, nextRow]);
@@ -498,7 +586,11 @@ export default function MaterialControlPage() {
 
       let savedControl: any;
       if (editingId) {
-        savedControl = await materialControlApi.update(editingId, payload);
+        savedControl = await materialControlApi.update(editingId, {
+          ...payload,
+          expected_updated_at: editingVersion ?? undefined,
+        });
+        setEditingVersion(savedControl?.updated_at ?? editingVersion);
       } else {
         savedControl = await materialControlApi.create(payload);
       }
@@ -508,33 +600,28 @@ export default function MaterialControlPage() {
         throw new Error('Material Control could not be saved');
       }
 
-      if (editingId) {
-        const existingItemsResult = await materialControlItemApi.list(100, 0, { material_control_id: editingId });
-        const existingItems = Array.isArray(existingItemsResult?.items) ? existingItemsResult.items : [];
-        for (const item of existingItems) {
-          await materialControlItemApi.delete(item.material_control_item_id);
-        }
-      }
+      if (!editingId) {
+        for (const row of detailRows) {
+          if (!row.material_id || !row.estimated_quantity || !row.uom_id) {
+            continue;
+          }
 
-      for (const row of detailRows) {
-        if (!row.material_id || !row.estimated_quantity || !row.uom_id) {
-          continue;
+          await materialControlItemApi.create({
+            material_control_id: controlId,
+            material_id: Number(row.material_id),
+            estimated_quantity: Number(row.estimated_quantity),
+            uom_id: Number(row.uom_id),
+            estimated_unit_cost: row.estimated_unit_cost === '' ? null : Number(row.estimated_unit_cost),
+            estimated_total_cost: row.estimated_total_cost === '' ? null : Number(row.estimated_total_cost),
+            remarks: row.remarks.trim() || null,
+            line_no: Number(row.line_no || String(detailRows.indexOf(row) + 1)),
+          });
         }
-
-        await materialControlItemApi.create({
-          material_control_id: controlId,
-          material_id: Number(row.material_id),
-          estimated_quantity: Number(row.estimated_quantity),
-          uom_id: Number(row.uom_id),
-          estimated_unit_cost: row.estimated_unit_cost === '' ? null : Number(row.estimated_unit_cost),
-          estimated_total_cost: row.estimated_total_cost === '' ? null : Number(row.estimated_total_cost),
-          remarks: row.remarks.trim() || null,
-          line_no: Number(row.line_no || String(detailRows.indexOf(row) + 1)),
-        });
       }
 
       setSuccess(editingId ? 'Material Control updated' : 'Material Control created');
       setEditingId(null);
+      setEditingVersion(null);
       setForm(emptyForm());
       setDetailRows([]);
       resetDetailForm();
@@ -578,7 +665,10 @@ export default function MaterialControlPage() {
     }
 
     try {
-      await materialControlApi.update(viewItem.material_control_id, { status_id: statusId });
+      await materialControlApi.update(viewItem.material_control_id, {
+        status_id: statusId,
+        expected_updated_at: viewItem.updated_at,
+      });
       setSuccess(`Material Control marked as ${statusLabelMap[statusCode] || statusCode}`);
       setViewOpen(false);
       await loadItems();
@@ -1057,7 +1147,7 @@ export default function MaterialControlPage() {
                     </Grid>
                     <Grid item xs={12}>
                       <Stack direction="row" spacing={1}>
-                        <Button variant="contained" onClick={handleSaveDetailRow}>
+                        <Button variant="contained" onClick={() => void handleSaveDetailRow()}>
                           {editingDetailIndex === null ? 'Add Item' : 'Update Item'}
                         </Button>
                         {editingDetailIndex !== null && (
@@ -1099,7 +1189,7 @@ export default function MaterialControlPage() {
                                   <IconButton size="small" onClick={() => handleEditDetailRow(index)}>
                                     <EditIcon fontSize="small" />
                                   </IconButton>
-                                  <IconButton size="small" onClick={() => handleRemoveDetailRow(index)}>
+                                  <IconButton size="small" onClick={() => void handleRemoveDetailRow(index)}>
                                     <DeleteIcon fontSize="small" />
                                   </IconButton>
                                 </Stack>

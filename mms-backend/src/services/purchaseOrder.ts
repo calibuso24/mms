@@ -9,6 +9,7 @@ import { MaterialRequestRepository } from '../repositories/materialRequest.js';
 import { PurchaseOrderRepository } from '../repositories/purchaseOrder.js';
 import {
   CreatePurchaseOrderDto,
+  PurchaseOrderItemMutationDto,
   PurchaseOrderItemDto,
   PurchaseOrderListQuery,
   UpdatePurchaseOrderDto,
@@ -20,6 +21,8 @@ import {
   PurchaseOrderListViewModel,
 } from '../modules/purchase_order/viewModels.js';
 import { PurchaseOrderValidator } from '../modules/purchase_order/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
+import { TransactionLifecycleManager } from '../shared/transaction/lifecycle.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'purchase_order';
@@ -31,8 +34,14 @@ const TYPE_LOOKUP_TYPE = 'purchase_order_type';
 const DRAFT_STATUS_CODE = 'draft';
 const APPROVED_STATUS_CODE = 'approved';
 const CANCELLED_STATUS_CODE = 'cancelled';
-const CANCELLABLE_STATUS_CODES = new Set(['draft', 'approved']);
 const IMMUTABLE_STATUS_CODES = new Set(['approved', 'partially_delivered', 'delivered', 'cancelled']);
+const lifecycleManager = new TransactionLifecycleManager({
+  moduleName: 'Purchase Order',
+  transitions: {
+    draft: ['approved', 'cancelled'],
+    approved: ['cancelled'],
+  },
+});
 
 export class PurchaseOrderService {
   private repository = new PurchaseOrderRepository();
@@ -163,6 +172,8 @@ export class PurchaseOrderService {
     if (!existing) {
       throw new NotFoundError('Purchase Order not found');
     }
+
+    assertOptimisticConcurrency('Purchase Order', dto.expected_updated_at, existing.updated_at);
 
     if (IMMUTABLE_STATUS_CODES.has(existing.status_code)) {
       throw new ConflictError('Only draft purchase orders can be updated');
@@ -295,31 +306,241 @@ export class PurchaseOrderService {
     }
   }
 
-  async approvePurchaseOrder(id: number, actorAccountId?: number): Promise<PurchaseOrderDetailViewModel> {
-    return this.transitionStatus(id, APPROVED_STATUS_CODE, actorAccountId);
+  async approvePurchaseOrder(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<PurchaseOrderDetailViewModel> {
+    return this.transitionStatus(id, APPROVED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  async cancelPurchaseOrder(id: number, actorAccountId?: number): Promise<PurchaseOrderDetailViewModel> {
-    return this.transitionStatus(id, CANCELLED_STATUS_CODE, actorAccountId);
+  async cancelPurchaseOrder(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<PurchaseOrderDetailViewModel> {
+    return this.transitionStatus(id, CANCELLED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  private async transitionStatus(id: number, statusCode: string, actorAccountId?: number): Promise<PurchaseOrderDetailViewModel> {
+  async addPurchaseOrderItem(
+    orderId: number,
+    dto: PurchaseOrderItemMutationDto,
+    actorAccountId?: number
+  ): Promise<PurchaseOrderDetailViewModel> {
+    PurchaseOrderValidator.validateItem(dto);
+
+    const order = await this.repository.findById(orderId);
+    if (!order) {
+      throw new NotFoundError('Purchase Order not found');
+    }
+    if (IMMUTABLE_STATUS_CODES.has(order.status_code)) {
+      throw new ConflictError('Only draft purchase orders can be modified');
+    }
+
+    const requestContext = await this.loadRequestContext(order.material_request_id ?? null);
+    const [normalized] = await this.validateAndNormalizeItems([dto], requestContext?.itemMap);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      const created = await this.repository.createItem(orderId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+      const items = await this.repository.findItemsByOrderId(orderId, client);
+      const totalAmount = this.calculateTotalAmount(items.map((item) => ({ line_total: item.line_total } as PurchaseOrderItemDto)));
+
+      await this.repository.updateHeader(
+        orderId,
+        { total_amount: totalAmount },
+        actorAccountId ?? null,
+        MODULE_NAME,
+        client
+      );
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'purchase_order',
+          entityId: orderId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'ADD',
+            purchase_order_item_id: created.purchase_order_item_id,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Purchase Order item added',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getPurchaseOrder(orderId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updatePurchaseOrderItem(
+    orderId: number,
+    itemId: number,
+    dto: PurchaseOrderItemMutationDto,
+    actorAccountId?: number
+  ): Promise<PurchaseOrderDetailViewModel> {
+    PurchaseOrderValidator.validateItem(dto);
+
+    const order = await this.repository.findById(orderId);
+    if (!order) {
+      throw new NotFoundError('Purchase Order not found');
+    }
+    if (IMMUTABLE_STATUS_CODES.has(order.status_code)) {
+      throw new ConflictError('Only draft purchase orders can be modified');
+    }
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Purchase Order item not found');
+    }
+
+    const items = await this.repository.findItemsByOrderId(orderId);
+    const belongsToOrder = items.some((row) => row.purchase_order_item_id === itemId);
+    if (!belongsToOrder) {
+      throw new ConflictError('Item does not belong to the purchase order');
+    }
+
+    assertOptimisticConcurrency('Purchase Order item', dto.expected_updated_at, item.updated_at);
+
+    const requestContext = await this.loadRequestContext(order.material_request_id ?? null);
+    const [normalized] = await this.validateAndNormalizeItems([dto], requestContext?.itemMap);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.updateItem(itemId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      const refreshedItems = await this.repository.findItemsByOrderId(orderId, client);
+      const totalAmount = this.calculateTotalAmount(refreshedItems.map((row) => ({ line_total: row.line_total } as PurchaseOrderItemDto)));
+
+      await this.repository.updateHeader(
+        orderId,
+        { total_amount: totalAmount },
+        actorAccountId ?? null,
+        MODULE_NAME,
+        client
+      );
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'purchase_order',
+          entityId: orderId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'UPDATE',
+            purchase_order_item_id: itemId,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Purchase Order item updated',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getPurchaseOrder(orderId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deletePurchaseOrderItem(
+    orderId: number,
+    itemId: number,
+    expectedUpdatedAt: string | null | undefined,
+    actorAccountId?: number
+  ): Promise<PurchaseOrderDetailViewModel> {
+    const order = await this.repository.findById(orderId);
+    if (!order) {
+      throw new NotFoundError('Purchase Order not found');
+    }
+    if (IMMUTABLE_STATUS_CODES.has(order.status_code)) {
+      throw new ConflictError('Only draft purchase orders can be modified');
+    }
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Purchase Order item not found');
+    }
+
+    const items = await this.repository.findItemsByOrderId(orderId);
+    const belongsToOrder = items.some((row) => row.purchase_order_item_id === itemId);
+    if (!belongsToOrder) {
+      throw new ConflictError('Item does not belong to the purchase order');
+    }
+
+    assertOptimisticConcurrency('Purchase Order item', expectedUpdatedAt, item.updated_at);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.softDeleteItem(itemId, actorAccountId ?? null, MODULE_NAME, client);
+
+      const refreshedItems = await this.repository.findItemsByOrderId(orderId, client);
+      const totalAmount = this.calculateTotalAmount(refreshedItems.map((row) => ({ line_total: row.line_total } as PurchaseOrderItemDto)));
+
+      await this.repository.updateHeader(
+        orderId,
+        { total_amount: totalAmount },
+        actorAccountId ?? null,
+        MODULE_NAME,
+        client
+      );
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'purchase_order',
+          entityId: orderId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'DELETE',
+            purchase_order_item_id: itemId,
+            material_id: item.material_id,
+          },
+          transactionId,
+          notes: 'Purchase Order item deleted',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getPurchaseOrder(orderId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async transitionStatus(
+    id: number,
+    statusCode: string,
+    actorAccountId?: number,
+    expectedUpdatedAt?: string | null
+  ): Promise<PurchaseOrderDetailViewModel> {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundError('Purchase Order not found');
     }
 
-    if (statusCode === APPROVED_STATUS_CODE && existing.status_code !== DRAFT_STATUS_CODE) {
-      throw new ConflictError('Only draft purchase orders can be approved');
-    }
-
-    if (statusCode === CANCELLED_STATUS_CODE && !CANCELLABLE_STATUS_CODES.has(existing.status_code)) {
-      throw new ConflictError('Only draft or approved purchase orders can be cancelled');
-    }
-
-    if (statusCode === CANCELLED_STATUS_CODE && existing.status_code === CANCELLED_STATUS_CODE) {
-      throw new ConflictError('Purchase Order is already cancelled');
-    }
+    assertOptimisticConcurrency('Purchase Order', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, statusCode);
 
     const status = await this.requireLookupByCode(STATUS_LOOKUP_TYPE, statusCode, 'status_id');
     const client = await pool.connect();
@@ -516,6 +737,7 @@ export class PurchaseOrderService {
       line_total: row.line_total ?? null,
       supplier_reference: row.supplier_reference ?? null,
       notes: row.notes ?? null,
+      updated_at: row.updated_at ?? null,
     };
   }
 

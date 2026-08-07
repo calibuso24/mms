@@ -8,6 +8,10 @@ export interface MaterialAdjustmentItemDto {
   notes?: string | null;
 }
 
+export interface MaterialAdjustmentItemMutationDto extends MaterialAdjustmentItemDto {
+  expected_updated_at?: string | null;
+}
+
 export interface CreateMaterialAdjustmentDto {
   project_id: number;
   requested_at?: string | null;
@@ -21,6 +25,7 @@ export interface UpdateMaterialAdjustmentDto {
   requested_at?: string | null;
   adjustment_reason_id?: number | null;
   notes?: string | null;
+  expected_updated_at?: string | null;
   items?: MaterialAdjustmentItemDto[];
 }
 

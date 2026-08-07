@@ -6,6 +6,7 @@ import { LookupRepository } from '../repositories/lookup.js';
 import { PurchaseOrderRepository } from '../repositories/purchaseOrder.js';
 import {
   CreateDeliveryAdviceDto,
+  DeliveryAdviceItemMutationDto,
   DeliveryAdviceItemDto,
   DeliveryAdviceListQuery,
   UpdateDeliveryAdviceDto,
@@ -17,6 +18,8 @@ import {
   DeliveryAdviceListViewModel,
 } from '../modules/delivery_advice/viewModels.js';
 import { DeliveryAdviceValidator } from '../modules/delivery_advice/validators.js';
+import { assertOptimisticConcurrency } from '../shared/transaction/concurrency.js';
+import { TransactionLifecycleManager } from '../shared/transaction/lifecycle.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
 
 const MODULE_NAME = 'delivery_advice';
@@ -25,6 +28,13 @@ const DRAFT_STATUS_CODE = 'draft';
 const SUBMITTED_STATUS_CODE = 'submitted';
 const COMPLETED_STATUS_CODE = 'completed';
 const CANCELLED_STATUS_CODE = 'cancelled';
+const lifecycleManager = new TransactionLifecycleManager({
+  moduleName: 'Delivery Advice',
+  transitions: {
+    draft: ['submitted', 'cancelled'],
+    submitted: ['completed', 'cancelled'],
+  },
+});
 
 export class DeliveryAdviceService {
   private repository = new DeliveryAdviceRepository();
@@ -130,6 +140,8 @@ export class DeliveryAdviceService {
     if (!existing) {
       throw new NotFoundError('Delivery Advice not found');
     }
+
+    assertOptimisticConcurrency('Delivery Advice', dto.expected_updated_at, existing.updated_at);
 
     if (existing.status_code !== DRAFT_STATUS_CODE) {
       throw new ConflictError('Only draft delivery advice records can be updated');
@@ -244,22 +256,197 @@ export class DeliveryAdviceService {
     }
   }
 
-  async submitDeliveryAdvice(id: number, actorAccountId?: number): Promise<DeliveryAdviceDetailViewModel> {
-    return this.transitionStatus(id, SUBMITTED_STATUS_CODE, actorAccountId);
+  async submitDeliveryAdvice(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<DeliveryAdviceDetailViewModel> {
+    return this.transitionStatus(id, SUBMITTED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
   }
 
-  async completeDeliveryAdvice(id: number, actorAccountId?: number): Promise<DeliveryAdviceDetailViewModel> {
-    return this.transitionStatus(id, COMPLETED_STATUS_CODE, actorAccountId, { setReceivedAt: true });
+  async completeDeliveryAdvice(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<DeliveryAdviceDetailViewModel> {
+    return this.transitionStatus(id, COMPLETED_STATUS_CODE, actorAccountId, expectedUpdatedAt, { setReceivedAt: true });
   }
 
-  async cancelDeliveryAdvice(id: number, actorAccountId?: number): Promise<DeliveryAdviceDetailViewModel> {
-    return this.transitionStatus(id, CANCELLED_STATUS_CODE, actorAccountId);
+  async cancelDeliveryAdvice(id: number, actorAccountId?: number, expectedUpdatedAt?: string | null): Promise<DeliveryAdviceDetailViewModel> {
+    return this.transitionStatus(id, CANCELLED_STATUS_CODE, actorAccountId, expectedUpdatedAt);
+  }
+
+  async addDeliveryAdviceItem(
+    adviceId: number,
+    dto: DeliveryAdviceItemMutationDto,
+    actorAccountId?: number
+  ): Promise<DeliveryAdviceDetailViewModel> {
+    DeliveryAdviceValidator.validateItem(dto);
+
+    const advice = await this.repository.findById(adviceId);
+    if (!advice) {
+      throw new NotFoundError('Delivery Advice not found');
+    }
+    this.assertAdviceMutable(advice.status_code);
+
+    const [normalized] = await this.validateAndNormalizeItems(advice.purchase_order_id, [dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      const created = await this.repository.createItem(adviceId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'delivery_advice',
+          entityId: adviceId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'ADD',
+            delivery_advice_item_id: created.delivery_advice_item_id,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Delivery Advice item added',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getDeliveryAdvice(adviceId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateDeliveryAdviceItem(
+    adviceId: number,
+    itemId: number,
+    dto: DeliveryAdviceItemMutationDto,
+    actorAccountId?: number
+  ): Promise<DeliveryAdviceDetailViewModel> {
+    DeliveryAdviceValidator.validateItem(dto);
+
+    const advice = await this.repository.findById(adviceId);
+    if (!advice) {
+      throw new NotFoundError('Delivery Advice not found');
+    }
+    this.assertAdviceMutable(advice.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Delivery Advice item not found');
+    }
+
+    const items = await this.repository.findItemsByAdviceId(adviceId);
+    const belongsToAdvice = items.some((row) => row.delivery_advice_item_id === itemId);
+    if (!belongsToAdvice) {
+      throw new ConflictError('Item does not belong to the delivery advice');
+    }
+
+    assertOptimisticConcurrency('Delivery Advice item', dto.expected_updated_at, item.updated_at);
+
+    const [normalized] = await this.validateAndNormalizeItems(advice.purchase_order_id, [dto]);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.updateItem(itemId, normalized, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'delivery_advice',
+          entityId: adviceId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'UPDATE',
+            delivery_advice_item_id: itemId,
+            material_id: normalized.material_id,
+          },
+          transactionId,
+          notes: 'Delivery Advice item updated',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getDeliveryAdvice(adviceId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteDeliveryAdviceItem(
+    adviceId: number,
+    itemId: number,
+    expectedUpdatedAt: string | null | undefined,
+    actorAccountId?: number
+  ): Promise<DeliveryAdviceDetailViewModel> {
+    const advice = await this.repository.findById(adviceId);
+    if (!advice) {
+      throw new NotFoundError('Delivery Advice not found');
+    }
+    this.assertAdviceMutable(advice.status_code);
+
+    const item = await this.repository.findItemById(itemId);
+    if (!item) {
+      throw new NotFoundError('Delivery Advice item not found');
+    }
+
+    const items = await this.repository.findItemsByAdviceId(adviceId);
+    const belongsToAdvice = items.some((row) => row.delivery_advice_item_id === itemId);
+    if (!belongsToAdvice) {
+      throw new ConflictError('Item does not belong to the delivery advice');
+    }
+
+    assertOptimisticConcurrency('Delivery Advice item', expectedUpdatedAt, item.updated_at);
+
+    const client = await pool.connect();
+    const transactionId = randomUUID();
+    try {
+      await client.query('BEGIN');
+
+      await this.repository.softDeleteItem(itemId, actorAccountId ?? null, MODULE_NAME, client);
+
+      await this.auditLogRepository.create(
+        {
+          entityTable: 'delivery_advice',
+          entityId: adviceId,
+          operation: 'UPDATE',
+          changedBy: actorAccountId ?? null,
+          changes: {
+            item_operation: 'DELETE',
+            delivery_advice_item_id: itemId,
+            material_id: item.material_id,
+          },
+          transactionId,
+          notes: 'Delivery Advice item deleted',
+          moduleName: MODULE_NAME,
+        },
+        client
+      );
+
+      await client.query('COMMIT');
+      return this.getDeliveryAdvice(adviceId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async transitionStatus(
     id: number,
     targetStatusCode: string,
     actorAccountId?: number,
+    expectedUpdatedAt?: string | null,
     options?: { setReceivedAt?: boolean }
   ): Promise<DeliveryAdviceDetailViewModel> {
     const existing = await this.repository.findById(id);
@@ -267,17 +454,8 @@ export class DeliveryAdviceService {
       throw new NotFoundError('Delivery Advice not found');
     }
 
-    if (targetStatusCode === SUBMITTED_STATUS_CODE && existing.status_code !== DRAFT_STATUS_CODE) {
-      throw new ConflictError('Only draft delivery advice records can be submitted');
-    }
-
-    if (targetStatusCode === COMPLETED_STATUS_CODE && existing.status_code !== SUBMITTED_STATUS_CODE) {
-      throw new ConflictError('Only submitted delivery advice records can be completed');
-    }
-
-    if (targetStatusCode === CANCELLED_STATUS_CODE && !new Set([DRAFT_STATUS_CODE, SUBMITTED_STATUS_CODE]).has(existing.status_code)) {
-      throw new ConflictError('Only draft or submitted delivery advice records can be cancelled');
-    }
+    assertOptimisticConcurrency('Delivery Advice', expectedUpdatedAt, existing.updated_at);
+    lifecycleManager.assertCanTransition(existing.status_code, targetStatusCode);
 
     const status = await this.requireLookupByCode(STATUS_LOOKUP_TYPE, targetStatusCode, 'status_id');
     const client = await pool.connect();
@@ -354,6 +532,12 @@ export class DeliveryAdviceService {
     });
   }
 
+  private assertAdviceMutable(statusCode: string): void {
+    if (statusCode !== DRAFT_STATUS_CODE) {
+      throw new ConflictError('Only draft delivery advice records can be modified');
+    }
+  }
+
   private async requireLookupByCode(lookupType: string, code: string, fieldName: string) {
     const lookup = await this.lookupRepository.findByTypeAndCode(lookupType, code);
     if (!lookup) {
@@ -402,6 +586,7 @@ export class DeliveryAdviceService {
       advised_quantity: row.advised_quantity,
       received_quantity: row.received_quantity,
       notes: row.notes,
+      updated_at: row.updated_at ?? null,
     };
   }
 }

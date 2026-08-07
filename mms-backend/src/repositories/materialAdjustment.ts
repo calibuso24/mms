@@ -41,6 +41,7 @@ export interface MaterialAdjustmentItemRow {
   adjustment_quantity: string;
   resulting_quantity: string;
   notes: string | null;
+  updated_at: string | null;
 }
 
 export class MaterialAdjustmentRepository {
@@ -142,7 +143,8 @@ export class MaterialAdjustmentRepository {
         mai.system_quantity::TEXT AS system_quantity,
         mai.adjustment_quantity::TEXT AS adjustment_quantity,
         mai.resulting_quantity::TEXT AS resulting_quantity,
-        mai.notes
+        mai.notes,
+        mai.log_date_updated AS updated_at
       FROM material_adjustment_item mai
       JOIN material m ON m.material_id = mai.material_id AND m.is_deleted = false
       JOIN unit_of_measure u ON u.uom_id = mai.uom_id AND u.is_deleted = false
@@ -307,6 +309,130 @@ export class MaterialAdjustmentRepository {
         ]
       );
     }
+  }
+
+  async findItemById(itemId: number, client?: PoolClient): Promise<MaterialAdjustmentItemRow | null> {
+    const result = await this.getExecutor(client).query(
+      `SELECT
+        mai.material_adjustment_item_id,
+        mai.material_id,
+        m.product_code AS material_code,
+        m.product_name AS material_name,
+        mai.material_brand_id,
+        b.brand_name AS material_brand_name,
+        mai.uom_id,
+        u.uom_name,
+        u.abbreviation AS uom_abbreviation,
+        mai.system_quantity::TEXT AS system_quantity,
+        mai.adjustment_quantity::TEXT AS adjustment_quantity,
+        mai.resulting_quantity::TEXT AS resulting_quantity,
+        mai.notes,
+        mai.log_date_updated AS updated_at
+      FROM material_adjustment_item mai
+      JOIN material m ON m.material_id = mai.material_id AND m.is_deleted = false
+      JOIN unit_of_measure u ON u.uom_id = mai.uom_id AND u.is_deleted = false
+      LEFT JOIN material_brand mb ON mb.material_brand_id = mai.material_brand_id AND mb.is_deleted = false
+      LEFT JOIN brand b ON b.brand_id = mb.brand_id AND b.is_deleted = false
+      WHERE mai.material_adjustment_item_id = $1
+        AND mai.is_deleted = false`,
+      [itemId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async createItem(materialAdjustmentId: number, item: {
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    system_quantity: number;
+    adjustment_quantity: number;
+    resulting_quantity: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<{ material_adjustment_item_id: number }> {
+    const result = await this.getExecutor(client).query(
+      `INSERT INTO material_adjustment_item (
+        material_adjustment_id,
+        material_id,
+        material_brand_id,
+        uom_id,
+        system_quantity,
+        adjustment_quantity,
+        resulting_quantity,
+        notes,
+        log_date_created,
+        log_created_by_account_id,
+        log_module_created
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
+      RETURNING material_adjustment_item_id`,
+      [
+        materialAdjustmentId,
+        item.material_id,
+        item.material_brand_id ?? null,
+        item.uom_id,
+        item.system_quantity,
+        item.adjustment_quantity,
+        item.resulting_quantity,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+  async updateItem(itemId: number, item: {
+    material_id: number;
+    material_brand_id?: number | null;
+    uom_id: number;
+    system_quantity: number;
+    adjustment_quantity: number;
+    resulting_quantity: number;
+    notes?: string | null;
+  }, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE material_adjustment_item
+       SET material_id = $2,
+           material_brand_id = $3,
+           uom_id = $4,
+           system_quantity = $5,
+           adjustment_quantity = $6,
+           resulting_quantity = $7,
+           notes = $8,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $9,
+           log_module_updated = $10
+       WHERE material_adjustment_item_id = $1
+         AND is_deleted = false`,
+      [
+        itemId,
+        item.material_id,
+        item.material_brand_id ?? null,
+        item.uom_id,
+        item.system_quantity,
+        item.adjustment_quantity,
+        item.resulting_quantity,
+        item.notes ?? null,
+        actorAccountId,
+        moduleName,
+      ]
+    );
+  }
+
+  async softDeleteItem(itemId: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
+    await this.getExecutor(client).query(
+      `UPDATE material_adjustment_item
+       SET is_deleted = true,
+           log_date_deleted = NOW(),
+           log_deleted_by_account_id = $2,
+           log_module_updated = $3,
+           log_date_updated = NOW(),
+           log_updated_by_account_id = $2
+       WHERE material_adjustment_item_id = $1
+         AND is_deleted = false`,
+      [itemId, actorAccountId, moduleName]
+    );
   }
 
   async softDelete(id: number, actorAccountId: number | null, moduleName: string, client?: PoolClient): Promise<void> {
