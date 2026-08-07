@@ -526,11 +526,13 @@ export default function StockTransferPage() {
     if (!viewItem) return;
 
     try {
+      const latest = await stockTransferApi.get(viewItem.stock_transfer_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const next = action === 'submit'
-        ? await stockTransferApi.submit(viewItem.stock_transfer_id, { expected_updated_at: viewItem.updated_at })
+        ? await stockTransferApi.submit(viewItem.stock_transfer_id, { expected_updated_at: expectedUpdatedAt })
         : action === 'approve'
-          ? await stockTransferApi.approve(viewItem.stock_transfer_id, { expected_updated_at: viewItem.updated_at })
-          : await stockTransferApi.cancel(viewItem.stock_transfer_id, { expected_updated_at: viewItem.updated_at });
+          ? await stockTransferApi.approve(viewItem.stock_transfer_id, { expected_updated_at: expectedUpdatedAt })
+          : await stockTransferApi.cancel(viewItem.stock_transfer_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(next);
       setSuccess(`Stock Transfer ${action} successful`);
       await loadItems();

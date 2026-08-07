@@ -596,9 +596,11 @@ export default function SupplierDeliveryPage() {
     if (!viewItem) return;
 
     try {
+      const latest = await supplierDeliveryApi.get(viewItem.supplier_delivery_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const next = action === 'post'
-        ? await supplierDeliveryApi.post(viewItem.supplier_delivery_id, { expected_updated_at: viewItem.updated_at })
-        : await supplierDeliveryApi.cancel(viewItem.supplier_delivery_id, { expected_updated_at: viewItem.updated_at });
+        ? await supplierDeliveryApi.post(viewItem.supplier_delivery_id, { expected_updated_at: expectedUpdatedAt })
+        : await supplierDeliveryApi.cancel(viewItem.supplier_delivery_id, { expected_updated_at: expectedUpdatedAt });
 
       setViewItem(next);
       setSuccess(action === 'post' ? 'Supplier Delivery posted' : 'Supplier Delivery cancelled');

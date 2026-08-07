@@ -75,6 +75,17 @@ export class MaterialAdjustmentRepository {
         OR p.party_code ILIKE $${queryParams.length}
         OR p.party_name ILIKE $${queryParams.length}
         OR ma.notes ILIKE $${queryParams.length}
+        OR EXISTS (
+          SELECT 1
+          FROM material_adjustment_item mai_search
+          JOIN material m_search ON m_search.material_id = mai_search.material_id AND m_search.is_deleted = false
+          WHERE mai_search.material_adjustment_id = ma.material_adjustment_id
+            AND mai_search.is_deleted = false
+            AND (
+              m_search.product_code ILIKE $${queryParams.length}
+              OR m_search.product_name ILIKE $${queryParams.length}
+            )
+        )
       )`);
     }
 

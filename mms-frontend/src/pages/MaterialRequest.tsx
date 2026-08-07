@@ -661,16 +661,18 @@ export default function MaterialRequestPage() {
   const transition = async (action: 'submit' | 'approve' | 'reject' | 'cancel' | 'close') => {
     if (!viewItem) return;
     try {
+      const latest = await materialRequestApi.get(viewItem.material_request_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const response =
         action === 'submit'
-          ? await materialRequestApi.submit(viewItem.material_request_id, { expected_updated_at: viewItem.updated_at })
+          ? await materialRequestApi.submit(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
           : action === 'approve'
-            ? await materialRequestApi.approve(viewItem.material_request_id, { expected_updated_at: viewItem.updated_at })
+            ? await materialRequestApi.approve(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
             : action === 'reject'
-              ? await materialRequestApi.reject(viewItem.material_request_id, { expected_updated_at: viewItem.updated_at })
+              ? await materialRequestApi.reject(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
               : action === 'cancel'
-                ? await materialRequestApi.cancel(viewItem.material_request_id, { expected_updated_at: viewItem.updated_at })
-                : await materialRequestApi.close(viewItem.material_request_id, { expected_updated_at: viewItem.updated_at });
+                ? await materialRequestApi.cancel(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt })
+                : await materialRequestApi.close(viewItem.material_request_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(response);
       setSuccess(`Material Request ${action}d`);
       await loadItems();

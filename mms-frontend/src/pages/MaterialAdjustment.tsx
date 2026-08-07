@@ -280,14 +280,14 @@ export default function MaterialAdjustmentPage() {
         projectApi.list(200, 0).catch(() => ({ items: [] })),
         lookupApi.listByType('material_adjustment_status', 100),
         lookupApi.listByType('material_adjustment_reason', 100),
-        materialApi.list(300, 0).catch(() => ({ items: [] })),
+        materialApi.list(300, 0).catch(() => []),
         uomApi.list(200, 0).catch(() => []),
       ]);
 
       setProjects(Array.isArray(projectData?.items) ? projectData.items : []);
       setStatuses(Array.isArray(statusData) ? statusData : []);
       setReasons(Array.isArray(reasonData) ? reasonData : []);
-      setMaterials(Array.isArray(materialData?.items) ? materialData.items : []);
+      setMaterials(Array.isArray(materialData) ? materialData : Array.isArray((materialData as any)?.items) ? (materialData as any).items : []);
       setUoms(Array.isArray(uomData) ? uomData : []);
     } catch (err: any) {
       setError(err.message || 'Failed to load lookup values');
@@ -476,11 +476,13 @@ export default function MaterialAdjustmentPage() {
     if (!viewItem) return;
 
     try {
+      const latest = await materialAdjustmentApi.get(viewItem.material_adjustment_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const next = action === 'approve'
-        ? await materialAdjustmentApi.approve(viewItem.material_adjustment_id, { expected_updated_at: viewItem.updated_at })
+        ? await materialAdjustmentApi.approve(viewItem.material_adjustment_id, { expected_updated_at: expectedUpdatedAt })
         : action === 'reject'
-          ? await materialAdjustmentApi.reject(viewItem.material_adjustment_id, { expected_updated_at: viewItem.updated_at })
-          : await materialAdjustmentApi.complete(viewItem.material_adjustment_id, { expected_updated_at: viewItem.updated_at });
+          ? await materialAdjustmentApi.reject(viewItem.material_adjustment_id, { expected_updated_at: expectedUpdatedAt })
+          : await materialAdjustmentApi.complete(viewItem.material_adjustment_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(next);
       setSuccess(`Material Adjustment ${action} successful`);
       await loadItems();
@@ -659,7 +661,7 @@ export default function MaterialAdjustmentPage() {
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="Search adjustment no, project, notes"
+                  placeholder="Search adjustment no, project, material, notes"
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   onKeyDown={(event) => {

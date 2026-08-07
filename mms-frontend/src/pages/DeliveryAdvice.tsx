@@ -461,11 +461,13 @@ export default function DeliveryAdvicePage() {
     if (!viewItem) return;
 
     try {
+      const latest = await deliveryAdviceApi.get(viewItem.delivery_advice_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const next = action === 'submit'
-        ? await deliveryAdviceApi.submit(viewItem.delivery_advice_id, { expected_updated_at: viewItem.updated_at })
+        ? await deliveryAdviceApi.submit(viewItem.delivery_advice_id, { expected_updated_at: expectedUpdatedAt })
         : action === 'complete'
-          ? await deliveryAdviceApi.complete(viewItem.delivery_advice_id, { expected_updated_at: viewItem.updated_at })
-          : await deliveryAdviceApi.cancel(viewItem.delivery_advice_id, { expected_updated_at: viewItem.updated_at });
+          ? await deliveryAdviceApi.complete(viewItem.delivery_advice_id, { expected_updated_at: expectedUpdatedAt })
+          : await deliveryAdviceApi.cancel(viewItem.delivery_advice_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(next);
       setSuccess(`Delivery Advice ${action} successful`);
       await loadItems();

@@ -334,11 +334,11 @@ export default function MaterialControlPage() {
     try {
       const [materialsData, uomsData] = await Promise.all([
         materialApi.list(100, 0).catch(() => ({ items: [] })),
-        uomApi.list(100, 0).catch(() => ({ items: [] })),
+        uomApi.list(100, 0).catch(() => []),
       ]);
 
       setDetailMaterials(Array.isArray(materialsData?.items) ? materialsData.items : []);
-      setDetailUoms(Array.isArray(uomsData?.items) ? uomsData.items : []);
+      setDetailUoms(Array.isArray(uomsData) ? uomsData : Array.isArray((uomsData as any)?.items) ? (uomsData as any).items : []);
     } catch (err: any) {
       setError(err.message || 'Failed to load detail lookups');
     }
@@ -665,9 +665,11 @@ export default function MaterialControlPage() {
     }
 
     try {
+      const latest = await materialControlApi.get(viewItem.material_control_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       await materialControlApi.update(viewItem.material_control_id, {
         status_id: statusId,
-        expected_updated_at: viewItem.updated_at,
+        expected_updated_at: expectedUpdatedAt,
       });
       setSuccess(`Material Control marked as ${statusLabelMap[statusCode] || statusCode}`);
       setViewOpen(false);

@@ -620,9 +620,11 @@ export default function PurchaseOrderPage() {
     setSaving(true);
     setError('');
     try {
+      const latest = await purchaseOrderApi.get(viewItem.purchase_order_id);
+      const expectedUpdatedAt = latest?.updated_at ?? viewItem.updated_at ?? undefined;
       const updated = action === 'approve'
-        ? await purchaseOrderApi.approve(viewItem.purchase_order_id, { expected_updated_at: viewItem.updated_at })
-        : await purchaseOrderApi.cancel(viewItem.purchase_order_id, { expected_updated_at: viewItem.updated_at });
+        ? await purchaseOrderApi.approve(viewItem.purchase_order_id, { expected_updated_at: expectedUpdatedAt })
+        : await purchaseOrderApi.cancel(viewItem.purchase_order_id, { expected_updated_at: expectedUpdatedAt });
       setViewItem(updated);
       setSuccess(action === 'approve' ? 'Purchase order approved' : 'Purchase order cancelled');
       await loadItems();

@@ -22,9 +22,16 @@ export function assertOptimisticConcurrency(
   }
 
   const expectedMs = parseTimestamp(expectedUpdatedAt, 'expected_updated_at');
-  const actualMs = parseTimestamp(actualUpdatedAt, 'updated_at');
+  const actualMs = parseTimestamp(String(actualUpdatedAt), 'updated_at');
 
-  if (expectedMs !== actualMs) {
-    throw new ConflictError(`${entityName} was updated by another user. Refresh and try again.`);
+  if (expectedMs === actualMs) {
+    return;
   }
+
+  // Accept second-level equality to avoid false conflicts caused by precision/representation differences.
+  if (Math.trunc(expectedMs / 1000) === Math.trunc(actualMs / 1000)) {
+    return;
+  }
+
+  throw new ConflictError(`${entityName} was updated by another user. Refresh and try again.`);
 }
