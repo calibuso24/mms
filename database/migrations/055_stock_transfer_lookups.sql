@@ -15,5 +15,5 @@ VALUES
     ('stock_transfer_status', 'submitted', 'Submitted', 'Stock transfer is submitted for approval.', 2, NULL, NULL),
     ('stock_transfer_status', 'approved', 'Approved', 'Stock transfer has been approved.', 3, NULL, NULL),
     ('stock_transfer_status', 'cancelled', 'Cancelled', 'Stock transfer was cancelled.', 4, NULL, NULL),
-    ('stock_transfer_type', 'warehouse_transfer', 'Warehouse Transfer', 'Standard warehouse transfer movement.', 5, NULL, NULL)
+    -- ('stock_transfer_type', 'warehouse_transfer', 'Warehouse Transfer', 'Standard warehouse transfer movement.', 5, NULL, NULL)
 ON CONFLICT (look_up_type, name) DO NOTHING;

@@ -212,7 +212,7 @@ export class DashboardRepository {
   }
 
   private async activeProjects(): Promise<number> {
-    return this.scalar(`SELECT COUNT(*) FROM party p JOIN look_up t ON t.look_up_id = p.party_type_id WHERE p.is_deleted = false AND t.look_up_type='party_type' AND t.code='project'`);
+    return this.scalar(`SELECT COUNT(*) FROM party p JOIN look_up t ON t.look_up_id = p.party_type_id WHERE p.is_deleted = false AND t.look_up_type='party_type' AND t.code='project' AND p.status_id = (SELECT look_up_id FROM look_up WHERE look_up_type = 'status' AND code = 'active')`);
   }
 
   private async partyTypeCount(code: string): Promise<number> {

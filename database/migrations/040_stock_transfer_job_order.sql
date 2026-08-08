@@ -10,9 +10,10 @@ INSERT INTO look_up (
     log_module_updated
 )
 VALUES
+    ('stock_transfer_type', 'delivery_receipt', 'Delivery Receipt', 'Delivery receipt recorded as stock transfer.', 1, NULL, NULL),
     ('stock_transfer_type', 'rts_warehouse', 'RTS Warehouse', 'Warehouse return transfer slip recorded as stock transfer.', 1, NULL, NULL),
-    ('stock_transfer_type', 'rts_supplier', 'RTS Supplier', 'Supplier return transfer slip recorded as return to supplier.', 2, NULL, NULL),
-    ('stock_transfer_type', 'job_order_delivery', 'Job Order Delivery', 'Job order delivery recorded as inventory movement for service work.', 3, NULL, NULL),
+    -- ('stock_transfer_type', 'rts_supplier', 'RTS Supplier', 'Supplier return transfer slip recorded as return to supplier.', 2, NULL, NULL),
+    -- ('stock_transfer_type', 'job_order_delivery', 'Job Order Delivery', 'Job order delivery recorded as inventory movement for service work.', 3, NULL, NULL),
     ('job_order_service_type', 'internal_service', 'Internal Service', 'Job order service performed by an internal shop.', 1, NULL, NULL),
     ('job_order_service_type', 'external_service', 'External Service', 'Job order service performed by an external service provider.', 2, NULL, NULL),
     ('job_order_status', 'pending', 'Pending', 'Job order is created and pending processing.', 1, NULL, NULL),

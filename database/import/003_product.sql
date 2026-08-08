@@ -223,6 +223,7 @@ INSERT INTO public.material (
     product_code,
     product_name,
     source_description,
+    full_description,
     status_id,
     category_id,
     sub_category_id,
@@ -239,6 +240,13 @@ SELECT DISTINCT
     a.productcode AS product_code,
     a.description AS product_name,
     NULLIF(BTRIM(a.description), '') AS source_description,
+    concat(
+        NULLIF(BTRIM(a.product_code), ''),
+        ' - ',
+        NULLIF(BTRIM(b.subcategory), ''),
+        ' ',
+        NULLIF(BTRIM(a.description), '')
+    ) AS full_description,
     CASE WHEN a.status = 1 THEN (SELECT look_up_id FROM look_up WHERE look_up_type = 'material_status' AND code = 'active') ELSE 
     (SELECT look_up_id FROM look_up WHERE look_up_type = 'material_status' AND code = 'inactive') END  AS status_id,
     a.category_id,
@@ -251,6 +259,7 @@ SELECT DISTINCT
     'import_product' AS log_module_created,
     'import_product' AS log_module_updated
 FROM source.tblproduct a
+LEFT JOIN source.tblsubcategory b ON a.subcategory = b.subcatid AND a.category = b.categoryid
 WHERE a.material_id IS NOT NULL 
 ;
 

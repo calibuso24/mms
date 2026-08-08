@@ -982,10 +982,10 @@ export default function MaterialsPage() {
             <TableHead>
               <TableRow sx={{ backgroundColor: '#F5F7FA' }}>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Product Code</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Product Name</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Full Description</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Category</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Sub Category</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Product Name</TableCell>
+                {/* <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Full Description</TableCell> */}
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Unit</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#0b2748' }}>Actions</TableCell>
@@ -995,10 +995,10 @@ export default function MaterialsPage() {
               {materials.map((material) => (
                 <TableRow key={material.material_id} sx={{ '&:hover': { backgroundColor: '#F5F7FA' } }}>
                   <TableCell>{material.product_code}</TableCell>
-                  <TableCell>{material.product_name}</TableCell>
-                  <TableCell>{material.full_description || '-'}</TableCell>
                   <TableCell>{material.category_name}</TableCell>
                   <TableCell>{material.sub_category_name || '-'}</TableCell>
+                  <TableCell>{material.product_name}</TableCell>
+                  {/* <TableCell>{material.full_description || '-'}</TableCell> */}
                   <TableCell>{material.uom_name}</TableCell>
                   <TableCell>
                     <Chip label={material.status_name} size="small" color="primary" variant="outlined" />

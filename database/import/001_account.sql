@@ -55,7 +55,7 @@ INSERT INTO account_role(account_id,role_id)
 SELECT DISTINCT a.account_id, r.role_id
 FROM source.tbluser a, role r
 WHERE a.logtype = 1
-AND r.role_code = 'ADMIN'
+AND r.role_code = 'SUPER_ADMIN'
 ;
 
 INSERT INTO account_role(account_id,role_id)

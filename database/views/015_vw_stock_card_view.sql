@@ -11,8 +11,8 @@ SELECT
     p.party_name,
 
     m.material_id,
-    p.party_code,
-    p.party_name,
+    m.product_code,
+    m.product_name,
     
     mb.material_brand_id,
     b.brand_name,
